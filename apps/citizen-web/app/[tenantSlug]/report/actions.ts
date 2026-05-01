@@ -10,7 +10,9 @@ export async function createReportAction(tenantSlug: string, formData: FormData)
   const phone = String(formData.get('phone') ?? '').trim();
   const email = String(formData.get('email') ?? '').trim();
 
-  if (description.length < 10) redirect(`/${tenantSlug}/report?error=description`);
+  if (description.length < 10) redirect(`/${tenantSlug}/report?error=description&field=description`);
+
+  let ticketNo: string;
 
   try {
     const ticket = await citizenApi.createTicket(tenantSlug, {
@@ -20,8 +22,10 @@ export async function createReportAction(tenantSlug: string, formData: FormData)
       phone: phone || undefined,
       email: email || undefined,
     });
-    redirect(`/${tenantSlug}/ticket/${ticket.ticketNo}`);
+    ticketNo = ticket.ticketNo;
   } catch {
     redirect(`/${tenantSlug}/report?error=api`);
   }
+
+  redirect(`/${tenantSlug}/ticket/${ticketNo}`);
 }
