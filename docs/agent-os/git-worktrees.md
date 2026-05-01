@@ -4,6 +4,8 @@ KentOS AI is initialized as a Git repository with GitHub remote `origin` at `htt
 
 Use worktrees for parallel Claude Code windows only after the branch you want to split from has a clean working tree and a committed baseline.
 
+If a wave branch was already merged into `master` and will be reused for a new wave, align it with current local `master` before editing. First run `git status --short --branch`, `git log --oneline --decorate -5`, and `git fetch origin`; if the branch is clean and behind local `master`, use `git merge master`. If the branch is dirty, stop and report the uncommitted files to the main control window before changing docs or code.
+
 ## Preflight
 
 Run this from the main workspace before creating or merging worktrees:
@@ -133,7 +135,11 @@ If UI routes, forms, auth/session, settings, ticket pages, or citizen report/tra
 
 ## Push gate
 
-Do not push from an agent window unless the user explicitly asks for it in that turn. Before any push:
+Do not push from an agent window unless the user explicitly asks for it in that turn. The team default is milestone-end push, not push-after-each-merge.
+
+After a local merge into `master`, it is acceptable for `master` to remain ahead of `origin/master` while the milestone continues. Record verification and merge notes locally, then wait for the main control window to decide when to publish.
+
+Before any push:
 
 - Confirm the branch being pushed.
 - Confirm local verification results.

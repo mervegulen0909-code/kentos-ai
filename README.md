@@ -70,6 +70,8 @@ pnpm db:generate
 
 For UI changes, start the relevant app and perform a browser/manual smoke check when possible.
 
+Do not push after every branch merge. Hold pushes until the milestone is complete unless the user explicitly asks for an earlier push.
+
 See [docs/workflows/local-smoke.md](docs/workflows/local-smoke.md) for local API smoke commands, [docs/workflows/browser-smoke.md](docs/workflows/browser-smoke.md) for manual browser-flow verification, and [docs/checklists/release-checklist.md](docs/checklists/release-checklist.md) for merge/release gates.
 
 ## Claude Code Agent OS

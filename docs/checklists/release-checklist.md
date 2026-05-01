@@ -7,6 +7,7 @@ Use this checklist before merging wave branches into `master` and before publish
 - [ ] Confirm `master` is the integration branch.
 - [ ] Confirm the GitHub remote is the expected repo: `origin https://github.com/filizgulen1966-tech/kentos-ai.git`.
 - [ ] Check `git status --short` and identify any uncommitted work before merging.
+- [ ] If reusing a branch that was already merged, align it with current local `master` before new edits.
 - [ ] Merge API/database/contracts branches first.
 - [ ] Merge frontend branches after the API shape they consume is merged.
 - [ ] Merge QA/docs/smoke branches after implementation branches so docs match final behavior.
@@ -71,7 +72,10 @@ Run browser smoke when admin or citizen UI routes, forms, auth/session, settings
 
 ## 7. Push gate
 
-Do not push unless the user explicitly asks for it.
+Do not push unless the user explicitly asks for it. The default team policy is milestone-end push, not push-after-each-merge.
+
+- [ ] It is acceptable for local `master` to be ahead of `origin/master` while a milestone is still in progress.
+- [ ] Record merge order and verification locally, then wait for the milestone-end push decision.
 
 Before push:
 

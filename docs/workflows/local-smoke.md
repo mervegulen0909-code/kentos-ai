@@ -10,8 +10,10 @@ The current smoke script verifies:
 - Demo admin login for tenant `demo-belediye`.
 - Authenticated tenant config reads for departments, categories, neighborhoods, SLA policies, and message templates.
 - Tenant settings write/read through authenticated admin API.
+- RBAC negative checks for settings writes and department-scoped ticket access.
 - Authenticated ticket create, assignment, internal note, public message, status transition, and audit-log read.
 - Public citizen ticket create and public-safe ticket tracking.
+- Public responses do not leak internal notes, audit logs, AI reasoning, tokens, or tenant internals.
 
 The smoke must not call non-local endpoints, send WhatsApp/email/social messages, deploy, push, or mutate production data.
 
@@ -58,6 +60,18 @@ curl http://127.0.0.1:3110/api/v1/health
 curl http://127.0.0.1:3110/api/v1/health/ready
 curl http://127.0.0.1:3110/api/docs
 ```
+
+## RBAC negative smoke
+
+Run this scope when auth, RBAC, tenant settings, ticket workflow, department scoping, seed roles, or public response boundaries change. The automated smoke should prove that:
+
+- A seeded read-only user can authenticate but cannot write tenant settings.
+- Department staff can see and mutate only tickets assigned to their department scope.
+- Cross-department ticket reads or mutations return a safe denial or not-found response.
+- Public ticket responses never include internal notes, audit entries, AI reasoning, staff-only IDs, secrets, or tokens.
+- Negative responses are explicit enough for QA diagnosis but do not expose stack traces or raw internal errors.
+
+If any RBAC negative case fails twice, stop and report the exact role, endpoint, expected denial, and actual response before changing any app code.
 
 ## Manual endpoint probes
 

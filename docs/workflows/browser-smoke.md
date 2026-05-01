@@ -65,6 +65,8 @@ Checklist:
 16. Update or disable that category.
 17. Create or update an SLA policy.
 18. Edit one message template and refresh the page to confirm persistence.
+19. Trigger at least one successful admin mutation and confirm the success notice is specific and visible after navigation or refresh when intended.
+20. Trigger one validation or authorization-style error path and confirm the error notice is actionable without exposing raw backend payloads.
 
 Admin expected markers:
 
@@ -87,6 +89,9 @@ Checklist:
 7. Open `http://127.0.0.1:3112/demo-belediye/track`.
 8. Enter the same ticket number and confirm navigation to the same public ticket page.
 9. Try an obviously invalid ticket number and confirm the error state is citizen-safe and helpful.
+10. Submit the tracking form with a missing ticket number and confirm inline copy explains what is required.
+11. Submit a malformed ticket number and confirm the format error is calm, Turkish-first, and does not leak lookup internals.
+12. Reopen the valid ticket page after the invalid states and confirm the successful state still renders correctly.
 
 Citizen expected markers:
 
@@ -102,6 +107,7 @@ During the smoke, also watch for:
 - Browser console errors on admin and citizen pages.
 - Failed network requests that are not expected validation failures.
 - Layout breakage on a narrow mobile viewport.
+- Mobile viewport quick check around 390px width for admin login/settings/ticket detail and citizen report/track/ticket pages.
 - Forms that submit twice, stay stuck in loading state, or lose validation feedback.
 - Focus-visible state and keyboard navigation for login, ticket forms, and settings forms.
 
