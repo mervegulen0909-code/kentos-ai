@@ -1,0 +1,407 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum ChannelType {
+  WHATSAPP
+  WEB_CHAT
+  CITIZEN_WEB
+  MOBILE_APP
+  OPERATOR
+}
+
+enum TicketStatus {
+  NEW
+  TRIAGED
+  ASSIGNED
+  IN_PROGRESS
+  WAITING_INFO
+  RESOLVED
+  CLOSED
+  REJECTED
+}
+
+enum TicketPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum MessageVisibility {
+  PUBLIC
+  INTERNAL
+}
+
+enum UserRole {
+  SUPER_ADMIN
+  TENANT_ADMIN
+  MANAGER
+  DEPARTMENT_STAFF
+  OPERATOR
+  READ_ONLY
+}
+
+enum AuditActorType {
+  USER
+  CITIZEN
+  AI
+  SYSTEM
+  WEBHOOK
+}
+
+model Tenant {
+  id               String   @id @default(cuid())
+  name             String
+  slug             String   @unique
+  timezone         String   @default("Europe/Istanbul")
+  locale           String   @default("tr-TR")
+  status           String   @default("ACTIVE")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  aiRuns           AiRun[]
+  auditLogs        AuditLog[]
+  categories       Category[]
+  channelEvents    ChannelEvent[]
+  citizens         Citizen[]
+  conversations    Conversation[]
+  departments      Department[]
+  managerReports   ManagerReport[]
+  messageTemplates MessageTemplate[]
+  neighborhoods    Neighborhood[]
+  slaPolicies      SlaPolicy[]
+  tickets          Ticket[]
+  users            User[]
+}
+
+model Department {
+  id          String   @id @default(cuid())
+  tenantId    String
+  name        String
+  code        String
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  categories  Category[]
+  slaPolicies SlaPolicy[]
+  tickets     Ticket[]
+  users       UserDepartment[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId, isActive])
+}
+
+model Category {
+  id              String         @id @default(cuid())
+  tenantId        String
+  departmentId    String?
+  name            String
+  code            String
+  description     String?
+  defaultPriority TicketPriority @default(NORMAL)
+  isActive        Boolean        @default(true)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  tenant          Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  department      Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  slaPolicies     SlaPolicy[]
+  tickets         Ticket[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId, departmentId])
+  @@index([tenantId, isActive])
+}
+
+model Neighborhood {
+  id             String  @id @default(cuid())
+  tenantId       String
+  name           String
+  code           String?
+  polygonGeoJson Json?
+  isActive       Boolean @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  tenant         Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tickets        Ticket[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId, isActive])
+}
+
+model SlaPolicy {
+  id                String         @id @default(cuid())
+  tenantId          String
+  departmentId      String?
+  categoryId        String?
+  priority          TicketPriority
+  responseMinutes   Int
+  resolutionMinutes Int
+  isActive          Boolean        @default(true)
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  tenant            Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  department        Department? @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  category          Category?   @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, departmentId, categoryId, priority])
+  @@index([tenantId, priority])
+  @@index([tenantId, departmentId, categoryId])
+}
+
+model MessageTemplate {
+  id        String       @id @default(cuid())
+  tenantId  String
+  key       String
+  channel   ChannelType?
+  locale    String       @default("tr-TR")
+  body      String
+  isActive  Boolean      @default(true)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  tenant    Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, key, locale])
+  @@index([tenantId, channel])
+}
+
+model User {
+  id           String   @id @default(cuid())
+  tenantId     String
+  email        String
+  passwordHash String
+  fullName     String
+  role         UserRole
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  tenant          Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  assignedTickets Ticket[]         @relation("AssignedTickets")
+  auditLogs       AuditLog[]
+  departments     UserDepartment[]
+
+  @@unique([tenantId, email])
+  @@index([tenantId, role, isActive])
+}
+
+model UserDepartment {
+  userId       String
+  departmentId String
+  createdAt    DateTime @default(now())
+
+  user          User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  department    Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+
+  @@id([userId, departmentId])
+}
+
+model Citizen {
+  id            String    @id @default(cuid())
+  tenantId      String
+  displayName   String?
+  phone         String?
+  email         String?
+  kvkkConsentAt DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  tenant        Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  conversations Conversation[]
+  tickets       Ticket[]
+
+  @@index([tenantId, phone])
+  @@index([tenantId, email])
+}
+
+model Ticket {
+  id                     String         @id @default(cuid())
+  tenantId               String
+  ticketNo               String
+  citizenId              String?
+  channel                ChannelType
+  status                 TicketStatus   @default(NEW)
+  priority               TicketPriority @default(NORMAL)
+  categoryId             String?
+  departmentId           String?
+  assignedToId           String?
+  neighborhoodId         String?
+  title                  String
+  description            String
+  addressText            String?
+  latitude               Decimal?       @db.Decimal(10, 7)
+  longitude              Decimal?       @db.Decimal(10, 7)
+  locationAccuracyMeters Int?
+  firstResponseDueAt     DateTime?
+  resolutionDueAt        DateTime?
+  firstRespondedAt       DateTime?
+  resolvedAt             DateTime?
+  closedAt               DateTime?
+  aiConfidence           Decimal?       @db.Decimal(4, 3)
+  aiClassification       Json?
+  duplicateOfTicketId    String?
+  createdAt              DateTime       @default(now())
+  updatedAt              DateTime       @updatedAt
+
+  tenant                 Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  assignedTo             User?         @relation("AssignedTickets", fields: [assignedToId], references: [id], onDelete: SetNull)
+  category               Category?     @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  citizen                Citizen?      @relation(fields: [citizenId], references: [id], onDelete: SetNull)
+  department             Department?   @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  neighborhood           Neighborhood? @relation(fields: [neighborhoodId], references: [id], onDelete: SetNull)
+  duplicateOfTicket      Ticket?       @relation("DuplicateTickets", fields: [duplicateOfTicketId], references: [id], onDelete: SetNull)
+  duplicates             Ticket[]      @relation("DuplicateTickets")
+  aiRuns                 AiRun[]
+  attachments            Attachment[]
+  auditLogs              AuditLog[]
+  messages               TicketMessage[]
+
+  @@unique([tenantId, ticketNo])
+  @@index([tenantId, status, priority])
+  @@index([tenantId, departmentId, status])
+  @@index([tenantId, resolutionDueAt])
+  @@index([tenantId, createdAt])
+}
+
+model TicketMessage {
+  id                String            @id @default(cuid())
+  tenantId          String
+  ticketId          String
+  senderType        AuditActorType
+  senderId          String?
+  visibility        MessageVisibility
+  body              String
+  channel           ChannelType?
+  externalMessageId String?
+  createdAt         DateTime          @default(now())
+
+  ticket            Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  attachments       Attachment[]
+
+  @@index([tenantId, ticketId, createdAt])
+}
+
+model Attachment {
+  id              String         @id @default(cuid())
+  tenantId        String
+  ticketId        String?
+  messageId       String?
+  fileName        String
+  mimeType        String
+  sizeBytes       Int
+  storageKey      String
+  publicUrl       String?
+  checksumSha256  String?
+  uploadedByType  AuditActorType
+  createdAt       DateTime       @default(now())
+
+  ticket          Ticket?        @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  message         TicketMessage? @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, ticketId])
+  @@index([tenantId, messageId])
+}
+
+model Conversation {
+  id                     String      @id @default(cuid())
+  tenantId               String
+  citizenId              String?
+  channel                ChannelType
+  externalConversationId String?
+  state                  String      @default("OPEN")
+  handoffRequested       Boolean     @default(false)
+  context                Json?
+  lastMessageAt          DateTime?
+  createdAt              DateTime    @default(now())
+  updatedAt              DateTime    @updatedAt
+
+  tenant                 Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  citizen                Citizen? @relation(fields: [citizenId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, channel, externalConversationId])
+  @@index([tenantId, handoffRequested])
+}
+
+model ChannelEvent {
+  id              String      @id @default(cuid())
+  tenantId        String
+  channel         ChannelType
+  provider        String
+  externalEventId String?
+  payload         Json
+  processedAt     DateTime?
+  createdAt       DateTime    @default(now())
+
+  tenant          Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, channel, createdAt])
+  @@index([tenantId, processedAt])
+}
+
+model AuditLog {
+  id          String         @id @default(cuid())
+  tenantId    String
+  ticketId    String?
+  actorType   AuditActorType
+  actorUserId String?
+  action      String
+  before      Json?
+  after       Json?
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime       @default(now())
+
+  tenant      Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  ticket      Ticket? @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  user        User?   @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, ticketId, createdAt])
+  @@index([tenantId, action, createdAt])
+}
+
+model AiRun {
+  id            String   @id @default(cuid())
+  tenantId      String
+  ticketId      String?
+  purpose       String
+  provider      String
+  model         String
+  promptVersion String
+  input         Json
+  output        Json
+  confidence    Decimal? @db.Decimal(4, 3)
+  latencyMs     Int?
+  createdAt     DateTime @default(now())
+
+  tenant        Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  ticket        Ticket? @relation(fields: [ticketId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, purpose, createdAt])
+}
+
+model ManagerReport {
+  id          String   @id @default(cuid())
+  tenantId    String
+  type        String
+  periodStart DateTime
+  periodEnd   DateTime
+  summary     String
+  metrics     Json
+  createdAt   DateTime @default(now())
+
+  tenant      Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, type, periodStart])
+}

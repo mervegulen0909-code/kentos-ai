@@ -1,0 +1,24 @@
+:root {
+  color-scheme: light;
+  --bg: oklch(96% 0.018 92);
+  --ink: oklch(21% 0.032 72);
+  --muted: oklch(48% 0.036 72);
+  --surface: oklch(100% 0 0);
+  --line: oklch(86% 0.028 86);
+  --accent: oklch(62% 0.17 38);
+  --green: oklch(62% 0.15 146);
+  font-family: Fraunces, Charter, Georgia, serif;
+}
+* { box-sizing: border-box; }
+body { margin: 0; min-height: 100dvh; color: var(--ink); background: radial-gradient(circle at 90% 10%, color-mix(in oklch, var(--accent) 18%, transparent), transparent 24rem), var(--bg); }
+button, input, textarea { font: inherit; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+.wrap { width: min(1120px, calc(100% - 32px)); margin: 0 auto; padding: 40px 0; }
+.hero { display: grid; grid-template-columns: 1.1fr .9fr; gap: 28px; align-items: start; }
+.display { font-size: clamp(3.5rem, 11vw, 11rem); line-height: .82; letter-spacing: -.07em; margin: 0; text-wrap: balance; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 28px; padding: clamp(22px, 4vw, 40px); box-shadow: 0 30px 80px oklch(35% 0.05 72 / 14%); }
+.field { display: grid; gap: 8px; margin-bottom: 16px; }
+.field label { font-weight: 700; }
+.field input, .field textarea { border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; background: oklch(98% 0.01 92); color: var(--ink); }
+.cta { min-height: 48px; border: 0; border-radius: 999px; background: var(--ink); color: white; padding: 0 22px; cursor: pointer; }
+@media (max-width: 800px) { .hero { grid-template-columns: 1fr; } }

@@ -1,0 +1,99 @@
+import { Inject, Injectable } from '@nestjs/common';
+import { TicketStatus } from '@kentos/database';
+import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
+import { PrismaService } from '../prisma/prisma.service.js';
+
+@Injectable()
+export class AnalyticsService {
+  constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
+
+  async overview(user: AuthenticatedUser) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const [totalOpen, openedToday, resolvedToday, byStatus, dueTickets] = await Promise.all([
+      this.prisma.ticket.count({
+        where: { tenantId: user.tenantId, status: { notIn: [TicketStatus.CLOSED, TicketStatus.REJECTED] } },
+      }),
+      this.prisma.ticket.count({ where: { tenantId: user.tenantId, createdAt: { gte: today } } }),
+      this.prisma.ticket.count({ where: { tenantId: user.tenantId, resolvedAt: { gte: today } } }),
+      this.prisma.ticket.groupBy({ by: ['status'], where: { tenantId: user.tenantId }, _count: { _all: true } }),
+      this.prisma.ticket.findMany({
+        where: {
+          tenantId: user.tenantId,
+          status: { notIn: [TicketStatus.RESOLVED, TicketStatus.CLOSED, TicketStatus.REJECTED] },
+          resolutionDueAt: { not: null },
+        },
+        select: { resolutionDueAt: true },
+      }),
+    ]);
+
+    const now = Date.now();
+
+    return {
+      totalOpen,
+      openedToday,
+      resolvedToday,
+      slaBreached: dueTickets.filter((ticket) => ticket.resolutionDueAt && ticket.resolutionDueAt.getTime() < now).length,
+      slaDueSoon: dueTickets.filter((ticket) => {
+        if (!ticket.resolutionDueAt) return false;
+        const diff = ticket.resolutionDueAt.getTime() - now;
+        return diff >= 0 && diff <= 4 * 60 * 60 * 1000;
+      }).length,
+      byStatus: byStatus.map((item) => ({ status: item.status, count: item._count._all })),
+    };
+  }
+
+  async departments(user: AuthenticatedUser) {
+    const departments = await this.prisma.department.findMany({
+      where: { tenantId: user.tenantId, isActive: true },
+      include: {
+        _count: {
+          select: {
+            tickets: {
+              where: { status: { notIn: [TicketStatus.CLOSED, TicketStatus.REJECTED] } },
+            },
+          },
+        },
+      },
+      orderBy: { name: 'asc' },
+    });
+
+    return departments.map((department) => ({
+      id: department.id,
+      name: department.name,
+      code: department.code,
+      openTickets: department._count.tickets,
+    }));
+  }
+
+  async categories(user: AuthenticatedUser) {
+    const categories = await this.prisma.category.findMany({
+      where: { tenantId: user.tenantId, isActive: true },
+      include: { _count: { select: { tickets: true } }, department: true },
+      orderBy: { name: 'asc' },
+    });
+
+    return categories.map((category) => ({
+      id: category.id,
+      name: category.name,
+      code: category.code,
+      departmentName: category.department?.name ?? null,
+      tickets: category._count.tickets,
+    }));
+  }
+
+  async neighborhoods(user: AuthenticatedUser) {
+    const neighborhoods = await this.prisma.neighborhood.findMany({
+      where: { tenantId: user.tenantId, isActive: true },
+      include: { _count: { select: { tickets: true } } },
+      orderBy: { name: 'asc' },
+    });
+
+    return neighborhoods.map((neighborhood) => ({
+      id: neighborhood.id,
+      name: neighborhood.name,
+      tickets: neighborhood._count.tickets,
+    }));
+  }
+}

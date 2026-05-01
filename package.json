@@ -1,0 +1,24 @@
+{
+  "name": "kentos-ai",
+  "private": true,
+  "version": "0.1.0",
+  "description": "AI-powered municipal citizen request, workflow, SLA and WhatsApp operations platform.",
+  "packageManager": "pnpm@9.15.0",
+  "scripts": {
+    "build": "pnpm -r build",
+    "dev": "pnpm -r --parallel dev",
+    "lint": "pnpm -r lint",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "db:generate": "pnpm --filter @kentos/database prisma:generate",
+    "db:migrate": "pnpm --filter @kentos/database prisma:migrate",
+    "db:seed": "pnpm --filter @kentos/database prisma:seed",
+    "smoke:api": "node scripts/smoke-api.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "prettier": "^3.4.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}
