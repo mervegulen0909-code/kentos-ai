@@ -269,3 +269,12 @@
 - **Result:** Passed. Port 3110 was already occupied by an older local API process, so runtime smoke used port 3111 after stopping chatbot-api-wave dev processes that were holding the Prisma Windows DLL.
 - **Next action:** Merge API hardening branch after reviewing the commit.
 - **Blocker:** None.
+
+## 2026-05-01 15:55 — Wave 7 QA browser smoke hardening checkpoint
+
+- **Action taken:** Window 4 aligned `wave/qa-smoke` with local `master`, then rewrote browser smoke as scenario-based admin/citizen checks and documented ticket transition guard, audit coverage, commit ownership, parallel-session, and reused-branch hygiene rules.
+- **Files changed:** `docs/workflows/browser-smoke.md`, `docs/workflows/local-smoke.md`, `docs/checklists/release-checklist.md`, `docs/agent-os/parallel-sessions.md`, `docs/agent-os/git-worktrees.md`, `docs/workflows/autonomous-run-log.md`.
+- **Verification run:** `pnpm typecheck && pnpm build`.
+- **Result:** Passed.
+- **Next action:** `1 — Ana Kontrol` should review, commit, and merge this docs-only QA slice.
+- **Blocker:** None.

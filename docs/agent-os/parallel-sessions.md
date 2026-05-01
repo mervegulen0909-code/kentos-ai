@@ -24,6 +24,13 @@ Before editing, each window must read:
 
 When switching windows, create a concise handoff using `.claude/templates/handoff.md`.
 
+## Permanent multi-window rule
+
+- Window 1 is the main control window. It owns commits, merges, final verification sequencing, and milestone push decisions.
+- Windows 2, 3, and 4 edit only within their assigned scopes, run local verification, and report results with uncommitted file lists.
+- Worker windows do not commit, merge, push, deploy, or resolve broad cross-branch conflicts unless Window 1 explicitly grants a one-off exception in that turn.
+- If a worker branch is dirty or conflicted, the worker stops and reports to Window 1 instead of trying to clean up state.
+
 ## Git worktree upgrade path
 
 When the project becomes a git repository:

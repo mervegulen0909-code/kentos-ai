@@ -11,7 +11,9 @@ The current smoke script verifies:
 - Authenticated tenant config reads for departments, categories, neighborhoods, SLA policies, and message templates.
 - Tenant settings write/read through authenticated admin API.
 - RBAC negative checks for settings writes and department-scoped ticket access.
+- Ticket transition guard checks for invalid or repeated status changes.
 - Authenticated ticket create, assignment, internal note, public message, status transition, and audit-log read.
+- Audit coverage checks for ticket assignment, notes, public messages, status transitions, and denied mutations where applicable.
 - Public citizen ticket create and public-safe ticket tracking.
 - Public responses do not leak internal notes, audit logs, AI reasoning, tokens, or tenant internals.
 
@@ -72,6 +74,28 @@ Run this scope when auth, RBAC, tenant settings, ticket workflow, department sco
 - Negative responses are explicit enough for QA diagnosis but do not expose stack traces or raw internal errors.
 
 If any RBAC negative case fails twice, stop and report the exact role, endpoint, expected denial, and actual response before changing any app code.
+
+## Ticket transition guards
+
+Run this scope when ticket status logic, controller guards, role permissions, or UI transition buttons change. The automated smoke should prove that:
+
+- A valid next transition succeeds for the seeded admin.
+- Repeating a transition that is no longer valid returns a safe validation or conflict response.
+- Skipping required intermediate statuses is denied unless the workflow explicitly allows it.
+- Department-scoped users cannot transition tickets outside their assigned department scope.
+- Denied transition responses do not create misleading success messages or partial ticket state changes.
+
+If transition guard behavior is uncertain, report the current status, attempted target status, role, endpoint, expected result, and actual response.
+
+## Audit coverage smoke
+
+Run this scope when ticket mutations, audit writers, or public/private message boundaries change. The automated smoke should prove that:
+
+- Ticket creation, assignment, internal note, public message, and status transition each create an audit entry.
+- Audit entries include enough actor/action/timestamp context for staff diagnosis.
+- Denied mutations either create no audit entry or create an intentional security-relevant audit entry; document which behavior is expected.
+- Citizen public tracking never returns audit entries or internal notes.
+- Audit read failures are reported as QA blockers and are not masked by editing smoke expectations.
 
 ## Manual endpoint probes
 

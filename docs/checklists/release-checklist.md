@@ -66,6 +66,7 @@ Run browser smoke when admin or citizen UI routes, forms, auth/session, settings
 
 - [ ] QA window only edits allowed docs/checklists/workflow files unless separately authorized.
 - [ ] QA window does not modify `apps/**`, `packages/**`, `scripts/smoke-api.mjs`, production env files, or secrets.
+- [ ] QA, API, and UI worker windows do not commit; commits are created only by `1 — Ana Kontrol` unless that window explicitly delegates a one-off exception.
 - [ ] QA window records commands, results, skipped checks, and blockers.
 - [ ] If the same smoke failure repeats twice, QA stops and reports a root-cause hypothesis instead of changing app code.
 - [ ] UI completion claims include browser/manual smoke status or an explicit note that it was not run.
