@@ -3,11 +3,11 @@ import { createReportAction } from './actions';
 const errorCopy: Record<string, { title: string; detail: string }> = {
   description: {
     title: 'Açıklama biraz kısa kaldı.',
-    detail: 'Belediye ekibinin doğru birime yönlendirebilmesi için sorunu en az 10 karakterle, mümkünse konum veya belirtiyle anlatın.',
+    detail: 'En az 10 karakter yazın; ne olduğunu, nerede olduğunu ve ekip gelince neye bakması gerektiğini bir cümleyle anlatmanız yeterli.',
   },
   api: {
     title: 'Başvuruyu şu an alamadık.',
-    detail: 'Bilgileriniz ekranda güvende. Bağlantınızı kontrol edip birkaç dakika sonra yeniden deneyin.',
+    detail: 'Teknik hata ayrıntısını göstermiyoruz. Bilgileriniz ekranda duruyor; bağlantınızı kontrol edip birkaç dakika sonra yeniden gönderin.',
   },
 };
 
@@ -29,7 +29,7 @@ export default async function ReportPage({
       <section className="hero">
         <div>
           <h1 className="display">Talebinizi belediyeye iletin.</h1>
-          <p style={{ color: 'var(--muted)', fontSize: '1.2rem' }}>Konum, açıklama ve iletişim bilgisiyle başvurunuzu oluşturun.</p>
+          <p style={{ color: 'var(--muted)', fontSize: '1.2rem' }}>Gönderim başarılı olursa takip numaranızın olduğu güvenli sayfaya yönlendirileceksiniz.</p>
         </div>
         <form action={action} className="card">
           {errorMessage ? (

@@ -10,26 +10,76 @@ import {
   updateTemplateAction,
 } from './actions';
 
-const successCopy: Record<string, string> = {
-  'department-created': 'Departman eklendi; yeni kuyruğa atama yapılabilir.',
-  'department-updated': 'Departman bilgileri kaydedildi.',
-  'category-created': 'Kategori eklendi; vatandaş talepleri bu kategoriyle eşleşebilir.',
-  'category-updated': 'Kategori ayarları güncellendi.',
-  'sla-created': 'SLA politikası eklendi.',
-  'sla-updated': 'SLA politikası kaydedildi.',
-  'template-updated': 'Mesaj şablonu kaydedildi.',
+type FeedbackCopy = { title: string; detail: string };
+
+const successCopy: Record<string, FeedbackCopy> = {
+  'department-created': {
+    title: 'Departman eklendi.',
+    detail: 'Yeni birim artık kategori ve talep atama akışlarında kullanılabilir.',
+  },
+  'department-updated': {
+    title: 'Departman bilgileri kaydedildi.',
+    detail: 'Birim adı, açıklaması ve aktiflik durumu operasyon ekranlarına yansır.',
+  },
+  'category-created': {
+    title: 'Kategori eklendi.',
+    detail: 'Vatandaş talepleri bu kategoriyle eşleşebilir; varsayılan öncelik uygulanır.',
+  },
+  'category-updated': {
+    title: 'Kategori ayarları güncellendi.',
+    detail: 'Birim eşleşmesi, öncelik ve aktiflik bilgisi yeni taleplerde kullanılacak.',
+  },
+  'sla-created': {
+    title: 'SLA politikası eklendi.',
+    detail: 'Yanıt ve çözüm süreleri uygun talepler için izlenmeye başladı.',
+  },
+  'sla-updated': {
+    title: 'SLA politikası kaydedildi.',
+    detail: 'Süre ve aktiflik değişiklikleri sonraki SLA değerlendirmelerinde kullanılacak.',
+  },
+  'template-updated': {
+    title: 'Mesaj şablonu kaydedildi.',
+    detail: 'Vatandaşla paylaşılan standart metin güncel hâliyle kullanılacak.',
+  },
 };
 
-const errorCopy: Record<string, string> = {
-  session: 'Oturum bulunamadı. Ayar değişikliği için yeniden giriş yapın.',
-  'create-department': 'Departman eklenemedi. Kod benzersiz olmalı ve zorunlu alanlar dolu olmalı.',
-  'update-department': 'Departman güncellenemedi. Alanları kontrol edip tekrar deneyin.',
-  'create-category': 'Kategori eklenemedi. Kod ve ad alanlarını kontrol edin.',
-  'update-category': 'Kategori güncellenemedi. Seçili departman ve öncelik değerlerini kontrol edin.',
-  'create-sla': 'SLA politikası eklenemedi. Süreler 1 dakikadan büyük olmalı.',
-  'update-sla': 'SLA politikası kaydedilemedi. Süreleri kontrol edin.',
-  'update-template': 'Şablon kaydedilemedi. Metni kontrol edip tekrar deneyin.',
-  general: 'Ayar kaydedilemedi. Bağlantı veya yetki durumunu kontrol edin.',
+const errorCopy: Record<string, FeedbackCopy> = {
+  session: {
+    title: 'Oturum bulunamadı.',
+    detail: 'Ayar değişikliği için yeniden giriş yapın; güvenlik nedeniyle işlem gönderilmedi.',
+  },
+  'create-department': {
+    title: 'Departman eklenemedi.',
+    detail: 'Kod benzersiz olmalı; kod ve ad alanlarını boş bırakmayın.',
+  },
+  'update-department': {
+    title: 'Departman güncellenemedi.',
+    detail: 'Birim adı ve aktiflik alanlarını kontrol edip tekrar deneyin.',
+  },
+  'create-category': {
+    title: 'Kategori eklenemedi.',
+    detail: 'Kod ve ad zorunludur; seçili departman pasifse kategori oluşturulamaz.',
+  },
+  'update-category': {
+    title: 'Kategori güncellenemedi.',
+    detail: 'Departman seçimini, öncelik değerini ve aktiflik durumunu kontrol edin.',
+  },
+  'create-sla': {
+    title: 'SLA politikası eklenemedi.',
+    detail: 'Yanıt ve çözüm süreleri 1 dakikadan büyük olmalı; aynı kapsamda çakışan politika olabilir.',
+  },
+  'update-sla': {
+    title: 'SLA politikası kaydedilemedi.',
+    detail: 'Süre değerlerini ve aktiflik durumunu kontrol edip tekrar deneyin.',
+  },
+  'update-template': {
+    title: 'Şablon kaydedilemedi.',
+    detail: 'Vatandaş mesajı boş olmamalı; metni sade ve işlem odaklı tutun.',
+  },
+  general: {
+    title: 'Ayar kaydedilemedi.',
+    detail: 'Bağlantı, yetki veya kayıt durumunu kontrol edip işlemi tekrar deneyin.',
+  },
 };
 
 export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ success?: string; error?: string }> }) {
@@ -48,8 +98,18 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
     <main className="main">
       <p className="badge">Tenant ayarları</p>
       <h1>Belediye yapılandırması</h1>
-      {success ? <p className="notice success" role="status">{successCopy[success] ?? 'Ayar kaydedildi.'}</p> : null}
-      {error ? <p className="notice error" role="alert">{errorCopy[error] ?? errorCopy.general}</p> : null}
+      {success ? (
+        <div className="notice success" role="status">
+          <strong>{(successCopy[success] ?? { title: 'Ayar kaydedildi.', detail: 'Yapılandırma ekranı güncel verilerle yenilendi.' }).title}</strong>
+          <p>{(successCopy[success] ?? { title: 'Ayar kaydedildi.', detail: 'Yapılandırma ekranı güncel verilerle yenilendi.' }).detail}</p>
+        </div>
+      ) : null}
+      {error ? (
+        <div className="notice error" role="alert">
+          <strong>{(errorCopy[error] ?? errorCopy.general).title}</strong>
+          <p>{(errorCopy[error] ?? errorCopy.general).detail}</p>
+        </div>
+      ) : null}
       {!token ? <p className="notice muted">Ayarları düzenlemek için giriş yapın. Formlar güvenli biçimde pasif tutulur.</p> : null}
       <div className="grid">
         <section className="card">

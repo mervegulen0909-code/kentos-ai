@@ -3,11 +3,11 @@ import { trackTicketAction } from './actions';
 const errorCopy: Record<string, { title: string; detail: string }> = {
   missing: {
     title: 'Başvuru numarası eksik.',
-    detail: 'Başvuru oluşturduğunuzda verilen numarayı yazın. Örnek biçim: KNT-2026-000123.',
+    detail: 'Takip için başvuru sonrası verilen numara gerekir. T.C. kimlik, telefon veya ad-soyad ile sorgulama yapılmaz.',
   },
   format: {
     title: 'Numara biçimi tanınmadı.',
-    detail: 'Kısa çizgileriyle birlikte KNT-2026-000123 biçiminde girin. Harfler küçük yazılsa da otomatik büyütülür.',
+    detail: 'Numarayı kısa çizgileriyle birlikte KNT-2026-000123 biçiminde girin; küçük harf yazarsanız otomatik büyütülür.',
   },
 };
 

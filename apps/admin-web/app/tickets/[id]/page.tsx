@@ -13,20 +13,52 @@ const transitions: Record<string, string[]> = {
   REJECTED: [],
 };
 
-const successCopy: Record<string, string> = {
-  'status-updated': 'Durum güncellendi; kuyruk ve talep detayı yenilendi.',
-  assigned: 'Talep seçilen birime atandı.',
-  'internal-note-added': 'İç not kaydedildi; vatandaş ekranında görünmez.',
-  'public-message-sent': 'Vatandaş bilgilendirmesi gönderildi ve takip ekranına eklendi.',
+type FeedbackCopy = { title: string; detail: string };
+
+const successCopy: Record<string, FeedbackCopy> = {
+  'status-updated': {
+    title: 'Durum güncellendi.',
+    detail: 'Kuyruk ve talep detayı yenilendi; varsa vatandaş mesajı takip ekranında görünür.',
+  },
+  assigned: {
+    title: 'Atama tamamlandı.',
+    detail: 'Talep seçilen birimin operasyon kuyruğuna taşındı.',
+  },
+  'internal-note-added': {
+    title: 'İç not kaydedildi.',
+    detail: 'Bu not yalnızca personel ekranlarında görünür; vatandaş takip ekranına yansımaz.',
+  },
+  'public-message-sent': {
+    title: 'Vatandaş bilgilendirmesi gönderildi.',
+    detail: 'Mesaj takip ekranındaki belediye bilgilendirmeleri arasına eklendi.',
+  },
 };
 
-const errorCopy: Record<string, string> = {
-  session: 'Oturum bulunamadı. İşlem yapmak için yeniden giriş yapın.',
-  status: 'Durum güncellenemedi. Geçiş kuralı veya mesaj alanını kontrol edin.',
-  assignment: 'Atama yapılamadı. Geçerli ve aktif bir birim seçin.',
-  'internal-note': 'İç not kaydedilemedi. Not metni boş olmamalı.',
-  'public-message': 'Vatandaş mesajı gönderilemedi. Metni kontrol edip tekrar deneyin.',
-  general: 'İşlem tamamlanamadı. Yetki, bağlantı veya kayıt durumunu kontrol edin.',
+const errorCopy: Record<string, FeedbackCopy> = {
+  session: {
+    title: 'Oturum gerekli.',
+    detail: 'İşleme devam etmek için yeniden giriş yapın; form verisi güvenlik nedeniyle gönderilmedi.',
+  },
+  status: {
+    title: 'Durum güncellenemedi.',
+    detail: 'Seçilen geçiş bu talep için uygun olmayabilir veya opsiyonel vatandaş mesajı çok kısa olabilir.',
+  },
+  assignment: {
+    title: 'Atama yapılamadı.',
+    detail: 'Aktif bir birim seçildiğinden emin olun; pasif veya eksik birimlere atama yapılmaz.',
+  },
+  'internal-note': {
+    title: 'İç not kaydedilemedi.',
+    detail: 'Not metni boş olmamalı; operasyon geçmişi için kısa ama açıklayıcı bir kayıt girin.',
+  },
+  'public-message': {
+    title: 'Vatandaş mesajı gönderilemedi.',
+    detail: 'Mesaj metnini kontrol edin; vatandaş ekranında görüneceği için açık ve işlem odaklı yazın.',
+  },
+  general: {
+    title: 'İşlem tamamlanamadı.',
+    detail: 'Yetki, bağlantı veya kayıt durumunu kontrol edip işlemi tekrar deneyin.',
+  },
 };
 
 export default async function TicketDetailPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ success?: string; error?: string }> }) {
@@ -42,8 +74,18 @@ export default async function TicketDetailPage({ params, searchParams }: { param
     <main className="main">
       <p className="badge">Talep detayı · {ticket?.ticketNo ?? id}</p>
       <h1>{ticket?.title ?? 'Talep detayı için giriş yapın'}</h1>
-      {success ? <p className="notice success" role="status">{successCopy[success] ?? 'İşlem kaydedildi.'}</p> : null}
-      {error ? <p className="notice error" role="alert">{errorCopy[error] ?? errorCopy.general}</p> : null}
+      {success ? (
+        <div className="notice success" role="status">
+          <strong>{(successCopy[success] ?? { title: 'İşlem kaydedildi.', detail: 'Talep detayı güncel verilerle yenilendi.' }).title}</strong>
+          <p>{(successCopy[success] ?? { title: 'İşlem kaydedildi.', detail: 'Talep detayı güncel verilerle yenilendi.' }).detail}</p>
+        </div>
+      ) : null}
+      {error ? (
+        <div className="notice error" role="alert">
+          <strong>{(errorCopy[error] ?? errorCopy.general).title}</strong>
+          <p>{(errorCopy[error] ?? errorCopy.general).detail}</p>
+        </div>
+      ) : null}
       <div className="grid">
         <section className="card">
           <h2>Durum</h2>

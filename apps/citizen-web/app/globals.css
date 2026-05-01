@@ -12,6 +12,7 @@
 * { box-sizing: border-box; }
 body { margin: 0; min-height: 100dvh; color: var(--ink); background: radial-gradient(circle at 90% 10%, color-mix(in oklch, var(--accent) 18%, transparent), transparent 24rem), var(--bg); }
 button, input, textarea { font: inherit; }
+input, textarea, button { max-width: 100%; }
 :focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
 .wrap { width: min(1120px, calc(100% - 32px)); margin: 0 auto; padding: 40px 0; }
 .hero { display: grid; grid-template-columns: 1.1fr .9fr; gap: 28px; align-items: start; }
@@ -30,4 +31,9 @@ button, input, textarea { font: inherit; }
 .cta { min-height: 48px; border: 0; border-radius: 999px; background: var(--ink); color: white; padding: 0 22px; cursor: pointer; }
 @keyframes sweep { to { transform: translateX(100%); } }
 @media (prefers-reduced-motion: reduce) { .skeleton::after { animation-duration: 0.01ms; animation-iteration-count: 1; } }
-@media (max-width: 800px) { .hero { grid-template-columns: 1fr; } }
+@media (max-width: 800px) {
+  .wrap { width: min(100% - 24px, 1120px); padding: 24px 0; }
+  .hero { grid-template-columns: 1fr; gap: 18px; }
+  .display { font-size: clamp(3rem, 18vw, 5rem); letter-spacing: -.055em; }
+  .card { border-radius: 22px; }
+}

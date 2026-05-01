@@ -243,6 +243,15 @@
 - **Next action:** Continue with browser smoke or deeper READ_ONLY ticket mutation negative coverage.
 - **Blocker:** None.
 
+## 2026-05-01 13:35 — UI browser-smoke readiness checkpoint
+
+- **Action taken:** Synced `wave/ui-polish` with local `master`, then polished admin ticket/settings feedback copy, citizen report/track/not-found copy, and mobile layout resilience for browser smoke readiness.
+- **Files changed:** `apps/admin-web/**`, `apps/citizen-web/**`, `docs/workflows/autonomous-run-log.md`.
+- **Verification run:** `pnpm -C C:/Users/arfgl/OneDrive/Desktop/chatbot-ui-wave --filter @kentos/admin-web typecheck`; `pnpm -C C:/Users/arfgl/OneDrive/Desktop/chatbot-ui-wave --filter @kentos/admin-web build`; `pnpm -C C:/Users/arfgl/OneDrive/Desktop/chatbot-ui-wave --filter @kentos/citizen-web typecheck`; `pnpm -C C:/Users/arfgl/OneDrive/Desktop/chatbot-ui-wave --filter @kentos/citizen-web build`.
+- **Result:** Passed.
+- **Next action:** Commit UI browser-smoke readiness polish.
+- **Blocker:** None.
+
 ## 2026-05-01 15:40 — API hardening checkpoint
 
 - **Action taken:** Seeded READ_ONLY and DEPARTMENT_STAFF demo users, enforced DEPARTMENT_STAFF ticket department scope, expanded API smoke with settings RBAC negatives, department staff scope positives/negatives, and public response leak checks.
