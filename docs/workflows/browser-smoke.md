@@ -1,58 +1,112 @@
 # Browser Smoke Workflow
 
+This checklist verifies the real admin and citizen browser flows against a local API. It is manual today; do not report UI work as complete unless this checklist was run or the final report explicitly says browser smoke was not run.
+
 ## Start local services
+
+Start infrastructure and seed the demo tenant:
 
 ```bash
 docker compose -f infra/docker-compose.yml up -d
+DATABASE_URL='postgresql://kentos:kentos@localhost:5432/kentos_ai?schema=public' pnpm db:generate
+DATABASE_URL='postgresql://kentos:kentos@localhost:5432/kentos_ai?schema=public' pnpm db:migrate
 DATABASE_URL='postgresql://kentos:kentos@localhost:5432/kentos_ai?schema=public' pnpm db:seed
-DATABASE_URL='postgresql://kentos:kentos@localhost:5432/kentos_ai?schema=public' PORT=3110 pnpm --filter @kentos/api dev
-NEXT_PUBLIC_API_BASE_URL='http://localhost:3110/api/v1' pnpm --filter @kentos/admin-web dev -- -p 3111
-NEXT_PUBLIC_API_BASE_URL='http://localhost:3110/api/v1' pnpm --filter @kentos/citizen-web dev -- -p 3112
 ```
+
+Start API, admin web, and citizen web on QA ports:
+
+```bash
+DATABASE_URL='postgresql://kentos:kentos@localhost:5432/kentos_ai?schema=public' PORT=3110 pnpm --filter @kentos/api dev
+NEXT_PUBLIC_API_BASE_URL='http://127.0.0.1:3110/api/v1' pnpm --filter @kentos/admin-web dev -- -p 3111
+NEXT_PUBLIC_API_BASE_URL='http://127.0.0.1:3110/api/v1' pnpm --filter @kentos/citizen-web dev -- -p 3112
+```
+
+Expected local URLs:
+
+- API docs: `http://127.0.0.1:3110/api/docs`
+- Admin web: `http://127.0.0.1:3111`
+- Citizen web: `http://127.0.0.1:3112/demo-belediye/report`
+
+## Preflight API smoke
+
+Run API smoke before browser smoke so browser failures are easier to isolate:
+
+```bash
+KENTOS_API_BASE_URL='http://127.0.0.1:3110/api/v1' pnpm smoke:api
+```
+
+Continue to browser smoke only if API health, login, tenant settings, ticket mutations, audit log, and public create/track checks pass.
 
 ## Admin smoke
 
-1. Open `http://localhost:3111/login`.
-2. Login with:
-   - Tenant: `demo-belediye`
-   - Email: `admin@demo.local`
-   - Password: `ChangeMe123!`
-3. Confirm redirect to dashboard.
-4. Open `/tickets` and confirm real ticket rows or empty state render.
-5. Open a ticket detail from the list.
-6. Add an internal note.
-7. Add a public message.
-8. Assign the ticket to a department.
-9. Change status to one of the visible valid next transitions.
-10. Confirm audit timeline updates.
-11. Open `/settings`.
-12. Create a department with a unique code.
-13. Update or disable a department.
-14. Create a category under that department.
-15. Update or disable a category.
-16. Create or update an SLA policy.
-17. Edit one message template and confirm it persists after refresh.
+Seeded login:
+
+- Tenant: `demo-belediye`
+- Email: `admin@demo.local`
+- Password: `ChangeMe123!`
+
+Checklist:
+
+1. Open `http://127.0.0.1:3111/login`.
+2. Submit the seeded login and confirm redirect away from login to the admin dashboard.
+3. Confirm the dashboard renders operational cards and does not expose raw API errors.
+4. Open `http://127.0.0.1:3111/tickets`.
+5. Confirm either real ticket rows or the designed empty state renders.
+6. Open a ticket detail page from the list.
+7. Assign the ticket to a visible department.
+8. Add an internal note and confirm it appears only in the admin timeline.
+9. Add a public message and confirm the admin page records it.
+10. Change status using one of the visible valid next transitions.
+11. Refresh the ticket detail page and confirm status, assignment, notes/messages, and audit timeline persist.
+12. Open `http://127.0.0.1:3111/settings`.
+13. Create a department with a unique local smoke code, for example `QA-<date>-<initials>`.
+14. Update that department name or description, then disable it.
+15. Create a category under an enabled department.
+16. Update or disable that category.
+17. Create or update an SLA policy.
+18. Edit one message template and refresh the page to confirm persistence.
+
+Admin expected markers:
+
+- Login creates an HTTP-only local MVP session cookie.
+- Settings writes are accepted only for a seeded admin role with `TENANT_ADMIN` or `SUPER_ADMIN` privileges.
+- Settings rows stay tenant-scoped to `demo-belediye`.
+- Ticket assignment, internal note, public message, status transition, and audit log are visible in the admin flow.
+- Errors are actionable and do not leak stack traces, raw internal errors, secrets, or tokens.
 
 ## Citizen smoke
 
-1. Open `http://localhost:3112/demo-belediye/report`.
-2. Submit a report with description, address, and phone.
+Checklist:
+
+1. Open `http://127.0.0.1:3112/demo-belediye/report`.
+2. Submit a report with realistic Turkish description, address, and phone.
 3. Confirm redirect to `/demo-belediye/ticket/<ticketNo>`.
-4. Confirm public-safe ticket status renders.
-5. Open `http://localhost:3112/demo-belediye/track`.
-6. Enter the same ticket number.
-7. Confirm navigation to the same ticket page.
+4. Record the generated ticket number for the QA report.
+5. Confirm the public ticket page shows only public-safe fields: ticket number, status, category/department if public, address/description summary if intended, and citizen-safe messages.
+6. Confirm the page does not show internal notes, audit logs, staff-only metadata, AI reasoning, tokens, stack traces, or tenant internals.
+7. Open `http://127.0.0.1:3112/demo-belediye/track`.
+8. Enter the same ticket number and confirm navigation to the same public ticket page.
+9. Try an obviously invalid ticket number and confirm the error state is citizen-safe and helpful.
 
-## Expected markers
+Citizen expected markers:
 
-- API `/health` and `/health/ready` return 200.
-- Admin login creates an HTTP-only local MVP cookie.
-- Citizen pages never show internal notes, audit logs, or AI reasoning.
-- Settings writes require a `TENANT_ADMIN` or `SUPER_ADMIN` role and create tenant-scoped rows only for the logged-in tenant.
-- Ticket mutation smoke covers assignment, internal note, public message, status transition, and audit log entries.
+- Citizen copy is Turkish-first, calm, and public-safe.
+- The report flow works without staff authentication.
+- Tracking requires the ticket number and never exposes another tenant's internal data.
+- Empty, loading, and error states are understandable without raw backend payloads.
+
+## Regression checks
+
+During the smoke, also watch for:
+
+- Browser console errors on admin and citizen pages.
+- Failed network requests that are not expected validation failures.
+- Layout breakage on a narrow mobile viewport.
+- Forms that submit twice, stay stuck in loading state, or lose validation feedback.
+- Focus-visible state and keyboard navigation for login, ticket forms, and settings forms.
 
 ## Known limitations
 
 - Auth/session is local MVP, not production SSO.
-- No file upload or map picker yet.
-- Browser flow is currently manual; automated Playwright/Cypress can be added in a later wave.
+- File upload, map picker, WhatsApp send, and external notification delivery are not part of this browser smoke.
+- The browser flow is manual until a later automated Playwright/Cypress wave.
