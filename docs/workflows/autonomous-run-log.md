@@ -215,3 +215,12 @@
 - **Result:** Passed.
 - **Next action:** Use Agent OS for future Wave 6+ work; initialize git before real worktree-based parallel sessions.
 - **Blocker:** None.
+
+## 2026-05-01 15:40 — API hardening checkpoint
+
+- **Action taken:** Seeded READ_ONLY and DEPARTMENT_STAFF demo users, enforced DEPARTMENT_STAFF ticket department scope, expanded API smoke with settings RBAC negatives, department staff scope positives/negatives, and public response leak checks.
+- **Files changed:** `apps/api/src/modules/tickets/tickets.service.ts`, `packages/database/prisma/seed.ts`, `scripts/smoke-api.mjs`.
+- **Verification run:** `pnpm db:generate`; `pnpm --filter @kentos/database typecheck`; `pnpm --filter @kentos/shared typecheck`; `pnpm --filter @kentos/api typecheck`; local API smoke on port 3111 with `KENTOS_API_BASE_URL='http://127.0.0.1:3111/api/v1' pnpm smoke:api`.
+- **Result:** Passed. Port 3110 was already occupied by an older local API process, so runtime smoke used port 3111 after stopping chatbot-api-wave dev processes that were holding the Prisma Windows DLL.
+- **Next action:** Merge API hardening branch after reviewing the commit.
+- **Blocker:** None.

@@ -139,6 +139,39 @@ async function main() {
       role: UserRole.TENANT_ADMIN,
     },
   });
+
+  await prisma.user.upsert({
+    where: { tenantId_email: { tenantId: tenant.id, email: 'readonly@demo.local' } },
+    update: { passwordHash, role: UserRole.READ_ONLY, isActive: true },
+    create: {
+      tenantId: tenant.id,
+      email: 'readonly@demo.local',
+      passwordHash,
+      fullName: 'Demo Salt Okuma Kullanıcısı',
+      role: UserRole.READ_ONLY,
+    },
+  });
+
+  const fenDepartmentId = departmentByCode.get('FEN_ISLERI');
+  if (!fenDepartmentId) throw new Error('FEN_ISLERI department was not seeded.');
+
+  const departmentStaff = await prisma.user.upsert({
+    where: { tenantId_email: { tenantId: tenant.id, email: 'fen.staff@demo.local' } },
+    update: { passwordHash, role: UserRole.DEPARTMENT_STAFF, isActive: true },
+    create: {
+      tenantId: tenant.id,
+      email: 'fen.staff@demo.local',
+      passwordHash,
+      fullName: 'Demo Fen İşleri Personeli',
+      role: UserRole.DEPARTMENT_STAFF,
+    },
+  });
+
+  await prisma.userDepartment.upsert({
+    where: { userId_departmentId: { userId: departmentStaff.id, departmentId: fenDepartmentId } },
+    update: {},
+    create: { userId: departmentStaff.id, departmentId: fenDepartmentId },
+  });
 }
 
 main()
