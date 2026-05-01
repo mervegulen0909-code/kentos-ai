@@ -114,6 +114,7 @@ export class TicketsService {
 
   async assign(user: AuthenticatedUser, id: string, dto: AssignTicketDto) {
     const ticket = await this.requireTicket(user, id);
+    this.requireMutableTicket(ticket.status);
     await this.requireDepartment(user.tenantId, dto.departmentId);
     await this.requireDepartmentScope(user, dto.departmentId);
     if (dto.assignedToId) await this.requireUser(user.tenantId, dto.assignedToId);
@@ -139,7 +140,8 @@ export class TicketsService {
   }
 
   async addInternalNote(user: AuthenticatedUser, id: string, dto: CreateTicketMessageDto) {
-    await this.requireTicket(user, id);
+    const ticket = await this.requireTicket(user, id);
+    this.requireMutableTicket(ticket.status);
 
     const message = await this.prisma.ticketMessage.create({
       data: {
@@ -158,6 +160,7 @@ export class TicketsService {
 
   async addPublicMessage(user: AuthenticatedUser, id: string, dto: CreateTicketMessageDto) {
     const ticket = await this.requireTicket(user, id);
+    this.requireMutableTicket(ticket.status);
 
     const message = await this.prisma.ticketMessage.create({
       data: {
@@ -177,7 +180,9 @@ export class TicketsService {
 
   async updateStatus(user: AuthenticatedUser, id: string, dto: UpdateTicketStatusDto) {
     const ticket = await this.requireTicket(user, id);
-    if (!this.canTransition(ticket.status, dto.status)) throw new ForbiddenException('Bu durum geçişi desteklenmiyor.');
+    if (!this.canTransition(ticket.status, dto.status)) {
+      throw new ForbiddenException(`${ticket.status} durumundan ${dto.status} durumuna geçiş desteklenmiyor.`);
+    }
 
     const now = new Date();
     const updated = await this.prisma.ticket.update({
@@ -274,6 +279,12 @@ export class TicketsService {
         after,
       },
     });
+  }
+
+  private requireMutableTicket(status: TicketStatus) {
+    if (status === TicketStatus.CLOSED || status === TicketStatus.REJECTED) {
+      throw new ForbiddenException(`${status} durumundaki talep değiştirilemez.`);
+    }
   }
 
   private slaState(resolutionDueAt: Date | null) {

@@ -210,6 +210,13 @@ const statusUpdate = await request(`/tickets/${operatorTicket.body.id}/status`, 
 });
 console.log('ticket_status', statusUpdate.status, statusUpdate.body.status);
 
+await request(`/tickets/${operatorTicket.body.id}/assign`, {
+  method: 'POST',
+  token,
+  body: JSON.stringify({ departmentId: createdDepartment.body.id }),
+});
+console.log('ticket_assign', true);
+
 const auditLog = await request(`/tickets/${operatorTicket.body.id}/audit-log`, { token });
 console.log('ticket_audit', auditLog.status, auditLog.body.length > 0);
 
@@ -308,7 +315,12 @@ await expectStatus(`/tickets/${temizlikTicket.body.id}/status`, 404, {
   token: departmentStaffToken,
   body: JSON.stringify({ status: 'IN_PROGRESS' }),
 });
-await expectStatus(`/tickets/${temizlikTicket.body.id}/assign`, 404, {
+await expectStatus(`/tickets/${temizlikTicket.body.id}/assign`, 403, {
+  method: 'POST',
+  token: departmentStaffToken,
+  body: JSON.stringify({ departmentId: fenDepartment.id }),
+});
+await expectStatus(`/tickets/${fenTicket.body.id}/assign`, 403, {
   method: 'POST',
   token: departmentStaffToken,
   body: JSON.stringify({ departmentId: fenDepartment.id }),
@@ -330,6 +342,64 @@ await expectStatus('/tickets', 403, {
   }),
 });
 console.log('department_staff_ticket_scope', true);
+
+section('ticket transition guards');
+const transitionTicket = await request('/tickets', {
+  method: 'POST',
+  token,
+  body: JSON.stringify({
+    channel: 'OPERATOR',
+    title: `Smoke transition talebi ${unique}`,
+    description: 'Status transition guard testi için oluşturulan talep.',
+    priority: 'NORMAL',
+    departmentId: createdDepartment.body.id,
+    categoryId: createdCategory.body.id,
+    addressText: 'Transition Mahallesi',
+  }),
+});
+await request(`/tickets/${transitionTicket.body.id}/status`, {
+  method: 'POST',
+  token,
+  body: JSON.stringify({ status: 'ASSIGNED' }),
+});
+await request(`/tickets/${transitionTicket.body.id}/status`, {
+  method: 'POST',
+  token,
+  body: JSON.stringify({ status: 'IN_PROGRESS' }),
+});
+await request(`/tickets/${transitionTicket.body.id}/status`, {
+  method: 'POST',
+  token,
+  body: JSON.stringify({ status: 'RESOLVED' }),
+});
+await request(`/tickets/${transitionTicket.body.id}/status`, {
+  method: 'POST',
+  token,
+  body: JSON.stringify({ status: 'CLOSED' }),
+});
+await expectStatus(`/tickets/${transitionTicket.body.id}/status`, 403, {
+  method: 'POST',
+  token,
+  body: JSON.stringify({ status: 'IN_PROGRESS' }),
+});
+await expectStatus(`/tickets/${transitionTicket.body.id}/notes`, 403, {
+  method: 'POST',
+  token,
+  body: JSON.stringify({ body: 'Kapalı talebe iç not eklenememeli.' }),
+});
+await expectStatus(`/tickets/${transitionTicket.body.id}/assign`, 403, {
+  method: 'POST',
+  token,
+  body: JSON.stringify({ departmentId: createdDepartment.body.id }),
+});
+console.log('closed_ticket_transition_guard', true);
+
+section('audit coverage');
+const auditedActions = new Set(auditLog.body.map((entry) => entry.action));
+for (const action of ['ticket.assigned', 'ticket.status_changed', 'ticket.internal_note_added', 'ticket.public_message_added']) {
+  assert(auditedActions.has(action), `Audit log missing ${action}.`);
+}
+console.log('audit_coverage', true);
 
 section('public safety');
 const publicTicket = await request('/public/demo-belediye/tickets', {
