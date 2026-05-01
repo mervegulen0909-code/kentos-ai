@@ -242,3 +242,12 @@
 - **Result:** Passed.
 - **Next action:** Continue with browser smoke or deeper READ_ONLY ticket mutation negative coverage.
 - **Blocker:** None.
+
+## 2026-05-01 13:25 — Wave 6 QA docs hygiene checkpoint
+
+- **Action taken:** Window 4 aligned `wave/qa-smoke` with local `master`, then documented milestone-end push policy, reused-branch master alignment, release checklist push expectations, UI polish browser checks, and RBAC negative smoke expectations.
+- **Files changed:** `README.md`, `docs/agent-os/git-worktrees.md`, `docs/checklists/release-checklist.md`, `docs/workflows/browser-smoke.md`, `docs/workflows/local-smoke.md`, `docs/workflows/autonomous-run-log.md`.
+- **Verification run:** `pnpm typecheck && pnpm build`.
+- **Result:** Passed.
+- **Next action:** Commit docs-only QA slice, then merge QA docs after API/UI implementation branches.
+- **Blocker:** None.
