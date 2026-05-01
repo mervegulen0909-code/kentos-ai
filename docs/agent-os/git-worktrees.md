@@ -1,34 +1,38 @@
 # Git Worktrees for KentOS Agent OS
 
-This project is now initialized as a local git repository. Worktrees can be used for parallel Claude Code sessions after a baseline commit exists.
+KentOS AI is initialized as a Git repository with GitHub remote `origin` at `https://github.com/filizgulen1966-tech/kentos-ai.git`. The current integration branch is `master`.
 
-## Required first step
+Use worktrees for parallel Claude Code windows only after the branch you want to split from has a clean working tree and a committed baseline.
 
-Create one baseline commit manually after reviewing the initial file list:
+## Preflight
+
+Run this from the main workspace before creating or merging worktrees:
 
 ```bash
 git status --short
-git add .gitignore .env.example AGENTS.md CLAUDE.md DESIGN.md README.md .interface-design docs infra package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json apps packages scripts .claude/agents .claude/commands .claude/hooks .claude/mcp .claude/templates .claude/settings.json
-git commit -m "Initial KentOS AI workspace baseline"
+git branch --show-current
+git remote -v
 ```
 
-Do not include:
+Expected baseline:
 
-- `.claude/settings.local.json`
-- `.env` or `.env.*` except `.env.example`
-- `node_modules/`
-- `.next/`
-- `dist/`
+- Current branch: `master`.
+- Remote: `origin https://github.com/filizgulen1966-tech/kentos-ai.git`.
+- No unexpected uncommitted work in the files another window will own.
+
+Do not create a worktree to bypass local conflicts. Resolve or hand off the existing change first.
 
 ## Create parallel worktrees
 
-After the baseline commit:
+Example setup for an API, frontend, and QA/docs wave:
 
 ```bash
-git worktree add ../chatbot-api-wave -b wave/api-hardening
-git worktree add ../chatbot-ui-wave -b wave/ui-polish
-git worktree add ../chatbot-qa-wave -b wave/qa-smoke
+git worktree add ../chatbot-api-wave -b wave/api-hardening master
+git worktree add ../chatbot-ui-wave -b wave/ui-polish master
+git worktree add ../chatbot-qa-wave -b wave/qa-smoke master
 ```
+
+Use clear branch names with the owning role and purpose. Keep one Claude Code window per worktree.
 
 ## Suggested Claude windows
 
@@ -43,6 +47,8 @@ Owns:
 - `packages/shared/**`
 - `scripts/smoke-api.mjs`
 
+Must coordinate with QA before changing smoke coverage.
+
 ### Window B — Frontend Operator
 
 Path: `../chatbot-ui-wave`
@@ -52,22 +58,64 @@ Owns:
 - `apps/admin-web/**`
 - `apps/citizen-web/**`
 
+Must run or explicitly defer browser smoke before claiming UI completion.
+
 ### Window C — QA Smoke Runner
 
 Path: `../chatbot-qa-wave`
 
-Owns:
+Owns documentation and verification only unless separately authorized:
 
-- `scripts/**`
 - `docs/workflows/**`
-- verification only unless asked otherwise
+- `docs/agent-os/**`
+- `docs/checklists/**`
+- `docs/decisions/**`
+- `README.md`
+
+Does not own API/UI implementation files, package code, production env files, or deployment. The QA window may run verification commands and report blockers but should not fix app code from the QA worktree.
+
+## Handoff requirements
+
+Before merging a worktree branch, the owning window should report:
+
+- Branch name and worktree path.
+- Files changed.
+- Verification commands and results.
+- Known blockers or skipped checks.
+- Whether browser smoke was run, skipped, or not applicable.
+- Any conflict-prone files to watch during merge.
+
+Use `docs/workflows/autonomous-run-log.md` for durable checkpoints when the work spans multiple windows or long unattended runs.
+
+## Merge order
+
+Merge one branch at a time into `master`. Recommended order for wave branches:
+
+1. API/database/contracts branch.
+2. Frontend branch that depends on the API shape.
+3. QA/docs/smoke branch after the real implementation scope is known.
+4. Security/review-only branch, if present, after all implementation branches.
+
+If QA changed only docs, merge it after API/UI so smoke docs reflect the final behavior. If QA found blockers, fix and re-run the relevant smoke before merging QA docs.
 
 ## Merge discipline
 
-1. Each worktree runs scoped verification.
-2. Each worktree writes a handoff.
-3. Main workspace pulls/merges one branch at a time.
-4. After each merge:
+For each branch:
+
+```bash
+git status --short
+git merge <branch-name>
+```
+
+If conflicts occur:
+
+1. Stop and inspect each conflicted file.
+2. Preserve implementation behavior from the owning branch unless the conflict is purely documentation wording.
+3. For docs conflicts, prefer the version that matches the final verified behavior, not the newer timestamp.
+4. Re-run the smallest relevant check after resolving conflicts.
+5. Do not use broad destructive commands such as `git reset --hard`, `git checkout -- .`, or `git clean -fd` unless the user explicitly approves.
+
+After each successful merge:
 
 ```bash
 pnpm db:generate
@@ -75,11 +123,26 @@ pnpm typecheck
 pnpm build
 ```
 
-5. If API changed, run local smoke.
+If API, database, auth, RBAC, tenant settings, ticket workflow, or public citizen endpoints changed, also run:
+
+```bash
+KENTOS_API_BASE_URL='http://127.0.0.1:3110/api/v1' pnpm smoke:api
+```
+
+If UI routes, forms, auth/session, settings, ticket pages, or citizen report/track flows changed, run the manual browser smoke checklist in `docs/workflows/browser-smoke.md`.
+
+## Push gate
+
+Do not push from an agent window unless the user explicitly asks for it in that turn. Before any push:
+
+- Confirm the branch being pushed.
+- Confirm local verification results.
+- Confirm no secrets or production env files are staged.
+- Confirm whether the push should create/update a PR or only publish the branch.
 
 ## Cleanup
 
-After merging and verifying:
+After branches are merged, verified, and no uncommitted work remains:
 
 ```bash
 git worktree remove ../chatbot-api-wave
@@ -90,4 +153,4 @@ git branch -d wave/ui-polish
 git branch -d wave/qa-smoke
 ```
 
-Only remove worktrees after confirming no uncommitted work remains.
+Only remove a worktree after `git status --short` is clean inside that worktree and the branch has been merged or intentionally abandoned with user approval.

@@ -215,3 +215,12 @@
 - **Result:** Passed.
 - **Next action:** Use Agent OS for future Wave 6+ work; initialize git before real worktree-based parallel sessions.
 - **Blocker:** None.
+
+## 2026-05-01 11:05 — QA docs hardening checkpoint
+
+- **Action taken:** Hardened worktree, release, API smoke, and browser smoke documentation for parallel QA windows.
+- **Files changed:** `README.md`, `docs/agent-os/git-worktrees.md`, `docs/checklists/release-checklist.md`, `docs/workflows/browser-smoke.md`, `docs/workflows/local-smoke.md`, `docs/workflows/autonomous-run-log.md`.
+- **Verification run:** `pnpm install`; initial `pnpm typecheck && pnpm build` failed because `node_modules` was missing; second run failed because Prisma client had not been generated; `pnpm db:generate && pnpm typecheck && pnpm build`.
+- **Result:** Passed after dependency install and Prisma client generation.
+- **Next action:** Merge API branch first, UI branch second, and QA/docs branch last; run full verification and smoke checks after each relevant merge.
+- **Blocker:** None.
