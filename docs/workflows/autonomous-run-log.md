@@ -215,3 +215,12 @@
 - **Result:** Passed.
 - **Next action:** Use Agent OS for future Wave 6+ work; initialize git before real worktree-based parallel sessions.
 - **Blocker:** None.
+
+## 2026-05-01 13:14 — API hardening checkpoint
+
+- **Action taken:** Added seeded READ_ONLY and DEPARTMENT_STAFF test users, scoped DEPARTMENT_STAFF ticket list/read/mutations to assigned departments, expanded smoke with settings RBAC negative checks, ticket department scoping checks, and public response leak assertions.
+- **Files changed:** `packages/database/prisma/seed.ts`, `apps/api/src/modules/tickets/tickets.service.ts`, `scripts/smoke-api.mjs`, `docs/workflows/autonomous-run-log.md`.
+- **Verification run:** `pnpm db:generate`; `pnpm --filter @kentos/database typecheck`; `pnpm --filter @kentos/shared typecheck`; `DATABASE_URL=... pnpm db:seed`; local API on port 3110; `KENTOS_API_BASE_URL=... pnpm smoke:api`; `pnpm --filter @kentos/api typecheck`; `pnpm typecheck`; `pnpm build`.
+- **Result:** Passed.
+- **Next action:** Continue with browser smoke or deeper READ_ONLY ticket mutation negative coverage.
+- **Blocker:** None.

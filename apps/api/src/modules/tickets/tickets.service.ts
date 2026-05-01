@@ -1,5 +1,5 @@
 import { ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { AuditActorType, MessageVisibility, TicketStatus } from '@kentos/database';
+import { AuditActorType, MessageVisibility, TicketStatus, UserRole } from '@kentos/database';
 import type { Prisma } from '@kentos/database';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import { PrismaService } from '../prisma/prisma.service.js';
@@ -28,11 +28,12 @@ export class TicketsService {
       q?: string;
     } = {},
   ) {
+    const departmentScope = await this.departmentScope(user);
     const tickets = await this.prisma.ticket.findMany({
       where: {
         tenantId: user.tenantId,
         status: filters.status,
-        departmentId: filters.departmentId,
+        departmentId: this.scopedDepartmentFilter(departmentScope, filters.departmentId),
         categoryId: filters.categoryId,
         assignedToId: filters.assignedToId,
         OR: filters.q
@@ -53,6 +54,7 @@ export class TicketsService {
   }
 
   async create(user: AuthenticatedUser, dto: CreateTicketDto) {
+    await this.requireDepartmentScope(user, dto.departmentId);
     const priority = dto.priority ?? 'NORMAL';
     const deadlines = await this.sla.calculateDeadlines({
       tenantId: user.tenantId,
@@ -93,8 +95,9 @@ export class TicketsService {
   }
 
   async get(user: AuthenticatedUser, id: string) {
+    const departmentScope = await this.departmentScope(user);
     const ticket = await this.prisma.ticket.findFirst({
-      where: { id, tenantId: user.tenantId },
+      where: { id, tenantId: user.tenantId, departmentId: this.scopedDepartmentFilter(departmentScope) },
       include: {
         auditLogs: { orderBy: { createdAt: 'desc' } },
         attachments: true,
@@ -112,6 +115,7 @@ export class TicketsService {
   async assign(user: AuthenticatedUser, id: string, dto: AssignTicketDto) {
     const ticket = await this.requireTicket(user, id);
     await this.requireDepartment(user.tenantId, dto.departmentId);
+    await this.requireDepartmentScope(user, dto.departmentId);
     if (dto.assignedToId) await this.requireUser(user.tenantId, dto.assignedToId);
 
     return this.prisma.ticket.update({
@@ -217,9 +221,33 @@ export class TicketsService {
   }
 
   private async requireTicket(user: AuthenticatedUser, id: string) {
-    const ticket = await this.prisma.ticket.findFirst({ where: { id, tenantId: user.tenantId } });
+    const departmentScope = await this.departmentScope(user);
+    const ticket = await this.prisma.ticket.findFirst({
+      where: { id, tenantId: user.tenantId, departmentId: this.scopedDepartmentFilter(departmentScope) },
+    });
     if (!ticket) throw new NotFoundException('Talep bulunamadı.');
     return ticket;
+  }
+
+  private async departmentScope(user: AuthenticatedUser) {
+    if (user.role !== UserRole.DEPARTMENT_STAFF) return undefined;
+    const departments = await this.prisma.userDepartment.findMany({
+      where: { userId: user.id, department: { tenantId: user.tenantId, isActive: true } },
+      select: { departmentId: true },
+    });
+    return departments.map((department) => department.departmentId);
+  }
+
+  private scopedDepartmentFilter(departmentScope?: string[], requestedDepartmentId?: string): Prisma.StringNullableFilter | string | undefined {
+    if (!departmentScope) return requestedDepartmentId;
+    if (requestedDepartmentId) return departmentScope.includes(requestedDepartmentId) ? requestedDepartmentId : { in: [] };
+    return { in: departmentScope };
+  }
+
+  private async requireDepartmentScope(user: AuthenticatedUser, departmentId?: string | null) {
+    const departmentScope = await this.departmentScope(user);
+    if (!departmentScope || !departmentId) return;
+    if (!departmentScope.includes(departmentId)) throw new ForbiddenException('Bu birim için işlem yetkiniz yok.');
   }
 
   private async requireDepartment(tenantId: string, departmentId: string) {
