@@ -1,5 +1,13 @@
 const baseUrl = process.env.KENTOS_API_BASE_URL ?? 'http://127.0.0.1:3110/api/v1';
 
+function section(name) {
+  console.log(`\n[${name}]`);
+}
+
+function assert(condition, message) {
+  if (!condition) throw new Error(message);
+}
+
 async function request(path, options = {}) {
   const headers = {
     Accept: 'application/json',
@@ -32,6 +40,9 @@ async function expectStatus(path, expectedStatus, options = {}) {
   return { status: response.status, body };
 }
 
+const unique = Date.now();
+
+section('auth');
 const health = await request('/health');
 console.log('health', health.status);
 
@@ -42,7 +53,7 @@ const login = await request('/auth/login', {
   method: 'POST',
   body: JSON.stringify({ tenantSlug: 'demo-belediye', email: 'admin@demo.local', password: 'ChangeMe123!' }),
 });
-console.log('login', login.status, Boolean(login.body.accessToken), Boolean(login.body.refreshToken));
+console.log('tenant_admin_login', login.status, Boolean(login.body.accessToken), Boolean(login.body.refreshToken));
 
 const readOnlyLogin = await request('/auth/login', {
   method: 'POST',
@@ -59,14 +70,16 @@ console.log('department_staff_login', departmentStaffLogin.status, departmentSta
 const token = login.body.accessToken;
 const readOnlyToken = readOnlyLogin.body.accessToken;
 const departmentStaffToken = departmentStaffLogin.body.accessToken;
+
+section('settings RBAC');
 const departments = await request('/departments', { token });
 console.log('departments', departments.body.length);
 
 const fenDepartment = departments.body.find((department) => department.code === 'FEN_ISLERI');
+assert(fenDepartment, 'Seeded FEN_ISLERI department not found for smoke.');
 const temizlikDepartment = departments.body.find((department) => department.code === 'TEMIZLIK');
-if (!fenDepartment || !temizlikDepartment) throw new Error('Seeded departments FEN_ISLERI and TEMIZLIK are required for smoke.');
+assert(temizlikDepartment, 'Seeded TEMIZLIK department not found for smoke.');
 
-const unique = Date.now();
 const createdDepartment = await request('/departments', {
   method: 'POST',
   token,
@@ -115,7 +128,7 @@ console.log('sla_policy_update', updatedSlaPolicy.status, updatedSlaPolicy.body.
 
 const messageTemplates = await request('/message-templates', { token });
 const firstTemplate = messageTemplates.body[0];
-if (!firstTemplate) throw new Error('No seeded message template found for smoke.');
+assert(firstTemplate, 'No seeded message template found for smoke.');
 const updatedTemplate = await request(`/message-templates/${firstTemplate.id}`, {
   method: 'PATCH',
   token,
@@ -160,6 +173,7 @@ await expectStatus(`/message-templates/${firstTemplate.id}`, 403, {
 });
 console.log('settings_rbac_negative', true);
 
+section('ticket workflow');
 const operatorTicket = await request('/tickets', {
   method: 'POST',
   token,
@@ -199,59 +213,125 @@ console.log('ticket_status', statusUpdate.status, statusUpdate.body.status);
 const auditLog = await request(`/tickets/${operatorTicket.body.id}/audit-log`, { token });
 console.log('ticket_audit', auditLog.status, auditLog.body.length > 0);
 
+await expectStatus('/tickets', 403, {
+  method: 'POST',
+  token: readOnlyToken,
+  body: JSON.stringify({
+    channel: 'OPERATOR',
+    title: `Read only ticket create ${unique}`,
+    description: 'Read only kullanıcı ticket oluşturamamalı.',
+    priority: 'NORMAL',
+    departmentId: createdDepartment.body.id,
+    categoryId: createdCategory.body.id,
+    addressText: 'Read Only Mahallesi',
+  }),
+});
+await expectStatus(`/tickets/${operatorTicket.body.id}/notes`, 403, {
+  method: 'POST',
+  token: readOnlyToken,
+  body: JSON.stringify({ body: 'Read only iç not ekleyememeli.' }),
+});
+await expectStatus(`/tickets/${operatorTicket.body.id}/public-messages`, 403, {
+  method: 'POST',
+  token: readOnlyToken,
+  body: JSON.stringify({ body: 'Read only public mesaj ekleyememeli.' }),
+});
+await expectStatus(`/tickets/${operatorTicket.body.id}/status`, 403, {
+  method: 'POST',
+  token: readOnlyToken,
+  body: JSON.stringify({ status: 'IN_PROGRESS' }),
+});
+await expectStatus(`/tickets/${operatorTicket.body.id}/assign`, 403, {
+  method: 'POST',
+  token: readOnlyToken,
+  body: JSON.stringify({ departmentId: createdDepartment.body.id }),
+});
+console.log('ticket_rbac_negative', true);
+
+section('department scoping');
 const fenTicket = await request('/tickets', {
   method: 'POST',
   token,
   body: JSON.stringify({
     channel: 'OPERATOR',
-    title: `Fen işleri smoke talebi ${unique}`,
-    description: 'Smoke testi için Fen İşleri kapsamındaki talep.',
+    title: `Smoke Fen talebi ${unique}`,
+    description: 'Fen İşleri kapsam testi için oluşturulan talep.',
     priority: 'NORMAL',
     departmentId: fenDepartment.id,
-    addressText: 'Fen Smoke Mahallesi',
+    addressText: 'Fen Mahallesi',
   }),
 });
+console.log('department_staff_visible_ticket_create', fenTicket.status, fenTicket.body.ticketNo);
+
 const temizlikTicket = await request('/tickets', {
   method: 'POST',
   token,
   body: JSON.stringify({
     channel: 'OPERATOR',
-    title: `Temizlik smoke talebi ${unique}`,
-    description: 'Smoke testi için Temizlik kapsamındaki talep.',
+    title: `Smoke Temizlik talebi ${unique}`,
+    description: 'Departman dışı kapsam testi için oluşturulan talep.',
     priority: 'NORMAL',
     departmentId: temizlikDepartment.id,
-    addressText: 'Temizlik Smoke Mahallesi',
+    addressText: 'Temizlik Mahallesi',
   }),
 });
-const staffTicketList = await request('/tickets', { token: departmentStaffToken });
-const staffTicketIds = staffTicketList.body.map((ticket) => ticket.id);
-if (!staffTicketIds.includes(fenTicket.body.id)) throw new Error('Department staff cannot see own department ticket.');
-if (staffTicketIds.includes(temizlikTicket.body.id)) throw new Error('Department staff can see outside department ticket.');
-await request(`/tickets/${fenTicket.body.id}`, { token: departmentStaffToken });
+console.log('department_staff_hidden_ticket_create', temizlikTicket.status, temizlikTicket.body.ticketNo);
+
+const departmentStaffTickets = await request('/tickets', { token: departmentStaffToken });
+const departmentStaffTicketIds = departmentStaffTickets.body.map((ticket) => ticket.id);
+assert(departmentStaffTicketIds.includes(fenTicket.body.id), 'Department staff cannot see own department ticket.');
+assert(!departmentStaffTicketIds.includes(temizlikTicket.body.id), 'Department staff can see another department ticket.');
+
+const departmentStaffFenTicket = await request(`/tickets/${fenTicket.body.id}`, { token: departmentStaffToken });
+console.log('department_staff_read_scope', departmentStaffFenTicket.status, departmentStaffFenTicket.body.department.id === fenDepartment.id);
 await expectStatus(`/tickets/${temizlikTicket.body.id}`, 404, { token: departmentStaffToken });
+const departmentStaffFilteredOutTickets = await expectStatus(`/tickets?departmentId=${temizlikDepartment.id}`, 200, { token: departmentStaffToken });
+assert(departmentStaffFilteredOutTickets.body.length === 0, 'Department staff department filter returned out-of-scope tickets.');
+
 await request(`/tickets/${fenTicket.body.id}/notes`, {
   method: 'POST',
   token: departmentStaffToken,
-  body: JSON.stringify({ body: 'Fen personeli kapsam içi notu.' }),
+  body: JSON.stringify({ body: 'Fen personeli kapsam içi iç notu.' }),
 });
 await expectStatus(`/tickets/${temizlikTicket.body.id}/notes`, 404, {
   method: 'POST',
   token: departmentStaffToken,
-  body: JSON.stringify({ body: 'Kapsam dışı not engellenmeli.' }),
+  body: JSON.stringify({ body: 'Departman dışı iç not eklenememeli.' }),
+});
+await expectStatus(`/tickets/${temizlikTicket.body.id}/public-messages`, 404, {
+  method: 'POST',
+  token: departmentStaffToken,
+  body: JSON.stringify({ body: 'Departman dışı public mesaj eklenememeli.' }),
+});
+await expectStatus(`/tickets/${temizlikTicket.body.id}/status`, 404, {
+  method: 'POST',
+  token: departmentStaffToken,
+  body: JSON.stringify({ status: 'IN_PROGRESS' }),
+});
+await expectStatus(`/tickets/${temizlikTicket.body.id}/assign`, 404, {
+  method: 'POST',
+  token: departmentStaffToken,
+  body: JSON.stringify({ departmentId: fenDepartment.id }),
+});
+await expectStatus(`/tickets/${fenTicket.body.id}/assign`, 403, {
+  method: 'POST',
+  token: departmentStaffToken,
+  body: JSON.stringify({ departmentId: temizlikDepartment.id }),
 });
 await expectStatus('/tickets', 403, {
   method: 'POST',
   token: departmentStaffToken,
   body: JSON.stringify({
     channel: 'OPERATOR',
-    title: `Yetkisiz departman talebi ${unique}`,
-    description: 'Fen personeli Temizlik birimine talep açamamalı.',
+    title: `Smoke departmansız personel talebi ${unique}`,
+    description: 'Departman personeli departmansız talep açamamalı.',
     priority: 'NORMAL',
-    departmentId: temizlikDepartment.id,
+    addressText: 'Kapsamsız Mahalle',
   }),
 });
-console.log('ticket_department_scope', true);
+console.log('department_staff_ticket_scope', true);
 
+section('public safety');
 const publicTicket = await request('/public/demo-belediye/tickets', {
   method: 'POST',
   body: JSON.stringify({
@@ -263,9 +343,9 @@ const publicTicket = await request('/public/demo-belediye/tickets', {
 console.log('public_create', publicTicket.status, publicTicket.body.ticketNo);
 
 const tracked = await request(`/public/demo-belediye/tickets/${publicTicket.body.ticketNo}`);
-const leakedPublicFields = ['id', 'tenantId', 'citizenId', 'assignedToId', 'auditLogs', 'attachments', 'messages', 'aiConfidence', 'aiClassification'];
-for (const field of leakedPublicFields) {
-  if (field in tracked.body) throw new Error(`Public ticket response leaked ${field}.`);
+const forbiddenPublicKeys = ['id', 'tenantId', 'citizenId', 'auditLogs', 'aiRuns', 'aiClassification', 'aiConfidence', 'internalNotes'];
+for (const key of forbiddenPublicKeys) {
+  assert(!Object.hasOwn(tracked.body, key), `Public ticket response leaked ${key}.`);
 }
 console.log('public_track', tracked.status, tracked.body.status);
-console.log('public_no_internal_leak', true);
+console.log('public_safe_response', true);

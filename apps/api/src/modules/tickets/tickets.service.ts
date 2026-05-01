@@ -246,8 +246,8 @@ export class TicketsService {
 
   private async requireDepartmentScope(user: AuthenticatedUser, departmentId?: string | null) {
     const departmentScope = await this.departmentScope(user);
-    if (!departmentScope || !departmentId) return;
-    if (!departmentScope.includes(departmentId)) throw new ForbiddenException('Bu birim için işlem yetkiniz yok.');
+    if (!departmentScope) return;
+    if (!departmentId || !departmentScope.includes(departmentId)) throw new ForbiddenException('Bu birim için işlem yetkiniz yok.');
   }
 
   private async requireDepartment(tenantId: string, departmentId: string) {
