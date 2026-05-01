@@ -215,3 +215,12 @@
 - **Result:** Passed.
 - **Next action:** Use Agent OS for future Wave 6+ work; initialize git before real worktree-based parallel sessions.
 - **Blocker:** None.
+
+## 2026-05-01 11:20 — UI polish checkpoint
+
+- **Action taken:** Reviewed admin settings and ticket mutation feedback UX, citizen report/track validation copy, loading/error routes, and citizen-safe error handling. Fixed citizen report success redirect handling and ticket detail note/message mutation IDs.
+- **Files changed:** `apps/admin-web/**`, `apps/citizen-web/**`, `docs/workflows/autonomous-run-log.md`.
+- **Verification run:** `pnpm -C C:/Users/arfgl/OneDrive/Desktop/chatbot-ui-wave --filter @kentos/admin-web typecheck`; `pnpm -C C:/Users/arfgl/OneDrive/Desktop/chatbot-ui-wave --filter @kentos/admin-web build`; `pnpm -C C:/Users/arfgl/OneDrive/Desktop/chatbot-ui-wave --filter @kentos/citizen-web typecheck`; `pnpm -C C:/Users/arfgl/OneDrive/Desktop/chatbot-ui-wave --filter @kentos/citizen-web build`.
+- **Result:** Passed after installing missing workspace dependencies with `pnpm -C C:/Users/arfgl/OneDrive/Desktop/chatbot-ui-wave install --frozen-lockfile`.
+- **Next action:** Commit UI polish slice.
+- **Blocker:** None.

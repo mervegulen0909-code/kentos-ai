@@ -1,8 +1,20 @@
 import { trackTicketAction } from './actions';
 
+const errorCopy: Record<string, { title: string; detail: string }> = {
+  missing: {
+    title: 'Başvuru numarası eksik.',
+    detail: 'Başvuru oluşturduğunuzda verilen numarayı yazın. Örnek biçim: KNT-2026-000123.',
+  },
+  format: {
+    title: 'Numara biçimi tanınmadı.',
+    detail: 'Kısa çizgileriyle birlikte KNT-2026-000123 biçiminde girin. Harfler küçük yazılsa da otomatik büyütülür.',
+  },
+};
+
 export default async function TrackPage({ params, searchParams }: { params: Promise<{ tenantSlug: string }>; searchParams: Promise<{ error?: string }> }) {
   const { tenantSlug } = await params;
   const { error } = await searchParams;
+  const errorMessage = error ? (errorCopy[error] ?? errorCopy.format) : null;
   const action = trackTicketAction.bind(null, tenantSlug);
 
   return (
@@ -10,10 +22,16 @@ export default async function TrackPage({ params, searchParams }: { params: Prom
       <form action={action} className="card" style={{ maxWidth: 720 }}>
         <p style={{ color: 'var(--muted)', fontWeight: 700 }}>{tenantSlug} · Başvuru takibi</p>
         <h1>Başvuru numaranızı girin.</h1>
-        {error ? <p role="alert" style={{ color: 'oklch(54% 0.2 28)' }}>Başvuru numarası gerekli.</p> : null}
-        <div className="field">
+        {errorMessage ? (
+          <div className="notice error" role="alert">
+            <strong>{errorMessage.title}</strong>
+            <p>{errorMessage.detail}</p>
+          </div>
+        ) : null}
+        <div className={`field ${error ? 'field-error' : ''}`}>
           <label htmlFor="ticketNo">Başvuru numarası</label>
-          <input id="ticketNo" name="ticketNo" placeholder="KNT-2026-000123" required />
+          <input id="ticketNo" name="ticketNo" placeholder="KNT-2026-000123" required aria-describedby="ticketNo-help" aria-invalid={Boolean(error)} inputMode="text" autoCapitalize="characters" />
+          <small id="ticketNo-help">Numara başvuru sonrası verilen takip bilgisidir; T.C. kimlik veya telefon numarası değildir.</small>
         </div>
         <button className="cta" type="submit">Durumu sorgula</button>
       </form>

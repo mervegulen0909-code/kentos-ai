@@ -8,11 +8,11 @@ export default async function PublicTicketPage({ params }: { params: Promise<{ t
     <main className="wrap">
       <section className="card">
         <p style={{ color: 'var(--muted)', fontWeight: 700 }}>{tenantSlug} · {ticketNo}</p>
-        <h1>{ticket ? ticket.title : 'Başvuru bilgisi şu an alınamadı.'}</h1>
+        <h1>{ticket ? ticket.title : 'Bu numarayla başvuru görüntülenemedi.'}</h1>
         <p>
           {ticket
             ? `${ticket.status} durumundaki başvurunuz ${ticket.departmentName ?? 'ilgili belediye birimi'} tarafından takip ediliyor.`
-            : 'API çalışmıyorsa bu ekran güvenli boş durum gösterir. Lütfen başvuru numaranızı kontrol edin veya daha sonra tekrar deneyin.'}
+            : 'Numarayı başvuru sonrasında size verilen biçimiyle kontrol edin. Bilgi doğruysa belediye sistemi kısa süreli meşgul olabilir; biraz sonra yeniden deneyin.'}
         </p>
         <div style={{ display: 'grid', gap: 12, marginTop: 24 }}>
           {(ticket?.publicMessages.length ? ticket.publicMessages : [{ body: 'Başvurunuz kayda alındı.', createdAt: ticket?.createdAt ?? '', senderType: 'SYSTEM' }]).map((message, index) => (

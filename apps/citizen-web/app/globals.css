@@ -20,5 +20,14 @@ button, input, textarea { font: inherit; }
 .field { display: grid; gap: 8px; margin-bottom: 16px; }
 .field label { font-weight: 700; }
 .field input, .field textarea { border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; background: oklch(98% 0.01 92); color: var(--ink); }
+.field small { color: var(--muted); line-height: 1.45; }
+.field-error input, .field-error textarea { border-color: color-mix(in oklch, var(--accent) 72%, oklch(45% 0.18 28)); box-shadow: 0 0 0 4px color-mix(in oklch, var(--accent) 14%, transparent); }
+.notice { border: 1px solid var(--line); border-radius: 18px; padding: 14px 16px; margin: 0 0 18px; }
+.notice p { margin: 6px 0 0; color: var(--muted); }
+.notice.error { border-color: color-mix(in oklch, var(--accent) 45%, var(--line)); background: color-mix(in oklch, var(--accent) 10%, white); }
+.skeleton { overflow: hidden; position: relative; min-height: 88px; border-radius: 20px; background: oklch(94% 0.018 92); }
+.skeleton::after { content: ''; position: absolute; inset: 0; transform: translateX(-100%); background: linear-gradient(90deg, transparent, color-mix(in oklch, var(--accent) 16%, transparent), transparent); animation: sweep 1.4s infinite; }
 .cta { min-height: 48px; border: 0; border-radius: 999px; background: var(--ink); color: white; padding: 0 22px; cursor: pointer; }
+@keyframes sweep { to { transform: translateX(100%); } }
+@media (prefers-reduced-motion: reduce) { .skeleton::after { animation-duration: 0.01ms; animation-iteration-count: 1; } }
 @media (max-width: 800px) { .hero { grid-template-columns: 1fr; } }

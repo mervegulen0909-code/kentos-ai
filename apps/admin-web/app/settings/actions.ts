@@ -1,18 +1,31 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { redirect } from 'next/navigation';
 import { apiFetch } from '../../lib/api';
 import { getSessionToken } from '../../lib/session';
 
 async function requireToken() {
   const token = await getSessionToken();
-  if (!token) throw new Error('Oturum bulunamadı.');
+  if (!token) redirect('/settings?error=session');
   return token;
 }
 
-export async function createDepartmentAction(formData: FormData) {
+async function runSettingsMutation(formData: FormData, success: string, mutation: (token: string) => Promise<void>) {
   const token = await requireToken();
-  await apiFetch('/departments', {
+
+  try {
+    await mutation(token);
+  } catch {
+    redirect(`/settings?error=${encodeURIComponent(String(formData.get('intent') ?? 'general'))}`);
+  }
+
+  revalidatePath('/settings');
+  redirect(`/settings?success=${success}`);
+}
+
+export async function createDepartmentAction(formData: FormData) {
+  await runSettingsMutation(formData, 'department-created', (token) => apiFetch('/departments', {
     method: 'POST',
     token,
     body: JSON.stringify({
@@ -20,14 +33,12 @@ export async function createDepartmentAction(formData: FormData) {
       name: String(formData.get('name') ?? '').trim(),
       description: String(formData.get('description') ?? '').trim() || undefined,
     }),
-  });
-  revalidatePath('/settings');
+  }));
 }
 
 export async function updateDepartmentAction(formData: FormData) {
-  const token = await requireToken();
   const id = String(formData.get('id') ?? '');
-  await apiFetch(`/departments/${id}`, {
+  await runSettingsMutation(formData, 'department-updated', (token) => apiFetch(`/departments/${id}`, {
     method: 'PATCH',
     token,
     body: JSON.stringify({
@@ -35,13 +46,11 @@ export async function updateDepartmentAction(formData: FormData) {
       description: String(formData.get('description') ?? '').trim() || undefined,
       isActive: formData.get('isActive') === 'true',
     }),
-  });
-  revalidatePath('/settings');
+  }));
 }
 
 export async function createCategoryAction(formData: FormData) {
-  const token = await requireToken();
-  await apiFetch('/categories', {
+  await runSettingsMutation(formData, 'category-created', (token) => apiFetch('/categories', {
     method: 'POST',
     token,
     body: JSON.stringify({
@@ -50,14 +59,12 @@ export async function createCategoryAction(formData: FormData) {
       departmentId: String(formData.get('departmentId') ?? '').trim() || undefined,
       defaultPriority: String(formData.get('defaultPriority') ?? 'NORMAL'),
     }),
-  });
-  revalidatePath('/settings');
+  }));
 }
 
 export async function updateCategoryAction(formData: FormData) {
-  const token = await requireToken();
   const id = String(formData.get('id') ?? '');
-  await apiFetch(`/categories/${id}`, {
+  await runSettingsMutation(formData, 'category-updated', (token) => apiFetch(`/categories/${id}`, {
     method: 'PATCH',
     token,
     body: JSON.stringify({
@@ -66,13 +73,11 @@ export async function updateCategoryAction(formData: FormData) {
       defaultPriority: String(formData.get('defaultPriority') ?? 'NORMAL'),
       isActive: formData.get('isActive') === 'true',
     }),
-  });
-  revalidatePath('/settings');
+  }));
 }
 
 export async function createSlaPolicyAction(formData: FormData) {
-  const token = await requireToken();
-  await apiFetch('/sla-policies', {
+  await runSettingsMutation(formData, 'sla-created', (token) => apiFetch('/sla-policies', {
     method: 'POST',
     token,
     body: JSON.stringify({
@@ -82,14 +87,12 @@ export async function createSlaPolicyAction(formData: FormData) {
       departmentId: String(formData.get('departmentId') ?? '').trim() || undefined,
       categoryId: String(formData.get('categoryId') ?? '').trim() || undefined,
     }),
-  });
-  revalidatePath('/settings');
+  }));
 }
 
 export async function updateSlaPolicyAction(formData: FormData) {
-  const token = await requireToken();
   const id = String(formData.get('id') ?? '');
-  await apiFetch(`/sla-policies/${id}`, {
+  await runSettingsMutation(formData, 'sla-updated', (token) => apiFetch(`/sla-policies/${id}`, {
     method: 'PATCH',
     token,
     body: JSON.stringify({
@@ -97,17 +100,14 @@ export async function updateSlaPolicyAction(formData: FormData) {
       resolutionMinutes: Number(formData.get('resolutionMinutes') ?? 4320),
       isActive: formData.get('isActive') === 'true',
     }),
-  });
-  revalidatePath('/settings');
+  }));
 }
 
 export async function updateTemplateAction(formData: FormData) {
-  const token = await requireToken();
   const id = String(formData.get('id') ?? '');
-  await apiFetch(`/message-templates/${id}`, {
+  await runSettingsMutation(formData, 'template-updated', (token) => apiFetch(`/message-templates/${id}`, {
     method: 'PATCH',
     token,
     body: JSON.stringify({ body: String(formData.get('body') ?? '') }),
-  });
-  revalidatePath('/settings');
+  }));
 }
