@@ -4,7 +4,12 @@ KentOS AI is initialized as a Git repository with GitHub remote `origin` at `htt
 
 Use worktrees for parallel Claude Code windows only after the branch you want to split from has a clean working tree and a committed baseline.
 
-If a wave branch was already merged into `master` and will be reused for a new wave, align it with current local `master` before editing. First run `git status --short --branch`, `git log --oneline --decorate -5`, and `git fetch origin`; if the branch is clean and behind local `master`, use `git merge master`. If the branch is dirty, stop and report the uncommitted files to the main control window before changing docs or code.
+If a wave branch was already merged into `master` and will be reused for a new wave, align it with current local `master` before editing:
+
+1. Run `git status --short --branch` and `git log --oneline --decorate -5`.
+2. If the worktree branch is clean and behind local `master`, run `git merge master` before new edits.
+3. If the branch is dirty, conflicted, or the merge is not a fast-forward/clean merge, stop and report the exact state to `1 — Ana Kontrol`.
+4. Do not resolve conflicts, discard files, or continue editing from a stale baseline unless `1 — Ana Kontrol` explicitly directs it.
 
 ## Preflight
 
