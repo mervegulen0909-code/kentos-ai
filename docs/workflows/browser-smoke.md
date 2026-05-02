@@ -101,9 +101,19 @@ Admin expected markers:
 - Ticket assignment, internal note, public message, status transition, and audit log are visible in the admin flow.
 - Success/error notices are specific, persistent enough to read, and do not leak secrets, stack traces, or raw backend payloads.
 
+### Scenario G — Role-aware admin UI controls
+
+1. Login as a read-only seeded user if available for local smoke.
+2. Open dashboard, ticket list, ticket detail, and settings pages.
+3. Confirm read-only pages still render useful data or designed empty states without raw authorization errors.
+4. Confirm mutation controls are hidden, disabled, or guarded with clear copy for read-only users.
+5. Attempt one guarded action only if the UI exposes it; confirm the denial notice is specific, non-scary, and does not expose stack traces, tokens, role internals, or raw API payloads.
+6. Repeat a spot check with `DEPARTMENT_STAFF` if seeded credentials are available: assigned-department actions may appear, cross-department or admin-only actions must be hidden, disabled, or denied safely.
+7. Return to `TENANT_ADMIN` and confirm allowed mutation controls still work, so role restrictions did not break the happy path.
+
 ## Citizen smoke
 
-### Scenario G — Citizen report
+### Scenario H — Citizen report
 
 1. Open `http://127.0.0.1:3112/demo-belediye/report`.
 2. Submit a report with realistic Turkish description, address, and phone.
@@ -112,7 +122,7 @@ Admin expected markers:
 5. Confirm the report flow works without staff authentication.
 6. Confirm required-field validation copy is Turkish-first and does not expose backend internals.
 
-### Scenario H — Citizen track
+### Scenario I — Citizen track
 
 1. Open `http://127.0.0.1:3112/demo-belediye/track`.
 2. Enter the same ticket number and confirm navigation to the same public ticket page.
@@ -121,14 +131,14 @@ Admin expected markers:
 5. Try an obviously invalid but well-formed ticket number and confirm the not-found state is citizen-safe and helpful.
 6. Reopen the valid ticket page after the invalid states and confirm the successful state still renders correctly.
 
-### Scenario I — Citizen public ticket status copy
+### Scenario J — Citizen public ticket status copy
 
 1. Confirm the public ticket page shows only public-safe fields: ticket number, status, category/department if public, address/description summary if intended, and citizen-safe messages.
 2. Confirm status copy is understandable to a citizen and avoids internal workflow jargon.
 3. Confirm loading, empty, invalid, and error states explain what the citizen can do next.
 4. Confirm the page does not show internal notes, audit logs, staff-only metadata, AI reasoning, tokens, stack traces, or tenant internals.
 
-### Scenario J — Mobile viewport quick check
+### Scenario K — Mobile viewport quick check
 
 1. Set the viewport near 390px width.
 2. Recheck admin login, settings, ticket detail, citizen report, citizen track, and citizen ticket pages.

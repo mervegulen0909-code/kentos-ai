@@ -279,6 +279,15 @@
 - **Next action:** `1 — Ana Kontrol` should review, commit, and merge this docs-only QA slice.
 - **Blocker:** None.
 
+## 2026-05-01 16:10 — Wave 8 QA role matrix checkpoint
+
+- **Action taken:** Window 4 documented role matrix smoke expectations, role-aware browser UI checks, RBAC release regression checklist, and Window 1 active integration responsibilities.
+- **Files changed:** `docs/workflows/local-smoke.md`, `docs/workflows/browser-smoke.md`, `docs/checklists/release-checklist.md`, `docs/agent-os/parallel-sessions.md`, `docs/workflows/autonomous-run-log.md`.
+- **Verification run:** `pnpm typecheck && pnpm build`.
+- **Result:** Passed.
+- **Next action:** `1 — Ana Kontrol` should review, commit, and merge this docs-only QA slice.
+- **Blocker:** None.
+
 ## 2026-05-01 16:20 — Wave 8 UI role-aware polish checkpoint
 
 - **Action taken:** Window 3 verified `wave/ui-polish` starts at local `master`, then added role-aware mutation copy, terminal ticket disabled states, Turkish status/SLA labels, richer audit action labels, citizen-safe status copy, and small mobile sidebar improvements.

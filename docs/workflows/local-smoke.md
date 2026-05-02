@@ -75,6 +75,20 @@ Run this scope when auth, RBAC, tenant settings, ticket workflow, department sco
 
 If any RBAC negative case fails twice, stop and report the exact role, endpoint, expected denial, and actual response before changing any app code.
 
+## Role matrix smoke expectations
+
+Run this scope when seed roles, guards, ticket workflow permissions, tenant settings permissions, or admin UI affordances change. The smoke result should make each role's allowed and denied actions explicit:
+
+| Role | Expected positive checks | Expected negative checks |
+| --- | --- | --- |
+| `TENANT_ADMIN` | Can authenticate, read tenant config, write tenant settings, create/assign/mutate tickets, add internal notes and public messages, read audit logs. | Must remain tenant-scoped and must not access another tenant's data. |
+| `READ_ONLY` | Can authenticate and read allowed admin data for the tenant. | Cannot write tenant settings, create or mutate tickets, add notes/messages, or change statuses. Denials must be safe and non-mutating. |
+| `DEPARTMENT_STAFF` | Can read and mutate tickets assigned to its department scope when the transition/action is otherwise valid. | Cannot read or mutate cross-department tickets and cannot bypass status transition guards. |
+| `OPERATOR` | Can perform front-line ticket intake/triage actions that are explicitly in scope, such as ticket creation or permitted updates. | Cannot perform tenant-admin settings writes, privileged RBAC changes, or manager-only actions. |
+| `MANAGER` | Can read operational views and reports, and can perform manager-approved workflow actions if implemented. | Cannot perform tenant-admin-only settings/RBAC changes unless explicitly granted by product policy. |
+
+For each role, record the login identity used, endpoint or UI action, expected status/result, actual status/result, and whether an audit entry should exist.
+
 ## Ticket transition guards
 
 Run this scope when ticket status logic, controller guards, role permissions, or UI transition buttons change. The automated smoke should prove that:
