@@ -24,6 +24,13 @@ Before editing, each window must read:
 
 When switching windows, create a concise handoff using `.claude/templates/handoff.md`.
 
+## Hybrid work model
+
+- Small task: one window owns the full local edit, verification, and report loop.
+- Medium task: Window 1 plus the relevant specialist window is enough; avoid opening all roles when ownership is narrow.
+- Large wave: use Window 1 plus Windows 2, 3, and 4 with strict file ownership, explicit handoffs, and Window 1-owned commits/merges/final verification.
+- If scope grows, Window 1 decides whether to add specialist windows or collapse work back into a single integration flow.
+
 ## Permanent multi-window rule
 
 - Window 1 is the main control window. It owns commits, merges, final verification sequencing, and milestone push decisions.

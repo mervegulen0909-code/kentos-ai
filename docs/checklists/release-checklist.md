@@ -90,6 +90,18 @@ Do not push unless the user explicitly asks for it. The default team policy is m
 - [ ] It is acceptable for local `master` to be ahead of `origin/master` while a milestone is still in progress.
 - [ ] Record merge order and verification locally, then wait for the milestone-end push decision.
 
+### Milestone push final gate
+
+Before the milestone push decision:
+
+- [ ] Record `master` ahead count versus `origin/master`.
+- [ ] Confirm `pnpm typecheck` passed on final `master`.
+- [ ] Confirm `pnpm build` passed on final `master`.
+- [ ] Record API smoke as passed, or record a precise blocked reason such as `Docker daemon unavailable`.
+- [ ] Record browser smoke status: passed, partially run with gaps, blocked, or explicitly not run.
+- [ ] Confirm `git status --short` contains only intentional state.
+- [ ] Confirm no secrets, production env files, credentials, or real tokens are staged.
+
 Before push:
 
 - [ ] Confirm branch name and target remote.

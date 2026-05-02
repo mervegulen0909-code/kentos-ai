@@ -296,3 +296,12 @@
 - **Result:** Passed.
 - **Next action:** Window 1 should review, commit, and merge the uncommitted UI role-aware polish slice.
 - **Blocker:** None.
+
+## 2026-05-01 16:35 — Wave 9 QA operational readiness checkpoint
+
+- **Action taken:** Window 4 documented Docker Desktop smoke blockers, dashboard/reports/queues operational browser checks, milestone push final gate, and hybrid multi-window operating model.
+- **Files changed:** `docs/workflows/local-smoke.md`, `docs/workflows/browser-smoke.md`, `docs/checklists/release-checklist.md`, `docs/agent-os/parallel-sessions.md`, `docs/workflows/autonomous-run-log.md`.
+- **Verification run:** `pnpm typecheck && pnpm build`.
+- **Result:** Passed.
+- **Next action:** `1 — Ana Kontrol` should review, commit, and merge this docs-only QA slice.
+- **Blocker:** None.

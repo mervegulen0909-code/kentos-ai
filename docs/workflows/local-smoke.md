@@ -25,6 +25,23 @@ The smoke must not call non-local endpoints, send WhatsApp/email/social messages
 docker compose -f infra/docker-compose.yml up -d
 ```
 
+## Docker Desktop blocker
+
+If Docker Desktop or the Docker daemon is not running, local API smoke cannot be called passed. Treat this as **blocked**, not failed and not passed.
+
+How to identify the blocker:
+
+- `docker compose -f infra/docker-compose.yml up -d` cannot connect to the Docker daemon.
+- Docker CLI output mentions that the daemon is unavailable, Docker Desktop is not running, or the named pipe/socket cannot be reached.
+- Database-dependent commands fail because the local Postgres container never started.
+
+How to report it:
+
+- Record the exact command that hit the Docker blocker.
+- Report API smoke as `blocked: Docker daemon unavailable`.
+- Do not claim `pnpm smoke:api` passed unless the local API was actually running and the smoke command completed successfully.
+- Continue with non-Docker checks such as `pnpm typecheck` and `pnpm build` when they are not blocked by the same issue.
+
 ## Prepare the database
 
 ```bash

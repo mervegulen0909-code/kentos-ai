@@ -53,14 +53,23 @@ Seeded login:
 4. Confirm an HTTP-only local MVP session cookie exists.
 5. Confirm the dashboard renders operational cards and does not expose raw API errors.
 
-### Scenario B — Admin ticket list
+### Scenario B — Dashboard, reports, and queues operational smoke
+
+1. Open `http://127.0.0.1:3111/` after login.
+2. Confirm dashboard KPI cards render with labels, values, and safe empty/default states; no raw API errors should be visible.
+3. Open `http://127.0.0.1:3111/reports` and confirm empty, data, and error states are operationally useful for managers.
+4. Confirm reports copy distinguishes "no data yet" from "data failed to load".
+5. Open `http://127.0.0.1:3111/queues` and confirm queue copy explains operational ownership, next action, or current limitation without generic filler.
+6. Set the viewport near 390px width and quickly recheck dashboard, reports, and queues for clipped KPI values, hidden actions, or horizontal scrolling.
+
+### Scenario C — Admin ticket list
 
 1. Open `http://127.0.0.1:3111/tickets`.
 2. Confirm either real ticket rows or the designed empty state renders.
 3. If rows render, confirm visible ticket metadata is staff-safe and tenant-scoped.
 4. Open a ticket detail page from the list.
 
-### Scenario C — Ticket detail mutation forms
+### Scenario D — Ticket detail mutation forms
 
 1. Assign the ticket to a visible department and confirm a specific success notice.
 2. Add an internal note and confirm it appears only in the admin timeline.
@@ -68,7 +77,7 @@ Seeded login:
 4. Refresh the ticket detail page and confirm assignment, notes, messages, and notices persist or clear intentionally.
 5. Trigger one validation or authorization-style error path and confirm the error notice is actionable without exposing raw backend payloads.
 
-### Scenario D — Status transition disabled and guarded states
+### Scenario E — Status transition disabled and guarded states
 
 1. Review the visible next status actions for the ticket's current status.
 2. Confirm invalid transitions are hidden, disabled, or guarded by explanatory copy.
@@ -76,14 +85,14 @@ Seeded login:
 4. Refresh the page and confirm the new status persists.
 5. Confirm repeated or now-invalid transitions cannot be submitted accidentally.
 
-### Scenario E — Audit timeline
+### Scenario F — Audit timeline
 
 1. After assignment, note, public message, and status transition, inspect the audit timeline.
 2. Confirm each mutation has a visible audit event with actor, action, and timestamp context.
 3. Confirm internal notes and audit details do not appear in citizen-facing pages.
 4. Confirm audit timeline failures do not collapse the whole ticket detail page into a raw error.
 
-### Scenario F — Settings notices
+### Scenario G — Settings notices
 
 1. Open `http://127.0.0.1:3111/settings`.
 2. Create a department with a unique local smoke code, for example `QA-<date>-<initials>`.
@@ -101,7 +110,7 @@ Admin expected markers:
 - Ticket assignment, internal note, public message, status transition, and audit log are visible in the admin flow.
 - Success/error notices are specific, persistent enough to read, and do not leak secrets, stack traces, or raw backend payloads.
 
-### Scenario G — Role-aware admin UI controls
+### Scenario H — Role-aware admin UI controls
 
 1. Login as a read-only seeded user if available for local smoke.
 2. Open dashboard, ticket list, ticket detail, and settings pages.
@@ -113,7 +122,7 @@ Admin expected markers:
 
 ## Citizen smoke
 
-### Scenario H — Citizen report
+### Scenario I — Citizen report
 
 1. Open `http://127.0.0.1:3112/demo-belediye/report`.
 2. Submit a report with realistic Turkish description, address, and phone.
@@ -122,7 +131,7 @@ Admin expected markers:
 5. Confirm the report flow works without staff authentication.
 6. Confirm required-field validation copy is Turkish-first and does not expose backend internals.
 
-### Scenario I — Citizen track
+### Scenario J — Citizen track
 
 1. Open `http://127.0.0.1:3112/demo-belediye/track`.
 2. Enter the same ticket number and confirm navigation to the same public ticket page.
@@ -131,14 +140,14 @@ Admin expected markers:
 5. Try an obviously invalid but well-formed ticket number and confirm the not-found state is citizen-safe and helpful.
 6. Reopen the valid ticket page after the invalid states and confirm the successful state still renders correctly.
 
-### Scenario J — Citizen public ticket status copy
+### Scenario K — Citizen public ticket status copy
 
 1. Confirm the public ticket page shows only public-safe fields: ticket number, status, category/department if public, address/description summary if intended, and citizen-safe messages.
 2. Confirm status copy is understandable to a citizen and avoids internal workflow jargon.
 3. Confirm loading, empty, invalid, and error states explain what the citizen can do next.
 4. Confirm the page does not show internal notes, audit logs, staff-only metadata, AI reasoning, tokens, stack traces, or tenant internals.
 
-### Scenario K — Mobile viewport quick check
+### Scenario L — Mobile viewport quick check
 
 1. Set the viewport near 390px width.
 2. Recheck admin login, settings, ticket detail, citizen report, citizen track, and citizen ticket pages.
