@@ -46,7 +46,19 @@ Run local API smoke when API, database, auth, RBAC, tenant settings, ticket work
 - [ ] Smoke verifies authenticated ticket create, assignment, internal note, public message, status transition, and audit log.
 - [ ] Smoke verifies public citizen ticket create/track.
 
-## 5. Manual browser smoke
+## 5. Role and RBAC regression
+
+Run role regression when auth, RBAC guards, seed users, ticket workflow, settings permissions, or admin UI affordances changed.
+
+- [ ] `TENANT_ADMIN` can perform tenant settings writes and ticket mutations while remaining tenant-scoped.
+- [ ] `READ_ONLY` can read permitted admin data but cannot write settings, create/mutate tickets, add notes/messages, or change statuses.
+- [ ] `DEPARTMENT_STAFF` can access only assigned-department ticket scope and cannot mutate cross-department tickets.
+- [ ] `OPERATOR` can perform only explicitly allowed intake/triage actions and cannot perform tenant-admin or manager-only actions.
+- [ ] `MANAGER` can read operational/reporting views and only the workflow actions granted by product policy.
+- [ ] Denied actions return safe notices/responses without stack traces, raw internal errors, secrets, tokens, or cross-tenant data.
+- [ ] Allowed and denied role actions have the expected audit behavior documented in the QA report.
+
+## 6. Manual browser smoke
 
 Run browser smoke when admin or citizen UI routes, forms, auth/session, settings, ticket pages, or report/track flows changed.
 
@@ -62,7 +74,7 @@ Run browser smoke when admin or citizen UI routes, forms, auth/session, settings
 - [ ] Browser console has no unexpected errors on the smoke path.
 - [ ] Narrow mobile viewport has no blocking layout breakage.
 
-## 6. QA Smoke Runner window behavior
+## 7. QA Smoke Runner window behavior
 
 - [ ] QA window only edits allowed docs/checklists/workflow files unless separately authorized.
 - [ ] QA window does not modify `apps/**`, `packages/**`, `scripts/smoke-api.mjs`, production env files, or secrets.
@@ -71,7 +83,7 @@ Run browser smoke when admin or citizen UI routes, forms, auth/session, settings
 - [ ] If the same smoke failure repeats twice, QA stops and reports a root-cause hypothesis instead of changing app code.
 - [ ] UI completion claims include browser/manual smoke status or an explicit note that it was not run.
 
-## 7. Push gate
+## 8. Push gate
 
 Do not push unless the user explicitly asks for it. The default team policy is milestone-end push, not push-after-each-merge.
 
@@ -86,7 +98,7 @@ Before push:
 - [ ] Confirm no secrets or production env files are staged.
 - [ ] Confirm whether the action is branch push only or PR creation/update.
 
-## 8. Final merge note
+## 9. Final merge note
 
 Record the final note with:
 
