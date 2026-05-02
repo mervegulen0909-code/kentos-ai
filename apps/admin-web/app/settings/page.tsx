@@ -111,6 +111,12 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
         </div>
       ) : null}
       {!token ? <p className="notice muted">Ayarları düzenlemek için giriş yapın. Formlar güvenli biçimde pasif tutulur.</p> : null}
+      {token ? (
+        <div className="notice muted" role="note">
+          <strong>Ayar değişiklikleri rol ve tenant yetkisine göre denetlenir.</strong>
+          <p>READ_ONLY veya kapsam dışı oturumlar API tarafından reddedilir; bu ekranda token client component’e taşınmadan güvenli hata mesajı gösterilir.</p>
+        </div>
+      ) : null}
       <div className="grid">
         <section className="card">
           <h2>Departmanlar</h2>

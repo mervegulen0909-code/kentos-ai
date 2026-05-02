@@ -13,6 +13,37 @@ const transitions: Record<string, string[]> = {
   REJECTED: [],
 };
 
+const statusCopy: Record<string, string> = {
+  NEW: 'Yeni kayıt',
+  TRIAGED: 'Ön incelemede',
+  ASSIGNED: 'Birime atandı',
+  IN_PROGRESS: 'İşlemde',
+  WAITING_INFO: 'Vatandaştan bilgi bekleniyor',
+  RESOLVED: 'Çözüm bildirildi',
+  CLOSED: 'Kapatıldı',
+  REJECTED: 'Reddedildi',
+};
+
+const slaCopy: Record<string, string> = {
+  OK: 'SLA içinde',
+  DUE_SOON: 'SLA yaklaşmakta',
+  BREACHED: 'SLA aşıldı',
+  UNKNOWN: 'SLA bilinmiyor',
+};
+
+const auditActionCopy: Record<string, string> = {
+  'ticket.created': 'Talep oluşturuldu',
+  'ticket.assigned': 'Talep birime atandı',
+  'ticket.status_changed': 'Durum değiştirildi',
+  'ticket.internal_note_added': 'İç not eklendi',
+  'ticket.public_message_added': 'Vatandaş mesajı eklendi',
+};
+
+const dateFormatter = new Intl.DateTimeFormat('tr-TR', {
+  dateStyle: 'medium',
+  timeStyle: 'short',
+});
+
 type FeedbackCopy = { title: string; detail: string };
 
 const successCopy: Record<string, FeedbackCopy> = {
@@ -69,11 +100,19 @@ export default async function TicketDetailPage({ params, searchParams }: { param
   const auditLog = token ? await adminApi.auditLog(token, id).catch(() => []) : [];
   const departments = token ? await adminApi.departments(token).catch(() => []) : [];
   const statusOptions = ticket ? [ticket.status, ...(transitions[ticket.status] ?? [])] : [];
+  const isTerminal = ticket?.status === 'CLOSED' || ticket?.status === 'REJECTED';
+  const canMutateTicket = Boolean(ticket && !isTerminal);
 
   return (
     <main className="main">
       <p className="badge">Talep detayı · {ticket?.ticketNo ?? id}</p>
       <h1>{ticket?.title ?? 'Talep detayı için giriş yapın'}</h1>
+      {token && ticket ? (
+        <div className="notice muted" role="note">
+          <strong>Yetki durumu API tarafından doğrulanır.</strong>
+          <p>Bu ekranda rol bilgisi taşınmadığı için READ_ONLY veya kapsam dışı kullanıcı işlemleri backend guard tarafından reddedilir; hata mesajı güvenli biçimde gösterilir.</p>
+        </div>
+      ) : null}
       {success ? (
         <div className="notice success" role="status">
           <strong>{(successCopy[success] ?? { title: 'İşlem kaydedildi.', detail: 'Talep detayı güncel verilerle yenilendi.' }).title}</strong>
@@ -89,18 +128,24 @@ export default async function TicketDetailPage({ params, searchParams }: { param
       <div className="grid">
         <section className="card">
           <h2>Durum</h2>
-          <p>{ticket ? `${ticket.status} · ${ticket.department?.name ?? 'Atanmamış'} · ${ticket.slaState ?? 'UNKNOWN'}` : 'Oturum yok veya API erişilemiyor.'}</p>
+          <p>{ticket ? `${statusCopy[ticket.status] ?? ticket.status} · ${ticket.department?.name ?? 'Atanmamış'} · ${slaCopy[ticket.slaState ?? 'UNKNOWN'] ?? slaCopy.UNKNOWN}` : 'Oturum yok veya API erişilemiyor.'}</p>
+          {isTerminal ? (
+            <div className="notice muted" role="note">
+              <strong>Bu talep son durumda.</strong>
+              <p>Kapatılmış veya reddedilmiş taleplerde yeni atama, durum geçişi ve mesaj işlemleri backend guard tarafından kabul edilmez.</p>
+            </div>
+          ) : null}
           {ticket ? (
             <form action={updateStatusAction} style={{ display: 'grid', gap: 10 }}>
               <input type="hidden" name="intent" value="status" />
               <input type="hidden" name="ticketId" value={ticket.id} />
-              <select name="status" defaultValue={ticket.status}>
+              <select name="status" defaultValue={ticket.status} disabled={!canMutateTicket}>
                 {statusOptions.map((status) => (
-                  <option key={status}>{status}</option>
+                  <option key={status} value={status}>{statusCopy[status] ?? status}</option>
                 ))}
               </select>
-              <input name="publicMessage" placeholder="Vatandaşa opsiyonel durum mesajı" />
-              <button type="submit">Durumu güncelle</button>
+              <input name="publicMessage" placeholder="Vatandaşa opsiyonel durum mesajı" disabled={!canMutateTicket} />
+              <button type="submit" disabled={!canMutateTicket}>Durumu güncelle</button>
             </form>
           ) : null}
         </section>
@@ -110,11 +155,11 @@ export default async function TicketDetailPage({ params, searchParams }: { param
             <form action={assignTicketAction} style={{ display: 'grid', gap: 10 }}>
               <input type="hidden" name="intent" value="assignment" />
               <input type="hidden" name="ticketId" value={ticket.id} />
-              <select name="departmentId" defaultValue="">
+              <select name="departmentId" defaultValue="" disabled={!canMutateTicket || !departments.length}>
                 <option value="">Birim seçin</option>
                 {departments.map((department) => <option key={department.id} value={department.id}>{department.name}</option>)}
               </select>
-              <button type="submit" disabled={!departments.length}>Birime ata</button>
+              <button type="submit" disabled={!canMutateTicket || !departments.length}>Birime ata</button>
             </form>
           ) : <p style={{ color: 'var(--muted)' }}>Atama için oturum gerekli.</p>}
         </section>
@@ -129,8 +174,8 @@ export default async function TicketDetailPage({ params, searchParams }: { param
           <form action={addInternalNoteAction} style={{ display: 'grid', gap: 10 }}>
             <input type="hidden" name="intent" value="internal-note" />
             <input type="hidden" name="ticketId" value={ticket?.id ?? id} />
-            <textarea name="body" rows={4} placeholder="Sadece personel görür" />
-            <button type="submit" disabled={!ticket}>Notu kaydet</button>
+            <textarea name="body" rows={4} placeholder="Sadece personel görür" disabled={!canMutateTicket} />
+            <button type="submit" disabled={!canMutateTicket}>Notu kaydet</button>
           </form>
         </section>
         <section className="card">
@@ -138,15 +183,23 @@ export default async function TicketDetailPage({ params, searchParams }: { param
           <form action={addPublicMessageAction} style={{ display: 'grid', gap: 10 }}>
             <input type="hidden" name="intent" value="public-message" />
             <input type="hidden" name="ticketId" value={ticket?.id ?? id} />
-            <textarea name="body" rows={4} placeholder="Vatandaş takip ekranında görünür" />
-            <button type="submit" disabled={!ticket}>Mesajı gönder</button>
+            <textarea name="body" rows={4} placeholder="Vatandaş takip ekranında görünür" disabled={!canMutateTicket} />
+            <button type="submit" disabled={!canMutateTicket}>Mesajı gönder</button>
           </form>
         </section>
         <section className="card">
           <h2>Audit timeline</h2>
           {auditLog.length ? auditLog.map((item) => (
-            <p key={item.id}><strong>{item.action}</strong> · {new Date(item.createdAt).toLocaleString('tr-TR')}</p>
-          )) : <p style={{ color: 'var(--muted)' }}>Audit kaydı yok veya oturum açılmadı.</p>}
+            <div key={item.id} className="timeline-item">
+              <strong>{auditActionCopy[item.action] ?? item.action}</strong>
+              <time dateTime={item.createdAt}>{dateFormatter.format(new Date(item.createdAt))}</time>
+            </div>
+          )) : (
+            <div className="empty-state">
+              <strong>Henüz audit kaydı görünmüyor.</strong>
+              <p>Durum değişikliği, atama ve mesaj işlemleri yapıldığında operasyon izi burada zaman sırasıyla listelenir.</p>
+            </div>
+          )}
         </section>
       </div>
     </main>
