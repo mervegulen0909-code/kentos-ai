@@ -278,3 +278,12 @@
 - **Result:** Passed.
 - **Next action:** `1 — Ana Kontrol` should review, commit, and merge this docs-only QA slice.
 - **Blocker:** None.
+
+## 2026-05-01 16:20 — Wave 8 UI role-aware polish checkpoint
+
+- **Action taken:** Window 3 verified `wave/ui-polish` starts at local `master`, then added role-aware mutation copy, terminal ticket disabled states, Turkish status/SLA labels, richer audit action labels, citizen-safe status copy, and small mobile sidebar improvements.
+- **Files changed:** `apps/admin-web/**`, `apps/citizen-web/**`, `docs/workflows/autonomous-run-log.md`.
+- **Verification run:** `pnpm -C C:/Users/arfgl/OneDrive/Desktop/chatbot-ui-wave --filter @kentos/admin-web typecheck`; `pnpm -C C:/Users/arfgl/OneDrive/Desktop/chatbot-ui-wave --filter @kentos/admin-web build`; `pnpm -C C:/Users/arfgl/OneDrive/Desktop/chatbot-ui-wave --filter @kentos/citizen-web typecheck`; `pnpm -C C:/Users/arfgl/OneDrive/Desktop/chatbot-ui-wave --filter @kentos/citizen-web build`.
+- **Result:** Passed.
+- **Next action:** Window 1 should review, commit, and merge the uncommitted UI role-aware polish slice.
+- **Blocker:** None.

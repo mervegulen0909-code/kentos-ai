@@ -7,6 +7,24 @@ const fallbackRows = [
   { id: 'demo-3', ticketNo: 'KNT-2026-000125', title: 'Park aydınlatması', department: { name: 'Park ve Bahçeler' }, status: 'NEW', slaState: 'OK' },
 ];
 
+const statusCopy: Record<string, string> = {
+  NEW: 'Yeni kayıt',
+  TRIAGED: 'Ön incelemede',
+  ASSIGNED: 'Birime atandı',
+  IN_PROGRESS: 'İşlemde',
+  WAITING_INFO: 'Bilgi bekleniyor',
+  RESOLVED: 'Çözüm bildirildi',
+  CLOSED: 'Kapatıldı',
+  REJECTED: 'Reddedildi',
+};
+
+const slaCopy: Record<string, string> = {
+  OK: 'SLA içinde',
+  DUE_SOON: 'SLA yaklaşmakta',
+  BREACHED: 'SLA aşıldı',
+  UNKNOWN: 'SLA bilinmiyor',
+};
+
 export default async function TicketsPage() {
   const token = await getSessionToken();
   let dataUnavailable = false;
@@ -30,8 +48,8 @@ export default async function TicketsPage() {
               <strong>{ticket.ticketNo}</strong>
               <span>{ticket.title}</span>
               <span>{ticket.department?.name ?? 'Atanmamış'}</span>
-              <span>{ticket.status}</span>
-              <span>{ticket.slaState ?? 'UNKNOWN'}</span>
+              <span>{statusCopy[ticket.status] ?? ticket.status}</span>
+              <span>{slaCopy[ticket.slaState ?? 'UNKNOWN'] ?? slaCopy.UNKNOWN}</span>
             </a>
           )) : (
             <div className="empty-state">
