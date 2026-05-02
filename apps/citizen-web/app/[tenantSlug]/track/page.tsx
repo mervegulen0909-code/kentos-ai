@@ -31,7 +31,7 @@ export default async function TrackPage({ params, searchParams }: { params: Prom
         <div className={`field ${error ? 'field-error' : ''}`}>
           <label htmlFor="ticketNo">Başvuru numarası</label>
           <input id="ticketNo" name="ticketNo" placeholder="KNT-2026-000123" required aria-describedby="ticketNo-help" aria-invalid={Boolean(error)} inputMode="text" autoCapitalize="characters" />
-          <small id="ticketNo-help">Numara başvuru sonrası verilen takip bilgisidir; T.C. kimlik veya telefon numarası değildir.</small>
+          <small id="ticketNo-help">Numara yalnızca başvuru sonrası verilen takip bilgisidir; kişisel kimlik, telefon veya iç belediye kayıt bilgisi girmeniz gerekmez.</small>
         </div>
         <button className="cta" type="submit">Durumu sorgula</button>
       </form>

@@ -7,6 +7,24 @@ const fallbackTickets = [
   { ticketNo: 'KNT-2026-000125', title: 'Sokak aydınlatması', department: { name: 'Ulaşım' }, slaState: 'OK', status: 'NEW' },
 ];
 
+const statusCopy: Record<string, string> = {
+  NEW: 'Yeni kayıt',
+  TRIAGED: 'Ön incelemede',
+  ASSIGNED: 'Birime atandı',
+  IN_PROGRESS: 'İşlemde',
+  WAITING_INFO: 'Bilgi bekleniyor',
+  RESOLVED: 'Çözüm bildirildi',
+  CLOSED: 'Kapatıldı',
+  REJECTED: 'Reddedildi',
+};
+
+const slaCopy: Record<string, string> = {
+  OK: 'SLA içinde',
+  DUE_SOON: 'SLA yaklaşmakta',
+  BREACHED: 'SLA aşıldı',
+  UNKNOWN: 'SLA bilinmiyor',
+};
+
 export default async function AdminHome() {
   const token = process.env.KENTOS_DEMO_ACCESS_TOKEN;
   const [overview, tickets] = token
@@ -29,14 +47,18 @@ export default async function AdminHome() {
         </nav>
       </aside>
       <section className="main">
-        <p className="badge">Demo Belediyesi · Bugünkü operasyon özeti</p>
+        <p className="badge">Demo Belediyesi · Rol ve SLA odaklı operasyon özeti</p>
         <h2 style={{ fontSize: 'clamp(2.8rem, 8vw, 7rem)', lineHeight: .9, letterSpacing: '-.06em', maxWidth: 900 }}>
-          Talep akışı, SLA riski ve birim performansı tek ekranda.
+          Yetkili ekiplerin talep yükü, SLA alarmı ve RBAC kapsamı tek ekranda.
         </h2>
+        <div className="notice muted" role="note">
+          <strong>Canlı veriler rol ve tenant yetkisine göre okunur.</strong>
+          <p>Yetkisiz veya READ_ONLY oturumlarda mutasyonlar backend guard tarafından reddedilir; dashboard ham API hatası göstermez.</p>
+        </div>
         <div className="grid">
-          <article className="card"><p>Açık talep</p><p className="kpi">{overview.totalOpen}</p></article>
-          <article className="card"><p>SLA riski</p><p className="kpi" style={{ color: 'var(--danger)' }}>{overview.slaBreached}</p></article>
-          <article className="card"><p>Bugün çözülen</p><p className="kpi">{overview.resolvedToday}</p></article>
+          <article className="card"><p>Yetkili kuyruk yükü</p><p className="kpi">{overview.totalOpen}</p><p style={{ color: 'var(--muted)' }}>Rol kapsamınızda görünen açık başvurular.</p></article>
+          <article className="card"><p>SLA aşımı</p><p className="kpi" style={{ color: 'var(--danger)' }}>{overview.slaBreached}</p><p style={{ color: 'var(--muted)' }}>Yönetici takibi isteyen süre ihlalleri.</p></article>
+          <article className="card"><p>Bugün sonuçlanan</p><p className="kpi">{overview.resolvedToday}</p><p style={{ color: 'var(--muted)' }}>Çözüm bildirilen veya kapanışa hazır kayıtlar.</p></article>
         </div>
         <section className="card" style={{ marginTop: 18 }}>
           <h3>Öncelikli kuyruk</h3>
@@ -46,7 +68,7 @@ export default async function AdminHome() {
                 <strong>{ticket.ticketNo}</strong>
                 <span>{ticket.title}</span>
                 <span>{ticket.department?.name ?? 'Atanmamış'}</span>
-                <span>{ticket.slaState ?? 'UNKNOWN'} · {ticket.status}</span>
+                <span>{slaCopy[ticket.slaState ?? 'UNKNOWN'] ?? slaCopy.UNKNOWN} · {statusCopy[ticket.status] ?? ticket.status}</span>
               </div>
             ))}
           </div>
