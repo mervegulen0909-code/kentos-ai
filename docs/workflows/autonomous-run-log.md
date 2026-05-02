@@ -314,3 +314,12 @@
 - **Result:** Passed.
 - **Next action:** Window 1 should review, commit, and merge the uncommitted Wave 10 UI operational readiness slice.
 - **Blocker:** None.
+
+## 2026-05-01 17:25 — Wave 11 UI browser-smoke readiness checkpoint
+
+- **Action taken:** Window 3 verified `wave/ui-polish` is aligned with local `master`, reviewed dashboard/reports/queues copy consistency, added route-level loading states for reports and queues, and reused responsive queue rows on the dashboard.
+- **Files changed:** `apps/admin-web/**`, `docs/workflows/autonomous-run-log.md`.
+- **Verification run:** `pnpm -C C:/Users/arfgl/OneDrive/Desktop/chatbot-ui-wave --filter @kentos/admin-web typecheck`; `pnpm -C C:/Users/arfgl/OneDrive/Desktop/chatbot-ui-wave --filter @kentos/admin-web build`; `pnpm -C C:/Users/arfgl/OneDrive/Desktop/chatbot-ui-wave --filter @kentos/citizen-web typecheck`; `pnpm -C C:/Users/arfgl/OneDrive/Desktop/chatbot-ui-wave --filter @kentos/citizen-web build`.
+- **Result:** Passed.
+- **Next action:** Window 1 should review, commit, and merge the uncommitted Wave 11 UI browser-smoke readiness slice.
+- **Blocker:** None.

@@ -64,7 +64,7 @@ export default async function AdminHome() {
           <h3>Öncelikli kuyruk</h3>
           <div style={{ display: 'grid', gap: 12 }}>
             {tickets.map((ticket) => (
-              <div key={ticket.ticketNo} style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1fr 1fr', gap: 12, padding: 14, borderTop: '1px solid var(--line)' }}>
+              <div className="queue-row" key={ticket.ticketNo}>
                 <strong>{ticket.ticketNo}</strong>
                 <span>{ticket.title}</span>
                 <span>{ticket.department?.name ?? 'Atanmamış'}</span>
