@@ -27,7 +27,7 @@ docker compose -f infra/docker-compose.yml up -d
 
 ## Docker Desktop blocker
 
-If Docker Desktop or the Docker daemon is not running, local API smoke cannot be called passed. Treat this as **blocked**, not failed and not passed.
+If Docker Desktop or the Docker daemon is not running, local API smoke cannot be marked as passed. Treat this as **blocked**, not failed and not passed.
 
 How to identify the blocker:
 
@@ -71,6 +71,8 @@ If `3110` is occupied by another workspace-owned API process, choose another loc
 ```bash
 KENTOS_API_BASE_URL='http://127.0.0.1:3110/api/v1' pnpm smoke:api
 ```
+
+If API smoke fails, retry only after changing the condition that caused the failure: start Docker Desktop, start the local API, regenerate Prisma client, migrate/seed the database, or update `KENTOS_API_BASE_URL` to the actual localhost port. Do not rerun the same failing command repeatedly without a changed condition. If the same smoke failure repeats twice, stop and report the command, changed condition, last error, and root-cause hypothesis.
 
 Quick health probes while the API is running:
 

@@ -323,3 +323,12 @@
 - **Result:** Passed.
 - **Next action:** Window 1 should review, commit, and merge the uncommitted Wave 11 UI browser-smoke readiness slice.
 - **Blocker:** None.
+
+## 2026-05-01 17:40 — Wave 11 QA milestone push readiness checkpoint
+
+- **Action taken:** Window 4 verified `wave/qa-smoke` is aligned with local `master`, tightened milestone push gate wording, clarified API smoke retry/blocker reporting, and sharpened dashboard/reports/queues browser smoke expectations.
+- **Files changed:** `docs/checklists/release-checklist.md`, `docs/workflows/local-smoke.md`, `docs/workflows/browser-smoke.md`, `docs/workflows/autonomous-run-log.md`.
+- **Verification run:** `pnpm typecheck && pnpm build`.
+- **Result:** Passed.
+- **Next action:** `1 — Ana Kontrol` should review, commit, and merge this docs-only QA slice.
+- **Blocker:** None.

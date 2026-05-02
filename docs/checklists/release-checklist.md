@@ -94,7 +94,7 @@ Do not push unless the user explicitly asks for it. The default team policy is m
 
 Before the milestone push decision:
 
-- [ ] Record `master` ahead count versus `origin/master`.
+- [ ] Record `git rev-list --left-right --count origin/master...master` output for the final `master` ahead count.
 - [ ] Confirm `pnpm typecheck` passed on final `master`.
 - [ ] Confirm `pnpm build` passed on final `master`.
 - [ ] Record API smoke as passed, or record a precise blocked reason such as `Docker daemon unavailable`.

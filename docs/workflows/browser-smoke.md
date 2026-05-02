@@ -57,10 +57,11 @@ Seeded login:
 
 1. Open `http://127.0.0.1:3111/` after login.
 2. Confirm dashboard KPI cards render with labels, values, and safe empty/default states; no raw API errors should be visible.
-3. Open `http://127.0.0.1:3111/reports` and confirm empty, data, and error states are operationally useful for managers.
-4. Confirm reports copy distinguishes "no data yet" from "data failed to load".
+3. Open `http://127.0.0.1:3111/reports` and confirm empty, data, loading, and error states are operationally useful for managers.
+4. Confirm reports copy distinguishes "no data yet" from "data failed to load" and offers a next step when possible.
 5. Open `http://127.0.0.1:3111/queues` and confirm queue copy explains operational ownership, next action, or current limitation without generic filler.
-6. Set the viewport near 390px width and quickly recheck dashboard, reports, and queues for clipped KPI values, hidden actions, or horizontal scrolling.
+6. Confirm queues show SLA/workload context clearly enough for a staff operator to decide what to open next.
+7. Set the viewport near 390px width and quickly recheck dashboard, reports, and queues for clipped KPI values, hidden actions, or horizontal scrolling.
 
 ### Scenario C — Admin ticket list
 
