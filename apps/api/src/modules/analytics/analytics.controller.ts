@@ -2,9 +2,12 @@ import { Controller, Get, Inject, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { CurrentUser } from '../../common/decorators/current-user.decorator.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
+import { Roles } from '../../common/decorators/roles.decorator.js';
+import { RolesGuard } from '../../common/guards/roles.guard.js';
 import { AnalyticsService } from './analytics.service.js';
 
-@UseGuards(AuthGuard('jwt'))
+@UseGuards(AuthGuard('jwt'), RolesGuard)
+@Roles('SUPER_ADMIN', 'TENANT_ADMIN', 'MANAGER')
 @Controller('analytics')
 export class AnalyticsController {
   constructor(@Inject(AnalyticsService) private readonly analytics: AnalyticsService) {}

@@ -188,6 +188,23 @@ await expectStatus(`/message-templates/${firstTemplate.id}`, 403, {
 });
 console.log('settings_rbac_negative', true);
 
+section('analytics');
+const analyticsOverview = await request('/analytics/overview', { token });
+assert(typeof analyticsOverview.body.totalOpen === 'number', 'Admin analytics overview missing totalOpen.');
+const analyticsDepartments = await request('/analytics/departments', { token });
+assert(Array.isArray(analyticsDepartments.body), 'Admin analytics departments response is not an array.');
+const managerAnalyticsOverview = await request('/analytics/overview', { token: managerToken });
+assert(typeof managerAnalyticsOverview.body.totalOpen === 'number', 'Manager analytics overview missing totalOpen.');
+await expectStatus('/analytics/overview', 403, { token: operatorToken });
+await expectStatus('/analytics/overview', 403, { token: departmentStaffToken });
+await expectStatus('/analytics/overview', 403, { token: readOnlyToken });
+const forbiddenAnalyticsKeys = ['citizen', 'citizens', 'citizenId', 'phone', 'email', 'auditLogs', 'messages', 'internalNotes', 'aiRuns', 'aiClassification'];
+const analyticsPayload = JSON.stringify([analyticsOverview.body, analyticsDepartments.body]);
+for (const key of forbiddenAnalyticsKeys) {
+  assert(!analyticsPayload.includes(`"${key}"`), `Analytics response leaked ${key}.`);
+}
+console.log('analytics_read', true);
+
 section('ticket workflow');
 const operatorTicket = await request('/tickets', {
   method: 'POST',
