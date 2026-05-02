@@ -117,7 +117,7 @@ export class TicketsService {
     this.requireMutableTicket(ticket.status);
     await this.requireDepartment(user.tenantId, dto.departmentId);
     await this.requireDepartmentScope(user, dto.departmentId);
-    if (dto.assignedToId) await this.requireUser(user.tenantId, dto.assignedToId);
+    if (dto.assignedToId) await this.requireAssignableUser(user.tenantId, dto.assignedToId, dto.departmentId);
 
     return this.prisma.ticket.update({
       where: { id },
@@ -261,9 +261,15 @@ export class TicketsService {
     return department;
   }
 
-  private async requireUser(tenantId: string, userId: string) {
-    const user = await this.prisma.user.findFirst({ where: { id: userId, tenantId, isActive: true } });
+  private async requireAssignableUser(tenantId: string, userId: string, departmentId: string) {
+    const user = await this.prisma.user.findFirst({
+      where: { id: userId, tenantId, isActive: true },
+      include: { departments: true },
+    });
     if (!user) throw new NotFoundException('Kullanıcı bulunamadı.');
+    if (user.role === UserRole.DEPARTMENT_STAFF && !user.departments.some((department) => department.departmentId === departmentId)) {
+      throw new ForbiddenException('Kullanıcı bu birime atanamaz.');
+    }
     return user;
   }
 

@@ -152,6 +152,30 @@ async function main() {
     },
   });
 
+  await prisma.user.upsert({
+    where: { tenantId_email: { tenantId: tenant.id, email: 'manager@demo.local' } },
+    update: { passwordHash, role: UserRole.MANAGER, isActive: true },
+    create: {
+      tenantId: tenant.id,
+      email: 'manager@demo.local',
+      passwordHash,
+      fullName: 'Demo Operasyon Yöneticisi',
+      role: UserRole.MANAGER,
+    },
+  });
+
+  await prisma.user.upsert({
+    where: { tenantId_email: { tenantId: tenant.id, email: 'operator@demo.local' } },
+    update: { passwordHash, role: UserRole.OPERATOR, isActive: true },
+    create: {
+      tenantId: tenant.id,
+      email: 'operator@demo.local',
+      passwordHash,
+      fullName: 'Demo Operatör Kullanıcısı',
+      role: UserRole.OPERATOR,
+    },
+  });
+
   const fenDepartmentId = departmentByCode.get('FEN_ISLERI');
   if (!fenDepartmentId) throw new Error('FEN_ISLERI department was not seeded.');
 

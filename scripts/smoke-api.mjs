@@ -67,9 +67,24 @@ const departmentStaffLogin = await request('/auth/login', {
 });
 console.log('department_staff_login', departmentStaffLogin.status, departmentStaffLogin.body.user.role);
 
+const managerLogin = await request('/auth/login', {
+  method: 'POST',
+  body: JSON.stringify({ tenantSlug: 'demo-belediye', email: 'manager@demo.local', password: 'ChangeMe123!' }),
+});
+console.log('manager_login', managerLogin.status, managerLogin.body.user.role);
+
+const operatorLogin = await request('/auth/login', {
+  method: 'POST',
+  body: JSON.stringify({ tenantSlug: 'demo-belediye', email: 'operator@demo.local', password: 'ChangeMe123!' }),
+});
+console.log('operator_login', operatorLogin.status, operatorLogin.body.user.role);
+
 const token = login.body.accessToken;
 const readOnlyToken = readOnlyLogin.body.accessToken;
 const departmentStaffToken = departmentStaffLogin.body.accessToken;
+const managerToken = managerLogin.body.accessToken;
+const operatorToken = operatorLogin.body.accessToken;
+const departmentStaffUserId = departmentStaffLogin.body.user.id;
 
 section('settings RBAC');
 const departments = await request('/departments', { token });
@@ -215,6 +230,11 @@ await request(`/tickets/${operatorTicket.body.id}/assign`, {
   token,
   body: JSON.stringify({ departmentId: createdDepartment.body.id }),
 });
+await expectStatus(`/tickets/${operatorTicket.body.id}/assign`, 403, {
+  method: 'POST',
+  token,
+  body: JSON.stringify({ departmentId: createdDepartment.body.id, assignedToId: departmentStaffUserId }),
+});
 console.log('ticket_assign', true);
 
 const auditLog = await request(`/tickets/${operatorTicket.body.id}/audit-log`, { token });
@@ -254,6 +274,41 @@ await expectStatus(`/tickets/${operatorTicket.body.id}/assign`, 403, {
   body: JSON.stringify({ departmentId: createdDepartment.body.id }),
 });
 console.log('ticket_rbac_negative', true);
+
+section('role matrix');
+const operatorMatrixTicket = await request('/tickets', {
+  method: 'POST',
+  token: operatorToken,
+  body: JSON.stringify({
+    channel: 'OPERATOR',
+    title: `Smoke operatör rol talebi ${unique}`,
+    description: 'Operatör role matrix testi için oluşturulan talep.',
+    priority: 'NORMAL',
+    departmentId: createdDepartment.body.id,
+    categoryId: createdCategory.body.id,
+    addressText: 'Operatör Mahallesi',
+  }),
+});
+await request(`/tickets/${operatorMatrixTicket.body.id}/notes`, {
+  method: 'POST',
+  token: operatorToken,
+  body: JSON.stringify({ body: 'Operatör role matrix iç notu.' }),
+});
+await request(`/tickets/${operatorMatrixTicket.body.id}/status`, {
+  method: 'POST',
+  token: operatorToken,
+  body: JSON.stringify({ status: 'ASSIGNED' }),
+});
+const managerTickets = await request('/tickets', { token: managerToken });
+assert(managerTickets.body.some((ticket) => ticket.id === operatorMatrixTicket.body.id), 'Manager cannot see tenant ticket list.');
+const managerMatrixTicket = await request(`/tickets/${operatorMatrixTicket.body.id}`, { token: managerToken });
+assert(managerMatrixTicket.body.id === operatorMatrixTicket.body.id, 'Manager cannot read tenant ticket detail.');
+await request(`/tickets/${operatorMatrixTicket.body.id}/public-messages`, {
+  method: 'POST',
+  token: managerToken,
+  body: JSON.stringify({ body: 'Manager role matrix public mesajı.' }),
+});
+console.log('role_matrix', true);
 
 section('department scoping');
 const fenTicket = await request('/tickets', {
@@ -395,9 +450,14 @@ await expectStatus(`/tickets/${transitionTicket.body.id}/assign`, 403, {
 console.log('closed_ticket_transition_guard', true);
 
 section('audit coverage');
-const auditedActions = new Set(auditLog.body.map((entry) => entry.action));
+const auditedEntries = auditLog.body.filter((entry) => ['ticket.assigned', 'ticket.status_changed', 'ticket.internal_note_added', 'ticket.public_message_added'].includes(entry.action));
+const auditedActions = new Set(auditedEntries.map((entry) => entry.action));
 for (const action of ['ticket.assigned', 'ticket.status_changed', 'ticket.internal_note_added', 'ticket.public_message_added']) {
   assert(auditedActions.has(action), `Audit log missing ${action}.`);
+}
+for (const entry of auditedEntries) {
+  assert(entry.actorType === 'USER', `Audit log ${entry.action} actorType is not USER.`);
+  assert(entry.actorUserId === login.body.user.id, `Audit log ${entry.action} actorUserId mismatch.`);
 }
 console.log('audit_coverage', true);
 
@@ -413,6 +473,7 @@ const publicTicket = await request('/public/demo-belediye/tickets', {
 console.log('public_create', publicTicket.status, publicTicket.body.ticketNo);
 
 const tracked = await request(`/public/demo-belediye/tickets/${publicTicket.body.ticketNo}`);
+await expectStatus(`/public/yanlis-belediye/tickets/${publicTicket.body.ticketNo}`, 404);
 const forbiddenPublicKeys = ['id', 'tenantId', 'citizenId', 'auditLogs', 'aiRuns', 'aiClassification', 'aiConfidence', 'internalNotes'];
 for (const key of forbiddenPublicKeys) {
   assert(!Object.hasOwn(tracked.body, key), `Public ticket response leaked ${key}.`);
