@@ -40,9 +40,9 @@ type TicketState =
   | { kind: 'not-found' }
   | { kind: 'unavailable' };
 
-async function getTicketState(tenantSlug: string, ticketNo: string): Promise<TicketState> {
+async function getTicketState(tenantSlug: string, trackingToken: string): Promise<TicketState> {
   try {
-    const ticket = await citizenApi.getTicket(tenantSlug, ticketNo);
+    const ticket = await citizenApi.getTicket(tenantSlug, trackingToken);
     return { kind: 'success', ticket };
   } catch (error) {
     if (error instanceof ApiError && error.status === 404) {
@@ -54,11 +54,11 @@ async function getTicketState(tenantSlug: string, ticketNo: string): Promise<Tic
 }
 
 export default async function PublicTicketPage({ params }: { params: Promise<{ tenantSlug: string; ticketNo: string }> }) {
-  const { tenantSlug, ticketNo } = await params;
-  const ticketState = await getTicketState(tenantSlug, ticketNo);
+  const { tenantSlug, ticketNo: trackingToken } = await params;
+  const ticketState = await getTicketState(tenantSlug, trackingToken);
   const ticket = ticketState.kind === 'success' ? ticketState.ticket : null;
   const statusMessage = ticket ? (citizenStatusCopy[ticket.status] ?? citizenStatusCopy.NEW) : null;
-  const displayedReference = ticket?.trackingToken ?? (ticketNo.startsWith('TK-') ? ticketNo : null);
+  const displayedReference = ticket?.trackingToken ?? (trackingToken.startsWith('TK-') ? trackingToken : null);
 
   return (
     <main className="wrap">
