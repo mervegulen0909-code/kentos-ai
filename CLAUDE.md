@@ -63,6 +63,8 @@ This project uses the Agent OS docs in `docs/agent-os/` and templates in `.claud
 
 This folder is currently not a git repository. Do not use git worktree until the project is initialized as git. Without git, multiple sessions must avoid editing the same files and must hand off through `docs/workflows/autonomous-run-log.md` or `.claude/templates/handoff.md`.
 
+When the user explicitly asks for parallel mode, multi-agent mode, or orchestrated agent execution, follow `docs/workflows/parallel-agent-mode.md` and keep worker write scopes non-overlapping.
+
 ## UI quality bar
 
 Admin UI should feel operational, data-dense, and serious. Citizen UI should be Turkish-first, calm, public-safe, and accessible. Avoid generic SaaS filler copy and avoid exposing raw internal errors to citizens.

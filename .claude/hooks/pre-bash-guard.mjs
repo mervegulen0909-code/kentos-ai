@@ -8,11 +8,19 @@ const input = await new Promise((resolve) => {
 
 const blocked = [
   /rm\s+-rf/i,
+  /\brm(?:\.exe)?\b\s+-(?:[^\s]*r|[^\s]*R|recursive\b)/i,
+  /\b(rmdir|rd)(?:\.exe)?\b\s+.*\/s\b/i,
   /git\s+reset\s+--hard/i,
+  /git\s+restore\b/i,
+  /git\s+rm\b/i,
   /git\s+push\s+--force/i,
   /drop\s+database/i,
   /docker\s+compose\s+down\s+-v/i,
-  /curl\s+.*https?:\/\/(?!localhost|127\.0\.0\.1)/i,
+  /\bremove-item\b/i,
+  /\b(del|erase)\b/i,
+  /\bstop-process\b/i,
+  /\bcurl(?:\.exe)?\b\s+.*https?:\/\/(?!localhost|127\.0\.0\.1|\[::1\])/i,
+  /\b(invoke-webrequest|invoke-restmethod|iwr|irm|wget)(?:\.exe)?\b\s+.*https?:\/\/(?!localhost|127\.0\.0\.1|\[::1\])/i,
 ];
 
 if (blocked.some((pattern) => pattern.test(input))) {

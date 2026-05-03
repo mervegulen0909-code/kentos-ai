@@ -1,8 +1,7 @@
 {
   "permissions": {
     "allow": [
-      "Bash(KENTOS_API_BASE_URL='http://127.0.0.1:3110/api/v1' pnpm smoke:api)",
-      "Bash(powershell.exe -NoProfile -Command 'Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -match \"chatbot\" -and \\($_.CommandLine -match \"tsx.*watch.*src/main.ts\" -or $_.CommandLine -match \"src/main.ts\"\\) } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force; Write-Output \\(\"stopped \" + $_.ProcessId\\) }')"
+      "Bash(KENTOS_API_BASE_URL='http://127.0.0.1:3110/api/v1' pnpm smoke:api)"
     ]
   }
 }

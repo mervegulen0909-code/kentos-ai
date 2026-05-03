@@ -74,6 +74,8 @@ Do not push after every branch merge. Hold pushes until the milestone is complet
 
 See [docs/workflows/local-smoke.md](docs/workflows/local-smoke.md) for local API smoke commands, [docs/workflows/browser-smoke.md](docs/workflows/browser-smoke.md) for manual browser-flow verification, and [docs/checklists/release-checklist.md](docs/checklists/release-checklist.md) for merge/release gates.
 
+For multi-surface work with orchestrated parallel execution, see [docs/workflows/parallel-agent-mode.md](docs/workflows/parallel-agent-mode.md).
+
 ## Claude Code Agent OS
 
 This project includes a local Claude Code operating system for autonomous waves, agent roles, workflow commands, hooks policy, MCP policy, parallel-session rules, and other-project installation guidance.

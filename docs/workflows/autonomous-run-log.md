@@ -332,3 +332,12 @@
 - **Result:** Passed.
 - **Next action:** `1 — Ana Kontrol` should review, commit, and merge this docs-only QA slice.
 - **Blocker:** None.
+
+## 2026-05-03 11:05 — Current stabilization checkpoint
+
+- **Action taken:** Reviewed large uncommitted public tracking/auth/notification/UI/smoke diff with specialized agents, added message template duplicate cleanup before partial unique indexes, added channel-event delivery idempotency index, made worker delivery creation race-tolerant, lazy-initialized notification queue, and hardened smoke JSON parsing.
+- **Files changed:** `packages/database/prisma/migrations/20260503003000_message_template_channel_uniqueness/migration.sql`, `packages/database/prisma/migrations/20260503004500_channel_event_delivery_idempotency/migration.sql`, `apps/worker/src/processors/notifications.processor.ts`, `apps/api/src/modules/tickets/notification-queue.service.ts`, `scripts/smoke-api.mjs`, `docs/workflows/autonomous-run-log.md`.
+- **Verification run:** `pnpm db:generate`; `pnpm --filter @kentos/database typecheck`; `pnpm --filter @kentos/api typecheck`; `pnpm --filter @kentos/worker typecheck`; local Docker `postgres`, `redis`, `minio`; local DB reset with explicit user approval; `pnpm db:seed`; local API on port 3110; `KENTOS_API_BASE_URL=... pnpm smoke:api`; `pnpm typecheck`; `pnpm --stream -r build`; `git diff --check`.
+- **Result:** Passed. Local dev DB reset was required because a previously applied migration was intentionally edited for duplicate cleanup. Prisma DLL lock was resolved by stopping workspace-owned API dev processes.
+- **Next action:** Review final diff and decide whether to commit the stabilized large change set.
+- **Blocker:** None.
