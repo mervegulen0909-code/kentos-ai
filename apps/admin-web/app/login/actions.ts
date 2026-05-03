@@ -2,7 +2,7 @@
 
 import { redirect } from 'next/navigation';
 import { apiFetch } from '../../lib/api';
-import { clearSessionToken, setSessionToken } from '../../lib/session';
+import { clearSessionToken, setAdminSession } from '../../lib/session';
 
 type LoginResponse = {
   accessToken: string;
@@ -26,7 +26,15 @@ export async function loginAction(formData: FormData) {
       method: 'POST',
       body: JSON.stringify({ tenantSlug, email, password }),
     });
-    await setSessionToken(result.accessToken);
+
+    await setAdminSession({
+      token: result.accessToken,
+      user: {
+        fullName: result.user.fullName,
+        email: result.user.email,
+        role: result.user.role,
+      },
+    });
   } catch {
     redirect('/login?error=invalid');
   }

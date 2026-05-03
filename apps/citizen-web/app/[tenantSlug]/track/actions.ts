@@ -3,8 +3,10 @@
 import { redirect } from 'next/navigation';
 
 export async function trackTicketAction(tenantSlug: string, formData: FormData) {
-  const ticketNo = String(formData.get('ticketNo') ?? '').trim().toUpperCase();
-  if (!ticketNo) redirect(`/${tenantSlug}/track?error=missing`);
-  if (!/^KNT-\d{4}-\d{6}$/.test(ticketNo)) redirect(`/${tenantSlug}/track?error=format`);
-  redirect(`/${tenantSlug}/ticket/${encodeURIComponent(ticketNo)}`);
+  const ticketIdentifier = String(formData.get('ticketNo') ?? '').trim().toUpperCase();
+  if (!ticketIdentifier) redirect(`/${tenantSlug}/track?error=missing`);
+  if (!/^TK-[A-F0-9]{16}$/.test(ticketIdentifier)) {
+    redirect(`/${tenantSlug}/track?error=format`);
+  }
+  redirect(`/${tenantSlug}/ticket/${encodeURIComponent(ticketIdentifier)}`);
 }

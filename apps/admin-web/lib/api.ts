@@ -2,6 +2,16 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:3
 
 type ApiOptions = RequestInit & { token?: string };
 
+export class ApiError extends Error {
+  status: number;
+
+  constructor(status: number, message: string) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+  }
+}
+
 export async function apiFetch<T>(path: string, options: ApiOptions = {}): Promise<T> {
   const headers = new Headers(options.headers);
   headers.set('Accept', 'application/json');
@@ -9,7 +19,7 @@ export async function apiFetch<T>(path: string, options: ApiOptions = {}): Promi
   if (options.token) headers.set('Authorization', `Bearer ${options.token}`);
 
   const response = await fetch(`${API_BASE_URL}${path}`, { ...options, headers, cache: 'no-store' });
-  if (!response.ok) throw new Error(`KentOS API ${response.status}: ${await response.text()}`);
+  if (!response.ok) throw new ApiError(response.status, `KentOS API ${response.status}: ${await response.text()}`);
   return response.json() as Promise<T>;
 }
 
@@ -39,10 +49,10 @@ export type TicketDetail = TicketListItem & {
   auditLogs?: Array<{ id: string; action: string; createdAt: string }>;
 };
 
-export type Department = { id: string; name: string; code: string; description?: string | null };
-export type Category = { id: string; name: string; code: string; departmentId?: string | null; defaultPriority: string; department?: Department | null };
-export type MessageTemplate = { id: string; key: string; body: string; locale: string };
-export type SlaPolicy = { id: string; priority: string; responseMinutes: number; resolutionMinutes: number; department?: Department | null; category?: Category | null };
+export type Department = { id: string; name: string; code: string; description?: string | null; isActive: boolean };
+export type Category = { id: string; name: string; code: string; departmentId?: string | null; defaultPriority: string; isActive: boolean; department?: Department | null };
+export type MessageTemplate = { id: string; key: string; body: string; locale: string; isActive: boolean };
+export type SlaPolicy = { id: string; priority: string; responseMinutes: number; resolutionMinutes: number; isActive: boolean; department?: Department | null; category?: Category | null };
 export type AuditLogItem = { id: string; action: string; createdAt: string; before?: unknown; after?: unknown };
 
 export const adminApi = {

@@ -1,27 +1,30 @@
 import { adminApi } from '../../lib/api';
 import { getSessionToken } from '../../lib/session';
 
-const fallbackRows = [
-  { id: 'demo-1', ticketNo: 'KNT-2026-000123', title: 'Kaldırım çökmesi', department: { name: 'Fen İşleri' }, status: 'ASSIGNED', slaState: 'DUE_SOON' },
-  { id: 'demo-2', ticketNo: 'KNT-2026-000124', title: 'Konteyner taşması', department: { name: 'Temizlik İşleri' }, status: 'IN_PROGRESS', slaState: 'BREACHED' },
-  { id: 'demo-3', ticketNo: 'KNT-2026-000125', title: 'Park aydınlatması', department: { name: 'Park ve Bahçeler' }, status: 'NEW', slaState: 'OK' },
-];
+const fallbackRows: Array<{
+  id: string;
+  ticketNo: string;
+  title: string;
+  department?: { name: string } | null;
+  status: string;
+  slaState?: string;
+}> = [];
 
 const statusCopy: Record<string, string> = {
-  NEW: 'Yeni kayıt',
-  TRIAGED: 'Ön incelemede',
-  ASSIGNED: 'Birime atandı',
-  IN_PROGRESS: 'İşlemde',
+  NEW: 'Yeni kayit',
+  TRIAGED: 'On incelemede',
+  ASSIGNED: 'Birime atandi',
+  IN_PROGRESS: 'Islemde',
   WAITING_INFO: 'Bilgi bekleniyor',
-  RESOLVED: 'Çözüm bildirildi',
-  CLOSED: 'Kapatıldı',
+  RESOLVED: 'Cozum bildirildi',
+  CLOSED: 'Kapatildi',
   REJECTED: 'Reddedildi',
 };
 
 const slaCopy: Record<string, string> = {
-  OK: 'SLA içinde',
-  DUE_SOON: 'SLA yaklaşmakta',
-  BREACHED: 'SLA aşıldı',
+  OK: 'SLA icinde',
+  DUE_SOON: 'SLA yaklasmakta',
+  BREACHED: 'SLA asildi',
   UNKNOWN: 'SLA bilinmiyor',
 };
 
@@ -37,24 +40,24 @@ export default async function TicketsPage() {
 
   return (
     <main className="main">
-      <p className="badge">Talepler · filtrelenebilir operasyon kuyruğu</p>
-      <h1>Tüm başvurular</h1>
-      {!token ? <p className="notice muted">Gerçek veriler için giriş yapın. Şu an demo kuyruk gösteriliyor.</p> : null}
-      {dataUnavailable ? <p className="notice error" role="alert">Canlı kuyruk alınamadı; operasyon ekranı demo verilerle ayakta tutuluyor.</p> : null}
+      <p className="badge">Talepler · filtrelenebilir operasyon kuyrugu</p>
+      <h1>Tum basvurular</h1>
+      {!token ? <p className="notice muted">Gercek veriler icin giris yapin. Bu liste artik demo token yerine session cookie akisina dayaniyor.</p> : null}
+      {dataUnavailable ? <p className="notice error" role="alert">Canli kuyruk alinamadi; ekran bos durumla ayakta tutuluyor.</p> : null}
       <section className="card">
-        <div style={{ display: 'grid', gap: 10 }}>
+        <div className="ticket-list">
           {rows.length ? rows.map((ticket) => (
-            <a key={ticket.id} href={`/tickets/${ticket.id}`} style={{ display: 'grid', gridTemplateColumns: '1fr 1.4fr 1fr 1fr 1fr', gap: 12, padding: 14, border: '1px solid var(--line)', borderRadius: 14 }}>
+            <a key={ticket.id} href={`/tickets/${ticket.id}`} className="ticket-list-row">
               <strong>{ticket.ticketNo}</strong>
-              <span>{ticket.title}</span>
-              <span>{ticket.department?.name ?? 'Atanmamış'}</span>
-              <span>{statusCopy[ticket.status] ?? ticket.status}</span>
-              <span>{slaCopy[ticket.slaState ?? 'UNKNOWN'] ?? slaCopy.UNKNOWN}</span>
+              <span><span className="ticket-list-label">Baslik</span>{ticket.title}</span>
+              <span><span className="ticket-list-label">Birim</span>{ticket.department?.name ?? 'Atanmamis'}</span>
+              <span><span className="ticket-list-label">Durum</span>{statusCopy[ticket.status] ?? ticket.status}</span>
+              <span><span className="ticket-list-label">SLA</span>{slaCopy[ticket.slaState ?? 'UNKNOWN'] ?? slaCopy.UNKNOWN}</span>
             </a>
           )) : (
             <div className="empty-state">
-              <strong>Açık başvuru yok.</strong>
-              <p>Filtrelenebilir operasyon kuyruğu hazır; yeni vatandaş başvuruları düştüğünde burada listelenecek.</p>
+              <strong>Acik basvuru yok.</strong>
+              <p>Filtrelenebilir operasyon kuyrugu hazir; yeni vatandas basvurulari dustugunde burada listelenecek.</p>
             </div>
           )}
         </div>

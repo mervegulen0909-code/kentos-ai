@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
-import { apiFetch } from '../../lib/api';
+import { ApiError, apiFetch } from '../../lib/api';
 import { getSessionToken } from '../../lib/session';
 
 async function requireToken() {
@@ -16,7 +16,10 @@ async function runSettingsMutation(formData: FormData, success: string, mutation
 
   try {
     await mutation(token);
-  } catch {
+  } catch (error) {
+    if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
+      redirect('/settings?error=forbidden');
+    }
     redirect(`/settings?error=${encodeURIComponent(String(formData.get('intent') ?? 'general'))}`);
   }
 
@@ -108,6 +111,9 @@ export async function updateTemplateAction(formData: FormData) {
   await runSettingsMutation(formData, 'template-updated', (token) => apiFetch(`/message-templates/${id}`, {
     method: 'PATCH',
     token,
-    body: JSON.stringify({ body: String(formData.get('body') ?? '') }),
+    body: JSON.stringify({
+      body: String(formData.get('body') ?? ''),
+      isActive: formData.get('isActive') === 'true',
+    }),
   }));
 }

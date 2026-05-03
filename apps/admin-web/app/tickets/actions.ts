@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
-import { apiFetch } from '../../lib/api';
+import { ApiError, apiFetch } from '../../lib/api';
 import { getSessionToken } from '../../lib/session';
 
 async function requireToken(ticketId: string) {
@@ -17,7 +17,10 @@ async function runTicketMutation(formData: FormData, success: string, mutation: 
 
   try {
     await mutation(token, ticketId);
-  } catch {
+  } catch (error) {
+    if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
+      redirect(`/tickets/${ticketId}?error=forbidden`);
+    }
     redirect(`/tickets/${ticketId}?error=${encodeURIComponent(String(formData.get('intent') ?? 'general'))}`);
   }
 

@@ -1,4 +1,4 @@
-import { citizenApi } from '../../../../lib/api';
+import { ApiError, citizenApi } from '../../../../lib/api';
 
 const citizenStatusCopy: Record<string, { title: string; detail: string }> = {
   NEW: {
@@ -35,30 +35,77 @@ const citizenStatusCopy: Record<string, { title: string; detail: string }> = {
   },
 };
 
+type TicketState =
+  | { kind: 'success'; ticket: Awaited<ReturnType<typeof citizenApi.getTicket>> }
+  | { kind: 'not-found' }
+  | { kind: 'unavailable' };
+
+async function getTicketState(tenantSlug: string, ticketNo: string): Promise<TicketState> {
+  try {
+    const ticket = await citizenApi.getTicket(tenantSlug, ticketNo);
+    return { kind: 'success', ticket };
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) {
+      return { kind: 'not-found' };
+    }
+
+    return { kind: 'unavailable' };
+  }
+}
+
 export default async function PublicTicketPage({ params }: { params: Promise<{ tenantSlug: string; ticketNo: string }> }) {
   const { tenantSlug, ticketNo } = await params;
-  const ticket = await citizenApi.getTicket(tenantSlug, ticketNo).catch(() => null);
+  const ticketState = await getTicketState(tenantSlug, ticketNo);
+  const ticket = ticketState.kind === 'success' ? ticketState.ticket : null;
   const statusMessage = ticket ? (citizenStatusCopy[ticket.status] ?? citizenStatusCopy.NEW) : null;
+  const displayedReference = ticket?.trackingToken ?? (ticketNo.startsWith('TK-') ? ticketNo : null);
 
   return (
     <main className="wrap">
       <section className="card">
-        <p style={{ color: 'var(--muted)', fontWeight: 700 }}>{tenantSlug} · {ticketNo}</p>
-        <h1>{ticket ? ticket.title : 'Bu numarayla başvuru bulunamadı.'}</h1>
-        <p>
-          {ticket
-            ? `${statusMessage?.title} ${statusMessage?.detail}`
-            : 'Numarayı kısa çizgileriyle birlikte kontrol edin. Numara doğruysa kayıt henüz takip ekranına düşmemiş veya belediye sistemi kısa süreli meşgul olabilir; biraz sonra yeniden deneyin.'}
+        <p style={{ color: 'var(--muted)', fontWeight: 700 }}>
+          {displayedReference ? `${tenantSlug} - ${displayedReference}` : `${tenantSlug} başvuru takibi`}
         </p>
+        <h1>
+          {ticketState.kind === 'success'
+            ? ticketState.ticket.title
+            : ticketState.kind === 'not-found'
+              ? 'Bu takip koduyla başvuru bulunamadı.'
+              : 'Başvuru durumu şu an gösterilemiyor.'}
+        </h1>
+        <p>
+          {ticketState.kind === 'success'
+            ? `${statusMessage?.title} ${statusMessage?.detail}`
+            : ticketState.kind === 'not-found'
+              ? 'Takip kodunu kısa çizgisiyle birlikte kontrol edin. Kod doğruysa bu kayıt henüz takip ekranına düşmemiş olabilir.'
+              : 'Belediye takip servisine şu anda ulaşılamıyor olabilir. Biraz sonra yeniden deneyin.'}
+        </p>
+        {ticketState.kind === 'not-found' ? (
+          <div className="notice error" role="alert">
+            <strong>Takip kodu eşleşmedi.</strong>
+            <p>T.C. kimlik, telefon veya ad-soyad ile sorgulama yapılmaz; yalnızca başvuru sonunda verilen takip kodu kullanılır.</p>
+          </div>
+        ) : null}
+        {ticketState.kind === 'unavailable' ? (
+          <div className="notice error" role="alert">
+            <strong>Geçici servis sorunu.</strong>
+            <p>Teknik hata ayrıntısı gösterilmiyor. Sayfayı yenileyip biraz sonra yeniden deneyin.</p>
+          </div>
+        ) : null}
+        {ticket?.trackingToken ? (
+          <p className="notice" role="status">Takip kodunuz: {ticket.trackingToken}</p>
+        ) : null}
         {ticket?.departmentName ? <p className="notice" role="status">Başvurunuz {ticket.departmentName} tarafından takip ediliyor.</p> : null}
-        <div style={{ display: 'grid', gap: 12, marginTop: 24 }}>
-          {(ticket?.publicMessages.length ? ticket.publicMessages : [{ body: 'Başvurunuz kayda alındı.', createdAt: ticket?.createdAt ?? '', senderType: 'SYSTEM' }]).map((message, index) => (
-            <div key={`${message.createdAt}-${index}`} style={{ border: '1px solid var(--line)', borderRadius: 18, padding: 16 }}>
-              <strong>{message.senderType === 'CITIZEN' ? 'Vatandaş mesajı' : 'Belediye bilgilendirmesi'}</strong>
-              <p style={{ color: 'var(--muted)' }}>{message.body}</p>
-            </div>
-          ))}
-        </div>
+        {ticket ? (
+          <div style={{ display: 'grid', gap: 12, marginTop: 24 }}>
+            {(ticket.publicMessages.length ? ticket.publicMessages : [{ body: 'Başvurunuz kayda alındı.', createdAt: ticket.createdAt, author: 'municipality' as const }]).map((message, index) => (
+              <div key={`${message.createdAt}-${index}`} style={{ border: '1px solid var(--line)', borderRadius: 18, padding: 16 }}>
+                <strong>{message.author === 'citizen' ? 'Vatandaş mesajı' : 'Belediye bilgilendirmesi'}</strong>
+                <p style={{ color: 'var(--muted)' }}>{message.body}</p>
+              </div>
+            ))}
+          </div>
+        ) : null}
       </section>
     </main>
   );

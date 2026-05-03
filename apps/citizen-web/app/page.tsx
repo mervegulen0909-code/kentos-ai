@@ -6,7 +6,7 @@ export default function CitizenHome() {
           <p style={{ color: 'var(--muted)', fontWeight: 700 }}>Demo Belediyesi · KentOS AI</p>
           <h1 className="display">Talebini açıkça yaz, süreci takip et.</h1>
           <p style={{ color: 'var(--muted)', fontSize: '1.25rem', maxWidth: 620 }}>
-            Yol, temizlik, park, zabıta, su-kanalizasyon ve diğer belediye taleplerini konum ve fotoğrafla ilet. Başvuru numaranla durumunu izleyebilirsin.
+            Yol, temizlik, park, zabıta, su-kanalizasyon ve diğer belediye taleplerini konum ve fotoğrafla ilet. Takip kodunla durumunu izleyebilirsin.
           </p>
         </div>
         <form className="card">

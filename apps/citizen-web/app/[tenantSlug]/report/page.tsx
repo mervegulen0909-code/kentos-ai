@@ -7,7 +7,7 @@ const errorCopy: Record<string, { title: string; detail: string }> = {
   },
   api: {
     title: 'Başvuruyu şu an alamadık.',
-    detail: 'Teknik hata ayrıntısını göstermiyoruz. Bilgileriniz ekranda duruyor; bağlantınızı kontrol edip birkaç dakika sonra yeniden gönderin.',
+    detail: 'Teknik hata ayrıntısını göstermiyoruz. Bilgileriniz ekranda duruyor; bağlantınızı kontrol edip biraz sonra yeniden gönderin.',
   },
 };
 
@@ -25,11 +25,11 @@ export default async function ReportPage({
 
   return (
     <main className="wrap">
-      <p style={{ color: 'var(--muted)', fontWeight: 700 }}>{tenantSlug} · Yeni başvuru</p>
+      <p style={{ color: 'var(--muted)', fontWeight: 700 }}>{tenantSlug} - Yeni başvuru</p>
       <section className="hero">
         <div>
           <h1 className="display">Talebinizi belediyeye iletin.</h1>
-          <p style={{ color: 'var(--muted)', fontSize: '1.2rem' }}>Gönderim başarılı olursa takip numaranızın olduğu güvenli sayfaya yönlendirileceksiniz.</p>
+          <p style={{ color: 'var(--muted)', fontSize: '1.2rem' }}>Gönderim başarılı olursa gizli takip kodunuzun olduğu güvenli sayfaya yönlendirileceksiniz.</p>
         </div>
         <form action={action} className="card">
           {errorMessage ? (
@@ -49,7 +49,7 @@ export default async function ReportPage({
           </div>
           <div className="field">
             <label htmlFor="displayName">Ad soyad</label>
-            <input id="displayName" name="displayName" placeholder="İsteğe bağlı" autoComplete="name" />
+            <input id="displayName" name="displayName" placeholder="İsteğinize bağlı" autoComplete="name" />
           </div>
           <div className="field">
             <label htmlFor="phone">Telefon</label>

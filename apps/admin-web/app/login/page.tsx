@@ -1,16 +1,22 @@
+import { redirect } from 'next/navigation';
+import { PendingSubmitButton } from '../components/form-controls';
+import { getAdminSession } from '../../lib/session';
 import { loginAction } from './actions';
 
 export default async function LoginPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
+  const session = await getAdminSession();
   const { error } = await searchParams;
+
+  if (session) redirect('/');
 
   return (
     <main className="main" style={{ minHeight: '100dvh', display: 'grid', placeItems: 'center' }}>
       <form action={loginAction} className="card" style={{ width: 'min(440px, 100%)' }}>
-        <p className="badge">KentOS AI · Yetkili giriş</p>
-        <h1>Operasyon paneline giriş</h1>
+        <p className="badge">KentOS AI - Yetkili girisi</p>
+        <h1>Operasyon paneline giris</h1>
         {error ? (
           <p role="alert" style={{ color: 'var(--danger)' }}>
-            {error === 'missing' ? 'Tüm alanları doldurun.' : 'Giriş bilgileri doğrulanamadı.'}
+            {error === 'missing' ? 'Tum alanlari doldurun.' : 'Giris bilgileri dogrulanamadi.'}
           </p>
         ) : null}
         <label style={{ display: 'grid', gap: 8, marginBottom: 14 }}>
@@ -22,12 +28,15 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
           <input name="email" type="email" defaultValue="admin@demo.local" autoComplete="email" />
         </label>
         <label style={{ display: 'grid', gap: 8, marginBottom: 18 }}>
-          Şifre
+          Sifre
           <input name="password" type="password" autoComplete="current-password" placeholder="ChangeMe123!" />
         </label>
-        <button type="submit" style={{ minHeight: 48, borderRadius: 999, border: 0, padding: '0 18px', background: 'var(--accent)' }}>
-          Güvenli giriş yap
-        </button>
+        <PendingSubmitButton
+          type="submit"
+          idleLabel="Guvenli giris yap"
+          pendingLabel="Giris dogrulaniyor..."
+          style={{ minHeight: 48, borderRadius: 999, border: 0, padding: '0 18px', background: 'var(--accent)' }}
+        />
       </form>
     </main>
   );

@@ -1,5 +1,6 @@
 import { adminApi } from '../../../lib/api';
-import { getSessionToken } from '../../../lib/session';
+import { canAssignTickets, canMutateTickets, getAdminSession, isReadOnlyRole } from '../../../lib/session';
+import { PendingFieldset, PendingSubmitButton } from '../../components/form-controls';
 import { addInternalNoteAction, addPublicMessageAction, assignTicketAction, updateStatusAction } from '../actions';
 
 const transitions: Record<string, string[]> = {
@@ -14,29 +15,29 @@ const transitions: Record<string, string[]> = {
 };
 
 const statusCopy: Record<string, string> = {
-  NEW: 'Yeni kayıt',
-  TRIAGED: 'Ön incelemede',
-  ASSIGNED: 'Birime atandı',
-  IN_PROGRESS: 'İşlemde',
-  WAITING_INFO: 'Vatandaştan bilgi bekleniyor',
-  RESOLVED: 'Çözüm bildirildi',
-  CLOSED: 'Kapatıldı',
+  NEW: 'Yeni kayit',
+  TRIAGED: 'On incelemede',
+  ASSIGNED: 'Birime atandi',
+  IN_PROGRESS: 'Islemde',
+  WAITING_INFO: 'Vatandastan bilgi bekleniyor',
+  RESOLVED: 'Cozum bildirildi',
+  CLOSED: 'Kapatildi',
   REJECTED: 'Reddedildi',
 };
 
 const slaCopy: Record<string, string> = {
-  OK: 'SLA içinde',
-  DUE_SOON: 'SLA yaklaşmakta',
-  BREACHED: 'SLA aşıldı',
+  OK: 'SLA icinde',
+  DUE_SOON: 'SLA yaklasmakta',
+  BREACHED: 'SLA asildi',
   UNKNOWN: 'SLA bilinmiyor',
 };
 
 const auditActionCopy: Record<string, string> = {
-  'ticket.created': 'Talep oluşturuldu',
-  'ticket.assigned': 'Talep birime atandı',
-  'ticket.status_changed': 'Durum değiştirildi',
-  'ticket.internal_note_added': 'İç not eklendi',
-  'ticket.public_message_added': 'Vatandaş mesajı eklendi',
+  'ticket.created': 'Talep olusturuldu',
+  'ticket.assigned': 'Talep birime atandi',
+  'ticket.status_changed': 'Durum degistirildi',
+  'ticket.internal_note_added': 'Ic not eklendi',
+  'ticket.public_message_added': 'Vatandas mesaji eklendi',
 };
 
 const dateFormatter = new Intl.DateTimeFormat('tr-TR', {
@@ -48,75 +49,89 @@ type FeedbackCopy = { title: string; detail: string };
 
 const successCopy: Record<string, FeedbackCopy> = {
   'status-updated': {
-    title: 'Durum güncellendi.',
-    detail: 'Kuyruk ve talep detayı yenilendi; varsa vatandaş mesajı takip ekranında görünür.',
+    title: 'Durum guncellendi.',
+    detail: 'Kuyruk ve talep detayi yenilendi; varsa vatandas mesaji takip ekraninda gorunur.',
   },
   assigned: {
-    title: 'Atama tamamlandı.',
-    detail: 'Talep seçilen birimin operasyon kuyruğuna taşındı.',
+    title: 'Atama tamamlandi.',
+    detail: 'Talep secilen birimin operasyon kuyruguna tasindi.',
   },
   'internal-note-added': {
-    title: 'İç not kaydedildi.',
-    detail: 'Bu not yalnızca personel ekranlarında görünür; vatandaş takip ekranına yansımaz.',
+    title: 'Ic not kaydedildi.',
+    detail: 'Bu not yalnizca personel ekranlarinda gorunur; vatandas takip ekranina yansimaz.',
   },
   'public-message-sent': {
-    title: 'Vatandaş bilgilendirmesi gönderildi.',
-    detail: 'Mesaj takip ekranındaki belediye bilgilendirmeleri arasına eklendi.',
+    title: 'Vatandas bilgilendirmesi gonderildi.',
+    detail: 'Mesaj takip ekranindaki belediye bilgilendirmeleri arasina eklendi.',
   },
 };
 
 const errorCopy: Record<string, FeedbackCopy> = {
   session: {
     title: 'Oturum gerekli.',
-    detail: 'İşleme devam etmek için yeniden giriş yapın; form verisi güvenlik nedeniyle gönderilmedi.',
+    detail: 'Isleme devam etmek icin yeniden giris yapin; form verisi guvenlik nedeniyle gonderilmedi.',
   },
   status: {
-    title: 'Durum güncellenemedi.',
-    detail: 'Seçilen geçiş bu talep için uygun olmayabilir veya opsiyonel vatandaş mesajı çok kısa olabilir.',
+    title: 'Durum guncellenemedi.',
+    detail: 'Secilen gecis bu talep icin uygun olmayabilir veya opsiyonel vatandas mesaji cok kisa olabilir.',
   },
   assignment: {
-    title: 'Atama yapılamadı.',
-    detail: 'Aktif bir birim seçildiğinden emin olun; pasif veya eksik birimlere atama yapılmaz.',
+    title: 'Atama yapilamadi.',
+    detail: 'Aktif bir birim secildiginden emin olun; pasif veya eksik birimlere atama yapilmaz.',
   },
   'internal-note': {
-    title: 'İç not kaydedilemedi.',
-    detail: 'Not metni boş olmamalı; operasyon geçmişi için kısa ama açıklayıcı bir kayıt girin.',
+    title: 'Ic not kaydedilemedi.',
+    detail: 'Not metni bos olmamali; operasyon gecmisi icin kisa ama aciklayici bir kayit girin.',
   },
   'public-message': {
-    title: 'Vatandaş mesajı gönderilemedi.',
-    detail: 'Mesaj metnini kontrol edin; vatandaş ekranında görüneceği için açık ve işlem odaklı yazın.',
+    title: 'Vatandas mesaji gonderilemedi.',
+    detail: 'Mesaj metnini kontrol edin; vatandas ekraninda gorunecegi icin acik ve islem odakli yazin.',
+  },
+  forbidden: {
+    title: 'Bu islem rol kapsaminizin disinda.',
+    detail: 'Frontend formu role gore daraltiyor; yine de son karar API guard tarafinda. Yetkiniz degistiyse yeniden oturum acin.',
   },
   general: {
-    title: 'İşlem tamamlanamadı.',
-    detail: 'Yetki, bağlantı veya kayıt durumunu kontrol edip işlemi tekrar deneyin.',
+    title: 'Islem tamamlanamadi.',
+    detail: 'Yetki, baglanti veya kayit durumunu kontrol edip islemi tekrar deneyin.',
   },
 };
 
-export default async function TicketDetailPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ success?: string; error?: string }> }) {
+export default async function TicketDetailPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ success?: string; error?: string }>;
+}) {
   const { id } = await params;
   const { success, error } = await searchParams;
-  const token = await getSessionToken();
+  const session = await getAdminSession();
+  const token = session?.token ?? null;
+  const role = session?.user.role ?? null;
   const ticket = token ? await adminApi.ticket(token, id).catch(() => null) : null;
   const auditLog = token ? await adminApi.auditLog(token, id).catch(() => []) : [];
   const departments = token ? await adminApi.departments(token).catch(() => []) : [];
   const statusOptions = ticket ? [ticket.status, ...(transitions[ticket.status] ?? [])] : [];
   const isTerminal = ticket?.status === 'CLOSED' || ticket?.status === 'REJECTED';
-  const canMutateTicket = Boolean(ticket && !isTerminal);
+  const canUpdateTicket = Boolean(ticket && !isTerminal && canMutateTickets(role));
+  const canAssignTicket = Boolean(ticket && !isTerminal && canAssignTickets(role));
+  const readOnlyRole = isReadOnlyRole(role);
 
   return (
     <main className="main">
-      <p className="badge">Talep detayı · {ticket?.ticketNo ?? id}</p>
-      <h1>{ticket?.title ?? 'Talep detayı için giriş yapın'}</h1>
+      <p className="badge">Talep detayi - {ticket?.ticketNo ?? id}</p>
+      <h1>{ticket?.title ?? 'Talep detayi icin giris yapin'}</h1>
       {token && ticket ? (
         <div className="notice muted" role="note">
-          <strong>Yetki durumu API tarafından doğrulanır.</strong>
-          <p>Bu ekranda rol bilgisi taşınmadığı için READ_ONLY veya kapsam dışı kullanıcı işlemleri backend guard tarafından reddedilir; hata mesajı güvenli biçimde gösterilir.</p>
+          <strong>{readOnlyRole ? 'Goruntuleme modu aktif.' : 'Yetki durumu API tarafindan da dogrulanir.'}</strong>
+          <p>{readOnlyRole ? 'READ_ONLY rolu icin durum gecisi, atama ve mesaj formlari pasif tutulur.' : canAssignTicket ? 'Atama ve ticket mutasyonlari bu rol icin acik; son karar yine API guard tarafindadir.' : 'Bu rolde ticket guncelleme acik, ancak atama islemi yonetici veya operator rolleriyle sinirlidir.'}</p>
         </div>
       ) : null}
       {success ? (
         <div className="notice success" role="status">
-          <strong>{(successCopy[success] ?? { title: 'İşlem kaydedildi.', detail: 'Talep detayı güncel verilerle yenilendi.' }).title}</strong>
-          <p>{(successCopy[success] ?? { title: 'İşlem kaydedildi.', detail: 'Talep detayı güncel verilerle yenilendi.' }).detail}</p>
+          <strong>{(successCopy[success] ?? { title: 'Islem kaydedildi.', detail: 'Talep detayi guncel verilerle yenilendi.' }).title}</strong>
+          <p>{(successCopy[success] ?? { title: 'Islem kaydedildi.', detail: 'Talep detayi guncel verilerle yenilendi.' }).detail}</p>
         </div>
       ) : null}
       {error ? (
@@ -128,24 +143,26 @@ export default async function TicketDetailPage({ params, searchParams }: { param
       <div className="grid">
         <section className="card">
           <h2>Durum</h2>
-          <p>{ticket ? `${statusCopy[ticket.status] ?? ticket.status} · ${ticket.department?.name ?? 'Atanmamış'} · ${slaCopy[ticket.slaState ?? 'UNKNOWN'] ?? slaCopy.UNKNOWN}` : 'Oturum yok veya API erişilemiyor.'}</p>
+          <p>{ticket ? `${statusCopy[ticket.status] ?? ticket.status} - ${ticket.department?.name ?? 'Atanmamis'} - ${slaCopy[ticket.slaState ?? 'UNKNOWN'] ?? slaCopy.UNKNOWN}` : 'Oturum yok veya API erisilemiyor.'}</p>
           {isTerminal ? (
             <div className="notice muted" role="note">
               <strong>Bu talep son durumda.</strong>
-              <p>Kapatılmış veya reddedilmiş taleplerde yeni atama, durum geçişi ve mesaj işlemleri backend guard tarafından kabul edilmez.</p>
+              <p>Kapatilmis veya reddedilmis taleplerde yeni atama, durum gecisi ve mesaj islemleri kabul edilmez.</p>
             </div>
           ) : null}
           {ticket ? (
             <form action={updateStatusAction} style={{ display: 'grid', gap: 10 }}>
-              <input type="hidden" name="intent" value="status" />
-              <input type="hidden" name="ticketId" value={ticket.id} />
-              <select name="status" defaultValue={ticket.status} disabled={!canMutateTicket}>
-                {statusOptions.map((status) => (
-                  <option key={status} value={status}>{statusCopy[status] ?? status}</option>
-                ))}
-              </select>
-              <input name="publicMessage" placeholder="Vatandaşa opsiyonel durum mesajı" disabled={!canMutateTicket} />
-              <button type="submit" disabled={!canMutateTicket}>Durumu güncelle</button>
+              <PendingFieldset style={{ display: 'grid', gap: 10 }}>
+                <input type="hidden" name="intent" value="status" />
+                <input type="hidden" name="ticketId" value={ticket.id} />
+                <select name="status" defaultValue={ticket.status} disabled={!canUpdateTicket}>
+                  {statusOptions.map((status) => (
+                    <option key={status} value={status}>{statusCopy[status] ?? status}</option>
+                  ))}
+                </select>
+                <input name="publicMessage" placeholder="Vatandasa opsiyonel durum mesaji" disabled={!canUpdateTicket} />
+                <PendingSubmitButton type="submit" disabled={!canUpdateTicket} idleLabel="Durumu guncelle" pendingLabel="Guncelleniyor..." />
+              </PendingFieldset>
             </form>
           ) : null}
         </section>
@@ -153,38 +170,44 @@ export default async function TicketDetailPage({ params, searchParams }: { param
           <h2>Atama</h2>
           {ticket ? (
             <form action={assignTicketAction} style={{ display: 'grid', gap: 10 }}>
-              <input type="hidden" name="intent" value="assignment" />
-              <input type="hidden" name="ticketId" value={ticket.id} />
-              <select name="departmentId" defaultValue="" disabled={!canMutateTicket || !departments.length}>
-                <option value="">Birim seçin</option>
-                {departments.map((department) => <option key={department.id} value={department.id}>{department.name}</option>)}
-              </select>
-              <button type="submit" disabled={!canMutateTicket || !departments.length}>Birime ata</button>
+              <PendingFieldset style={{ display: 'grid', gap: 10 }}>
+                <input type="hidden" name="intent" value="assignment" />
+                <input type="hidden" name="ticketId" value={ticket.id} />
+                <select name="departmentId" defaultValue="" disabled={!canAssignTicket || !departments.length}>
+                  <option value="">Birim secin</option>
+                  {departments.map((department) => <option key={department.id} value={department.id}>{department.name}</option>)}
+                </select>
+                <PendingSubmitButton type="submit" disabled={!canAssignTicket || !departments.length} idleLabel="Birime ata" pendingLabel="Ataniyor..." />
+              </PendingFieldset>
             </form>
-          ) : <p style={{ color: 'var(--muted)' }}>Atama için oturum gerekli.</p>}
+          ) : <p style={{ color: 'var(--muted)' }}>Atama icin oturum gerekli.</p>}
         </section>
         <section className="card">
           <h2>Mesajlar</h2>
           {ticket?.messages?.length ? ticket.messages.map((message) => (
-            <p key={message.id}><strong>{message.visibility === 'INTERNAL' ? 'İç not' : 'Vatandaş mesajı'}</strong> · {message.body}</p>
+            <p key={message.id}><strong>{message.visibility === 'INTERNAL' ? 'Ic not' : 'Vatandas mesaji'}</strong> - {message.body}</p>
           )) : <p style={{ color: 'var(--muted)' }}>Mesaj yok.</p>}
         </section>
         <section className="card">
-          <h2>İç not ekle</h2>
+          <h2>Ic not ekle</h2>
           <form action={addInternalNoteAction} style={{ display: 'grid', gap: 10 }}>
-            <input type="hidden" name="intent" value="internal-note" />
-            <input type="hidden" name="ticketId" value={ticket?.id ?? id} />
-            <textarea name="body" rows={4} placeholder="Sadece personel görür" disabled={!canMutateTicket} />
-            <button type="submit" disabled={!canMutateTicket}>Notu kaydet</button>
+            <PendingFieldset style={{ display: 'grid', gap: 10 }}>
+              <input type="hidden" name="intent" value="internal-note" />
+              <input type="hidden" name="ticketId" value={ticket?.id ?? id} />
+              <textarea name="body" rows={4} placeholder="Sadece personel gorur" disabled={!canUpdateTicket} />
+              <PendingSubmitButton type="submit" disabled={!canUpdateTicket} idleLabel="Notu kaydet" pendingLabel="Kaydediliyor..." />
+            </PendingFieldset>
           </form>
         </section>
         <section className="card">
-          <h2>Vatandaş mesajı</h2>
+          <h2>Vatandas mesaji</h2>
           <form action={addPublicMessageAction} style={{ display: 'grid', gap: 10 }}>
-            <input type="hidden" name="intent" value="public-message" />
-            <input type="hidden" name="ticketId" value={ticket?.id ?? id} />
-            <textarea name="body" rows={4} placeholder="Vatandaş takip ekranında görünür" disabled={!canMutateTicket} />
-            <button type="submit" disabled={!canMutateTicket}>Mesajı gönder</button>
+            <PendingFieldset style={{ display: 'grid', gap: 10 }}>
+              <input type="hidden" name="intent" value="public-message" />
+              <input type="hidden" name="ticketId" value={ticket?.id ?? id} />
+              <textarea name="body" rows={4} placeholder="Vatandas takip ekraninda gorunur" disabled={!canUpdateTicket} />
+              <PendingSubmitButton type="submit" disabled={!canUpdateTicket} idleLabel="Mesaji gonder" pendingLabel="Gonderiliyor..." />
+            </PendingFieldset>
           </form>
         </section>
         <section className="card">
@@ -196,8 +219,8 @@ export default async function TicketDetailPage({ params, searchParams }: { param
             </div>
           )) : (
             <div className="empty-state">
-              <strong>Henüz audit kaydı görünmüyor.</strong>
-              <p>Durum değişikliği, atama ve mesaj işlemleri yapıldığında operasyon izi burada zaman sırasıyla listelenir.</p>
+              <strong>Henuz audit kaydi gorunmuyor.</strong>
+              <p>Durum degisikligi, atama ve mesaj islemleri yapildiginda operasyon izi burada listelenir.</p>
             </div>
           )}
         </section>
