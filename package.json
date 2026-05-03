@@ -13,7 +13,8 @@
     "db:generate": "pnpm --filter @kentos/database prisma:generate",
     "db:migrate": "pnpm --filter @kentos/database prisma:migrate",
     "db:seed": "pnpm --filter @kentos/database prisma:seed",
-    "smoke:api": "node scripts/smoke-api.mjs"
+    "smoke:api": "node scripts/smoke-api.mjs",
+    "handoff": "node scripts/handoff.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",

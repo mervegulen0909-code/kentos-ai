@@ -47,3 +47,4 @@ Thumbs.db
 .claude/worktrees/
 .codex/
 .playwright-mcp/
+HANDOFF_PROMPT.md
