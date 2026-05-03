@@ -12,17 +12,17 @@ export class PublicTicketController {
     return this.tickets.create(tenantSlug, dto);
   }
 
-  @Get(':ticketNo')
-  get(@Param('tenantSlug') tenantSlug: string, @Param('ticketNo') ticketNo: string) {
-    return this.tickets.get(tenantSlug, ticketNo);
+  @Get(':trackingToken')
+  get(@Param('tenantSlug') tenantSlug: string, @Param('trackingToken') trackingToken: string) {
+    return this.tickets.get(tenantSlug, trackingToken);
   }
 
-  @Post(':ticketNo/messages')
+  @Post(':trackingToken/messages')
   addMessage(
     @Param('tenantSlug') tenantSlug: string,
-    @Param('ticketNo') ticketNo: string,
+    @Param('trackingToken') trackingToken: string,
     @Body() dto: CreatePublicMessageDto,
   ) {
-    return this.tickets.addMessage(tenantSlug, ticketNo, dto);
+    return this.tickets.addMessage(tenantSlug, trackingToken, dto);
   }
 }
