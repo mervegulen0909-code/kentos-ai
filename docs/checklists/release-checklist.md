@@ -44,7 +44,8 @@ Run local API smoke when API, database, auth, RBAC, tenant settings, ticket work
 - [ ] Smoke verifies demo admin login.
 - [ ] Smoke verifies tenant settings write/read.
 - [ ] Smoke verifies authenticated ticket create, assignment, internal note, public message, status transition, and audit log.
-- [ ] Smoke verifies public citizen ticket create/track.
+- [ ] Smoke verifies public citizen ticket create and TK tracking-code lookup.
+- [ ] Smoke verifies legacy/internal `KNT-*` ticket numbers do not work on public lookup endpoints.
 
 ## 5. Role and RBAC regression
 
@@ -68,7 +69,7 @@ Run browser smoke when admin or citizen UI routes, forms, auth/session, settings
 - [ ] Admin ticket detail supports assignment, internal note, public message, status transition, refresh persistence, and audit timeline.
 - [ ] Admin settings supports department/category/SLA/message-template create or update flows currently in scope.
 - [ ] Citizen report creates a ticket and redirects to the public ticket page.
-- [ ] Citizen tracking finds the same ticket by ticket number.
+- [ ] Citizen tracking finds the same public ticket by TK tracking code only.
 - [ ] Citizen invalid ticket state is public-safe and helpful.
 - [ ] Citizen pages do not expose internal notes, audit logs, AI reasoning, stack traces, secrets, or tenant internals.
 - [ ] Browser console has no unexpected errors on the smoke path.
@@ -101,6 +102,7 @@ Before the milestone push decision:
 - [ ] Record browser smoke status: passed, partially run with gaps, blocked, or explicitly not run.
 - [ ] Confirm `git status --short` contains only intentional state.
 - [ ] Confirm no secrets, production env files, credentials, or real tokens are staged.
+- [ ] Confirm local tool cache directories such as `.codex/` and `.playwright-mcp/` are ignored or otherwise not staged.
 
 Before push:
 

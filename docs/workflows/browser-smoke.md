@@ -127,23 +127,24 @@ Admin expected markers:
 
 1. Open `http://127.0.0.1:3112/demo-belediye/report`.
 2. Submit a report with realistic Turkish description, address, and phone.
-3. Confirm redirect to `/demo-belediye/ticket/<ticketNo>`.
-4. Record the generated ticket number for the QA report.
+3. Confirm redirect to `/demo-belediye/ticket/<trackingToken>` where the token matches `TK-[A-F0-9]{16}`.
+4. Record the generated TK tracking code for the QA report.
 5. Confirm the report flow works without staff authentication.
 6. Confirm required-field validation copy is Turkish-first and does not expose backend internals.
 
 ### Scenario J — Citizen track
 
 1. Open `http://127.0.0.1:3112/demo-belediye/track`.
-2. Enter the same ticket number and confirm navigation to the same public ticket page.
-3. Submit the tracking form with a missing ticket number and confirm inline copy explains what is required.
-4. Submit a malformed ticket number and confirm the format error is calm, Turkish-first, and does not leak lookup internals.
-5. Try an obviously invalid but well-formed ticket number and confirm the not-found state is citizen-safe and helpful.
+2. Enter the same TK tracking code and confirm navigation to the same public ticket page.
+3. Submit the tracking form with a missing tracking code and confirm inline copy explains what is required.
+4. Submit a malformed tracking code and confirm the format error is calm, Turkish-first, and does not leak lookup internals.
+5. Try an obviously invalid but well-formed TK tracking code and confirm the not-found state is citizen-safe and helpful.
+6. Try a legacy `KNT-YYYY-000001` style ticket number and confirm the public endpoint/UI treats it as invalid or not found; citizen tracking is TK-only.
 6. Reopen the valid ticket page after the invalid states and confirm the successful state still renders correctly.
 
 ### Scenario K — Citizen public ticket status copy
 
-1. Confirm the public ticket page shows only public-safe fields: ticket number, status, category/department if public, address/description summary if intended, and citizen-safe messages.
+1. Confirm the public ticket page shows only public-safe fields: TK tracking code, status, category/department if public, address/description summary if intended, and citizen-safe messages.
 2. Confirm status copy is understandable to a citizen and avoids internal workflow jargon.
 3. Confirm loading, empty, invalid, and error states explain what the citizen can do next.
 4. Confirm the page does not show internal notes, audit logs, staff-only metadata, AI reasoning, tokens, stack traces, or tenant internals.
@@ -159,7 +160,7 @@ Admin expected markers:
 Citizen expected markers:
 
 - Citizen copy is Turkish-first, calm, and public-safe.
-- Tracking requires the ticket number and never exposes another tenant's internal data.
+- Tracking requires the TK tracking code and never exposes another tenant's internal data.
 - Empty, loading, invalid, and error states are understandable without raw backend payloads.
 
 ## Regression checks

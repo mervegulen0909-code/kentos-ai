@@ -14,8 +14,9 @@ The current smoke script verifies:
 - Ticket transition guard checks for invalid or repeated status changes.
 - Authenticated ticket create, assignment, internal note, public message, status transition, and audit-log read.
 - Audit coverage checks for ticket assignment, notes, public messages, status transitions, and denied mutations where applicable.
-- Public citizen ticket create and public-safe ticket tracking.
-- Public responses do not leak internal notes, audit logs, AI reasoning, tokens, or tenant internals.
+- Public citizen ticket create and public-safe TK tracking-code lookup.
+- Public tracking is TK-only: `KNT-*` internal ticket numbers must not work on public lookup endpoints.
+- Public responses do not leak internal notes, audit logs, AI reasoning, internal ticket numbers, IDs, tokens, or tenant internals.
 
 The smoke must not call non-local endpoints, send WhatsApp/email/social messages, deploy, push, or mutate production data.
 
@@ -148,11 +149,13 @@ curl -s -X POST http://127.0.0.1:3110/api/v1/public/demo-belediye/tickets \
   -d '{"description":"Atatürk Mahallesi 12. Sokak önünde kaldırım çöktü.","phone":"+905551112233","addressText":"Atatürk Mahallesi 12. Sokak"}'
 ```
 
-Track the created ticket by ticket number:
+Track the created ticket by TK tracking code:
 
 ```bash
-curl http://127.0.0.1:3110/api/v1/public/demo-belediye/tickets/<ticketNo>
+curl http://127.0.0.1:3110/api/v1/public/demo-belediye/tickets/<trackingToken>
 ```
+
+Legacy/internal `KNT-*` ticket numbers are not valid public tracking identifiers and should return a safe invalid/not-found response.
 
 ## Full local verification
 

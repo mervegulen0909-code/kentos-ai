@@ -341,3 +341,12 @@
 - **Result:** Passed. Local dev DB reset was required because a previously applied migration was intentionally edited for duplicate cleanup. Prisma DLL lock was resolved by stopping workspace-owned API dev processes.
 - **Next action:** Review final diff and decide whether to commit the stabilized large change set.
 - **Blocker:** None.
+
+## 2026-05-03 11:45 — Wave 12 QA post-push evidence checkpoint
+
+- **Action taken:** Window 1 verified API/UI worktrees were clean and current, confirmed API/UI hardening needed no product-code change, then tightened QA runbooks for TK-only public tracking, legacy `KNT-*` public lookup rejection, post-push sync, and local tool-cache ignore evidence.
+- **Files changed:** `docs/workflows/local-smoke.md`, `docs/workflows/browser-smoke.md`, `docs/checklists/release-checklist.md`, `docs/workflows/autonomous-run-log.md`.
+- **Verification run:** Pending Window 1 final docs merge verification.
+- **Result:** Pending.
+- **Next action:** Window 1 should review, commit, merge, and run final verification.
+- **Blocker:** None.
