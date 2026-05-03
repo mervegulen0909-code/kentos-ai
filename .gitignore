@@ -45,3 +45,5 @@ Thumbs.db
 # Claude local-only state
 .claude/settings.local.json
 .claude/worktrees/
+.codex/
+.playwright-mcp/
