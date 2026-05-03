@@ -1,4 +1,10 @@
+import { createRequire } from 'node:module';
+
+const databaseRequire = createRequire(new URL('../packages/database/package.json', import.meta.url));
+const { PrismaClient } = databaseRequire('@prisma/client');
+
 const baseUrl = process.env.KENTOS_API_BASE_URL ?? 'http://127.0.0.1:3110/api/v1';
+const prisma = new PrismaClient();
 
 function section(name) {
   console.log(`\n[${name}]`);
@@ -6,6 +12,15 @@ function section(name) {
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
+}
+
+function parseBody(text, path) {
+  if (!text) return null;
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new Error(`Expected JSON from ${path}, got: ${text.slice(0, 300)}`);
+  }
 }
 
 async function request(path, options = {}) {
@@ -18,7 +33,7 @@ async function request(path, options = {}) {
 
   const response = await fetch(`${baseUrl}${path}`, { ...options, headers });
   const text = await response.text();
-  const body = text ? JSON.parse(text) : null;
+  const body = parseBody(text, path);
   if (!response.ok) throw new Error(`${options.method ?? 'GET'} ${path} -> ${response.status}: ${text}`);
   return { status: response.status, body };
 }
@@ -33,9 +48,28 @@ async function expectStatus(path, expectedStatus, options = {}) {
 
   const response = await fetch(`${baseUrl}${path}`, { ...options, headers });
   const text = await response.text();
-  const body = text ? JSON.parse(text) : null;
+  const body = parseBody(text, path);
   if (response.status !== expectedStatus) {
     throw new Error(`${options.method ?? 'GET'} ${path} expected ${expectedStatus}, got ${response.status}: ${text}`);
+  }
+  return { status: response.status, body };
+}
+
+async function expectStatusIn(path, expectedStatuses, options = {}) {
+  const headers = {
+    Accept: 'application/json',
+    ...(options.body ? { 'Content-Type': 'application/json' } : {}),
+    ...(options.token ? { Authorization: `Bearer ${options.token}` } : {}),
+    ...options.headers,
+  };
+
+  const response = await fetch(`${baseUrl}${path}`, { ...options, headers });
+  const text = await response.text();
+  const body = parseBody(text, path);
+  if (!expectedStatuses.includes(response.status)) {
+    throw new Error(
+      `${options.method ?? 'GET'} ${path} expected one of ${expectedStatuses.join(', ')}, got ${response.status}: ${text}`,
+    );
   }
   return { status: response.status, body };
 }
@@ -86,6 +120,38 @@ const managerToken = managerLogin.body.accessToken;
 const operatorToken = operatorLogin.body.accessToken;
 const departmentStaffUserId = departmentStaffLogin.body.user.id;
 
+await expectStatus('/auth/refresh', 401, {
+  method: 'POST',
+  body: JSON.stringify({ refreshToken: login.body.accessToken }),
+});
+
+await prisma.user.update({ where: { id: operatorLogin.body.user.id }, data: { isActive: false } });
+try {
+  await expectStatus('/auth/refresh', 401, {
+    method: 'POST',
+    body: JSON.stringify({ refreshToken: operatorLogin.body.refreshToken }),
+  });
+  await expectStatusIn('/departments', [401, 403], { token: operatorLogin.body.accessToken });
+  console.log('inactive_user_auth_revalidation', true);
+} finally {
+  await prisma.user.update({ where: { id: operatorLogin.body.user.id }, data: { isActive: true } });
+}
+
+await prisma.user.update({ where: { id: readOnlyLogin.body.user.id }, data: { role: 'OPERATOR' } });
+try {
+  const refreshedReadOnlyLogin = await request('/auth/refresh', {
+    method: 'POST',
+    body: JSON.stringify({ refreshToken: readOnlyLogin.body.refreshToken }),
+  });
+  const refreshedPayload = JSON.parse(
+    Buffer.from(refreshedReadOnlyLogin.body.accessToken.split('.')[1], 'base64url').toString('utf8'),
+  );
+  assert(refreshedPayload.role === 'OPERATOR', 'Refresh did not derive current user role from the database.');
+  console.log('refresh_db_role_revalidation', true);
+} finally {
+  await prisma.user.update({ where: { id: readOnlyLogin.body.user.id }, data: { role: readOnlyLogin.body.user.role } });
+}
+
 section('settings RBAC');
 const departments = await request('/departments', { token });
 console.log('departments', departments.body.length);
@@ -121,6 +187,17 @@ const createdCategory = await request('/categories', {
 });
 console.log('category_create', createdCategory.status, createdCategory.body.code);
 
+const updatedCategory = await request(`/categories/${createdCategory.body.id}`, {
+  method: 'PATCH',
+  token,
+  body: JSON.stringify({
+    name: `Smoke Kategorisi Guncel ${unique}`,
+    departmentId: createdDepartment.body.id,
+    defaultPriority: 'HIGH',
+  }),
+});
+console.log('category_update', updatedCategory.status, updatedCategory.body.defaultPriority === 'HIGH');
+
 const createdSlaPolicy = await request('/sla-policies', {
   method: 'POST',
   token,
@@ -150,6 +227,45 @@ const updatedTemplate = await request(`/message-templates/${firstTemplate.id}`, 
   body: JSON.stringify({ body: firstTemplate.body }),
 });
 console.log('message_template_update', updatedTemplate.status, Boolean(updatedTemplate.body.id));
+const disabledTemplate = await request(`/message-templates/${firstTemplate.id}`, {
+  method: 'PATCH',
+  token,
+  body: JSON.stringify({ body: firstTemplate.body, isActive: false }),
+});
+assert(disabledTemplate.body.isActive === false, 'Message template was not disabled.');
+const templatesAfterDisable = await request('/message-templates', { token });
+const disabledTemplateEntry = templatesAfterDisable.body.find((template) => template.id === firstTemplate.id);
+assert(disabledTemplateEntry?.isActive === false, 'Disabled message template disappeared from settings list.');
+await request(`/message-templates/${firstTemplate.id}`, {
+  method: 'PATCH',
+  token,
+  body: JSON.stringify({ body: firstTemplate.body, isActive: true }),
+});
+const existingCitizenWebReceivedTemplate = await prisma.messageTemplate.findFirst({
+  where: {
+    tenantId: login.body.user.tenantId,
+    key: 'TICKET_RECEIVED',
+    locale: 'tr-TR',
+    channel: 'CITIZEN_WEB',
+  },
+});
+const citizenWebReceivedTemplateBody = 'Kanal özel takip kodu: {{trackingToken}}.';
+if (existingCitizenWebReceivedTemplate) {
+  await prisma.messageTemplate.update({
+    where: { id: existingCitizenWebReceivedTemplate.id },
+    data: { body: citizenWebReceivedTemplateBody, isActive: true },
+  });
+} else {
+  await prisma.messageTemplate.create({
+    data: {
+      tenantId: login.body.user.tenantId,
+      key: 'TICKET_RECEIVED',
+      locale: 'tr-TR',
+      channel: 'CITIZEN_WEB',
+      body: citizenWebReceivedTemplateBody,
+    },
+  });
+}
 
 await expectStatus('/departments', 403, {
   method: 'POST',
@@ -323,7 +439,7 @@ await request(`/tickets/${operatorMatrixTicket.body.id}/status`, {
   token: operatorToken,
   body: JSON.stringify({ status: 'ASSIGNED' }),
 });
-const managerTickets = await request('/tickets', { token: managerToken });
+const managerTickets = await request(`/tickets?q=${encodeURIComponent(operatorMatrixTicket.body.title)}`, { token: managerToken });
 assert(managerTickets.body.some((ticket) => ticket.id === operatorMatrixTicket.body.id), 'Manager cannot see tenant ticket list.');
 const managerMatrixTicket = await request(`/tickets/${operatorMatrixTicket.body.id}`, { token: managerToken });
 assert(managerMatrixTicket.body.id === operatorMatrixTicket.body.id, 'Manager cannot read tenant ticket detail.');
@@ -363,10 +479,11 @@ const temizlikTicket = await request('/tickets', {
 });
 console.log('department_staff_hidden_ticket_create', temizlikTicket.status, temizlikTicket.body.ticketNo);
 
-const departmentStaffTickets = await request('/tickets', { token: departmentStaffToken });
+const departmentStaffTickets = await request(`/tickets?q=${encodeURIComponent(fenTicket.body.title)}`, { token: departmentStaffToken });
 const departmentStaffTicketIds = departmentStaffTickets.body.map((ticket) => ticket.id);
 assert(departmentStaffTicketIds.includes(fenTicket.body.id), 'Department staff cannot see own department ticket.');
-assert(!departmentStaffTicketIds.includes(temizlikTicket.body.id), 'Department staff can see another department ticket.');
+const departmentStaffHiddenTickets = await request(`/tickets?q=${encodeURIComponent(temizlikTicket.body.title)}`, { token: departmentStaffToken });
+assert(!departmentStaffHiddenTickets.body.some((ticket) => ticket.id === temizlikTicket.body.id), 'Department staff can see another department ticket.');
 
 const departmentStaffFenTicket = await request(`/tickets/${fenTicket.body.id}`, { token: departmentStaffToken });
 console.log('department_staff_read_scope', departmentStaffFenTicket.status, departmentStaffFenTicket.body.department.id === fenDepartment.id);
@@ -485,22 +602,140 @@ for (const entry of auditedEntries) {
 }
 console.log('audit_coverage', true);
 
+section('settings audit coverage');
+const settingsAuditActions = [
+  'tenant.department_created',
+  'tenant.department_updated',
+  'tenant.category_created',
+  'tenant.category_updated',
+  'tenant.sla_policy_created',
+  'tenant.sla_policy_updated',
+  'tenant.message_template_updated',
+];
+const settingsAuditEntries = await prisma.auditLog.findMany({
+  where: {
+    tenantId: login.body.user.tenantId,
+    actorUserId: login.body.user.id,
+    action: { in: settingsAuditActions },
+  },
+  orderBy: { createdAt: 'desc' },
+  take: 20,
+});
+const settingsAuditFound = new Set(settingsAuditEntries.map((entry) => entry.action));
+for (const action of settingsAuditActions) {
+  assert(settingsAuditFound.has(action), `Settings audit log missing ${action}.`);
+}
+console.log('settings_audit_coverage', true);
+
 section('public safety');
+const publicPhone = `+90555${String(unique).slice(-7).padStart(7, '0')}`;
+const existingPublicContactCitizen = await prisma.citizen.create({
+  data: {
+    tenantId: login.body.user.tenantId,
+    displayName: `Mevcut Vatandas ${unique}`,
+    phone: publicPhone,
+    email: `existing-${unique}@example.test`,
+  },
+});
 const publicTicket = await request('/public/demo-belediye/tickets', {
   method: 'POST',
   body: JSON.stringify({
     description: 'Atatürk Mahallesi 12. Sokak önünde kaldırım çöktü.',
-    phone: '+905551112233',
+    displayName: `Public Basvuran ${unique}`,
+    phone: publicPhone,
+    email: `public-${unique}@example.test`,
     addressText: 'Atatürk Mahallesi 12. Sokak',
   }),
 });
-console.log('public_create', publicTicket.status, publicTicket.body.ticketNo);
+console.log('public_create', publicTicket.status, publicTicket.body.trackingToken);
+assert(/^TK-[A-F0-9]{16}$/.test(publicTicket.body.trackingToken), 'Public ticket tracking token format is invalid.');
+assert(!Object.hasOwn(publicTicket.body, 'ticketNo'), 'Public ticket creation leaked internal ticketNo.');
 
-const tracked = await request(`/public/demo-belediye/tickets/${publicTicket.body.ticketNo}`);
-await expectStatus(`/public/yanlis-belediye/tickets/${publicTicket.body.ticketNo}`, 404);
-const forbiddenPublicKeys = ['id', 'tenantId', 'citizenId', 'auditLogs', 'aiRuns', 'aiClassification', 'aiConfidence', 'internalNotes'];
+const tracked = await request(`/public/demo-belediye/tickets/${publicTicket.body.trackingToken}`);
+assert(tracked.body.publicMessages.length > 0, 'Public ticket should include an automatic public status message.');
+assert(
+  tracked.body.publicMessages.some((message) => message.body === `Kanal özel takip kodu: ${publicTicket.body.trackingToken}.`),
+  'Public ticket did not use the channel-specific received template.',
+);
+const publicTicketMessage = await request(`/public/demo-belediye/tickets/${publicTicket.body.trackingToken}/messages`, {
+  method: 'POST',
+  body: JSON.stringify({
+    contact: publicPhone,
+    body: 'Ek bilgi: kaldirim coken alan genisliyor.',
+  }),
+});
+assert(
+  publicTicketMessage.body.publicMessages.some((message) => message.body === 'Ek bilgi: kaldirim coken alan genisliyor.'),
+  'Public ticket message was not persisted.',
+);
+
+const publicTicketAdminView = await request('/tickets?q=kald%C4%B1r%C4%B1m%20%C3%A7%C3%B6kt%C3%BC', { token });
+const publicTicketRecord = publicTicketAdminView.body.find((ticket) => ticket.publicTrackingToken === publicTicket.body.trackingToken);
+assert(publicTicketRecord, 'Public ticket not visible from staff list for audit verification.');
+const publicTicketDbRecord = await prisma.ticket.findFirst({
+  where: { tenantId: login.body.user.tenantId, publicTrackingToken: publicTicket.body.trackingToken },
+  select: { citizenId: true },
+});
+const unchangedPublicContactCitizen = await prisma.citizen.findUnique({ where: { id: existingPublicContactCitizen.id } });
+assert(publicTicketDbRecord?.citizenId && publicTicketDbRecord.citizenId !== existingPublicContactCitizen.id, 'Public intake reused an existing citizen contact record.');
+assert(unchangedPublicContactCitizen?.displayName === existingPublicContactCitizen.displayName, 'Public intake changed an existing citizen displayName.');
+assert(unchangedPublicContactCitizen?.email === existingPublicContactCitizen.email, 'Public intake changed an existing citizen email.');
+await expectStatus(`/public/demo-belediye/tickets/${publicTicketRecord.ticketNo}`, 404);
+
+const publicAuditLog = await request(`/tickets/${publicTicketRecord.id}/audit-log`, { token });
+assert(
+  publicAuditLog.body.some((entry) => entry.action === 'ticket.citizen_public_message_added' && entry.actorType === 'CITIZEN'),
+  'Audit log missing citizen public message entry.',
+);
+
+await request(`/tickets/${publicTicketRecord.id}/status`, {
+  method: 'POST',
+  token,
+  body: JSON.stringify({ status: 'REJECTED', publicMessage: 'Bu basvuru isleme alinamadi.' }),
+});
+await expectStatus(`/public/demo-belediye/tickets/${publicTicket.body.trackingToken}/messages`, 403, {
+  method: 'POST',
+  body: JSON.stringify({
+    contact: publicPhone,
+    body: 'Kapali basvuruya mesaj eklenmemeli.',
+  }),
+});
+await expectStatus(`/public/yanlis-belediye/tickets/${publicTicket.body.trackingToken}`, 404);
+const publicMessagesPayload = JSON.stringify(tracked.body.publicMessages);
+assert(!publicMessagesPayload.includes('"senderType"'), 'Public messages leaked senderType.');
+assert(tracked.body.publicMessages.every((message) => ['municipality', 'citizen'].includes(message.author)), 'Public messages missing safe author labels.');
+const forbiddenPublicKeys = ['id', 'tenantId', 'ticketNo', 'citizenId', 'auditLogs', 'aiRuns', 'aiClassification', 'aiConfidence', 'internalNotes'];
 for (const key of forbiddenPublicKeys) {
   assert(!Object.hasOwn(tracked.body, key), `Public ticket response leaked ${key}.`);
 }
 console.log('public_track', tracked.status, tracked.body.status);
 console.log('public_safe_response', true);
+
+section('ticket tenant validation');
+await expectStatus('/tickets', 404, {
+  method: 'POST',
+  token,
+  body: JSON.stringify({
+    channel: 'OPERATOR',
+    title: `Gecersiz citizen ${unique}`,
+    description: 'Var olmayan citizen baglantisi reddedilmeli.',
+    priority: 'NORMAL',
+    departmentId: createdDepartment.body.id,
+    citizenId: 'cm9999999999999999999999',
+  }),
+});
+await expectStatus('/tickets', 403, {
+  method: 'POST',
+  token,
+  body: JSON.stringify({
+    channel: 'OPERATOR',
+    title: `Kategori birim uyumsuz ${unique}`,
+    description: 'Kategori ve birim uyumsuz oldugunda ticket olusmamali.',
+    priority: 'NORMAL',
+    departmentId: temizlikDepartment.id,
+    categoryId: createdCategory.body.id,
+  }),
+});
+console.log('ticket_tenant_validation', true);
+
+await prisma.$disconnect();

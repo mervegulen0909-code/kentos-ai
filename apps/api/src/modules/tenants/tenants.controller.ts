@@ -48,42 +48,42 @@ export class TenantsController {
   @Roles('SUPER_ADMIN', 'TENANT_ADMIN')
   @Post('departments')
   createDepartment(@CurrentUser() user: AuthenticatedUser, @Body() dto: CreateDepartmentDto) {
-    return this.tenants.createDepartment(user.tenantId, dto);
+    return this.tenants.createDepartment(user, dto);
   }
 
   @Roles('SUPER_ADMIN', 'TENANT_ADMIN')
   @Patch('departments/:id')
   updateDepartment(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string, @Body() dto: UpdateDepartmentDto) {
-    return this.tenants.updateDepartment(user.tenantId, id, dto);
+    return this.tenants.updateDepartment(user, id, dto);
   }
 
   @Roles('SUPER_ADMIN', 'TENANT_ADMIN')
   @Post('categories')
   createCategory(@CurrentUser() user: AuthenticatedUser, @Body() dto: CreateCategoryDto) {
-    return this.tenants.createCategory(user.tenantId, dto);
+    return this.tenants.createCategory(user, dto);
   }
 
   @Roles('SUPER_ADMIN', 'TENANT_ADMIN')
   @Patch('categories/:id')
   updateCategory(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string, @Body() dto: UpdateCategoryDto) {
-    return this.tenants.updateCategory(user.tenantId, id, dto);
+    return this.tenants.updateCategory(user, id, dto);
   }
 
   @Roles('SUPER_ADMIN', 'TENANT_ADMIN')
   @Post('sla-policies')
   createSlaPolicy(@CurrentUser() user: AuthenticatedUser, @Body() dto: CreateSlaPolicyDto) {
-    return this.tenants.createSlaPolicy(user.tenantId, dto);
+    return this.tenants.createSlaPolicy(user, dto);
   }
 
   @Roles('SUPER_ADMIN', 'TENANT_ADMIN')
   @Patch('sla-policies/:id')
   updateSlaPolicy(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string, @Body() dto: UpdateSlaPolicyDto) {
-    return this.tenants.updateSlaPolicy(user.tenantId, id, dto);
+    return this.tenants.updateSlaPolicy(user, id, dto);
   }
 
   @Roles('SUPER_ADMIN', 'TENANT_ADMIN')
   @Patch('message-templates/:id')
   updateMessageTemplate(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string, @Body() dto: UpdateMessageTemplateDto) {
-    return this.tenants.updateMessageTemplate(user.tenantId, id, dto);
+    return this.tenants.updateMessageTemplate(user, id, dto);
   }
 }

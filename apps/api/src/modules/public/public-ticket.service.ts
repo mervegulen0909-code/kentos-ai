@@ -1,6 +1,9 @@
+import { randomBytes } from 'node:crypto';
 import { ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { AuditActorType, ChannelType, MessageVisibility } from '@kentos/database';
+import { AuditActorType, ChannelType, MessageVisibility, TicketStatus } from '@kentos/database';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { NotificationQueueService } from '../tickets/notification-queue.service.js';
+import { NotificationTemplateService } from '../tickets/notification-template.service.js';
 import { SlaService } from '../tickets/sla.service.js';
 import { TicketNumberService } from '../tickets/ticket-number.service.js';
 import { CreatePublicMessageDto } from './dto/create-public-message.dto.js';
@@ -10,42 +13,26 @@ import { CreatePublicTicketDto } from './dto/create-public-ticket.dto.js';
 export class PublicTicketService {
   constructor(
     @Inject(PrismaService) private readonly prisma: PrismaService,
+    @Inject(NotificationQueueService) private readonly notifications: NotificationQueueService,
+    @Inject(NotificationTemplateService) private readonly templates: NotificationTemplateService,
     @Inject(SlaService) private readonly sla: SlaService,
     @Inject(TicketNumberService) private readonly ticketNumbers: TicketNumberService,
   ) {}
 
   async create(tenantSlug: string, dto: CreatePublicTicketDto) {
     const tenant = await this.prisma.tenant.findUnique({ where: { slug: tenantSlug } });
-    if (!tenant || tenant.status !== 'ACTIVE') throw new NotFoundException('Belediye bulunamadı.');
+    if (!tenant || tenant.status !== 'ACTIVE') throw new NotFoundException('Belediye bulunamadi.');
 
-    const existingCitizen = dto.phone || dto.email
-      ? await this.prisma.citizen.findFirst({
-          where: {
+    const citizen = dto.phone || dto.email
+      ? await this.prisma.citizen.create({
+          data: {
             tenantId: tenant.id,
-            OR: [dto.phone ? { phone: dto.phone } : {}, dto.email ? { email: dto.email } : {}],
+            displayName: dto.displayName,
+            phone: dto.phone,
+            email: dto.email,
           },
         })
       : null;
-
-    const citizen = existingCitizen
-      ? await this.prisma.citizen.update({
-          where: { id: existingCitizen.id },
-          data: {
-            displayName: dto.displayName ?? existingCitizen.displayName,
-            phone: dto.phone ?? existingCitizen.phone,
-            email: dto.email ?? existingCitizen.email,
-          },
-        })
-      : dto.phone || dto.email
-        ? await this.prisma.citizen.create({
-            data: {
-              tenantId: tenant.id,
-              displayName: dto.displayName,
-              phone: dto.phone,
-              email: dto.email,
-            },
-          })
-        : null;
 
     const deadlines = await this.sla.calculateDeadlines({ tenantId: tenant.id, priority: 'NORMAL' });
 
@@ -53,6 +40,7 @@ export class PublicTicketService {
       data: {
         tenantId: tenant.id,
         ticketNo: await this.ticketNumbers.nextTicketNo(tenant.id),
+        publicTrackingToken: await this.generateTrackingToken(tenant.id),
         citizenId: citizen?.id,
         channel: ChannelType.CITIZEN_WEB,
         title: dto.title ?? dto.description.slice(0, 80),
@@ -73,12 +61,28 @@ export class PublicTicketService {
       include: { department: true, category: true },
     });
 
-    return this.toPublicTicket(ticket);
+    const createdMessage = await this.templates.renderForTicket(ticket.id, 'TICKET_RECEIVED');
+    if (createdMessage) {
+      const message = await this.prisma.ticketMessage.create({
+        data: {
+          tenantId: tenant.id,
+          ticketId: ticket.id,
+          senderType: AuditActorType.SYSTEM,
+          visibility: MessageVisibility.PUBLIC,
+          body: createdMessage,
+          channel: ChannelType.CITIZEN_WEB,
+        },
+      });
+      await this.notifications.enqueueMessage(message.id);
+    }
+
+    return this.get(tenantSlug, ticket.publicTrackingToken ?? ticket.ticketNo);
   }
 
-  async get(tenantSlug: string, ticketNo: string) {
-    const ticket = await this.prisma.ticket.findFirst({
-      where: { tenant: { slug: tenantSlug }, ticketNo },
+  async get(tenantSlug: string, identifier: string) {
+    const ticket = await this.requirePublicTicket(tenantSlug, identifier);
+    const fullTicket = await this.prisma.ticket.findFirst({
+      where: { id: ticket.id },
       include: {
         category: true,
         department: true,
@@ -90,22 +94,24 @@ export class PublicTicketService {
       },
     });
 
-    if (!ticket) throw new NotFoundException('Başvuru bulunamadı.');
-    return this.toPublicTicket(ticket);
+    if (!fullTicket) throw new NotFoundException('Basvuru bulunamadi.');
+    return this.toPublicTicket(fullTicket);
   }
 
-  async addMessage(tenantSlug: string, ticketNo: string, dto: CreatePublicMessageDto) {
+  async addMessage(tenantSlug: string, identifier: string, dto: CreatePublicMessageDto) {
+    const normalizedIdentifier = identifier.trim().toUpperCase();
     const ticket = await this.prisma.ticket.findFirst({
-      where: { tenant: { slug: tenantSlug }, ticketNo },
+      where: this.publicTicketWhere(tenantSlug, normalizedIdentifier),
       include: { citizen: true },
     });
 
-    if (!ticket) throw new NotFoundException('Başvuru bulunamadı.');
+    if (!ticket) throw new NotFoundException('Basvuru bulunamadi.');
+    this.requireCitizenMutableTicket(ticket.status);
     if (ticket.citizen?.phone !== dto.contact && ticket.citizen?.email !== dto.contact) {
-      throw new ForbiddenException('Başvuruya mesaj eklemek için kayıtlı iletişim bilgisini girin.');
+      throw new ForbiddenException('Basvuruya mesaj eklemek icin kayitli iletisim bilgisini girin.');
     }
 
-    await this.prisma.ticketMessage.create({
+    const message = await this.prisma.ticketMessage.create({
       data: {
         tenantId: ticket.tenantId,
         ticketId: ticket.id,
@@ -116,11 +122,57 @@ export class PublicTicketService {
       },
     });
 
-    return this.get(tenantSlug, ticketNo);
+    await this.prisma.auditLog.create({
+      data: {
+        tenantId: ticket.tenantId,
+        ticketId: ticket.id,
+        actorType: AuditActorType.CITIZEN,
+        action: 'ticket.citizen_public_message_added',
+        after: { messageId: message.id, channel: ChannelType.CITIZEN_WEB },
+      },
+    });
+
+    return this.get(tenantSlug, identifier);
+  }
+
+  private async requirePublicTicket(tenantSlug: string, identifier: string) {
+    const normalizedIdentifier = identifier.trim().toUpperCase();
+    const ticket = await this.prisma.ticket.findFirst({
+      where: this.publicTicketWhere(tenantSlug, normalizedIdentifier),
+    });
+
+    if (!ticket) throw new NotFoundException('Basvuru bulunamadi.');
+    return ticket;
+  }
+
+  private publicTicketWhere(tenantSlug: string, normalizedIdentifier: string) {
+    return {
+      tenant: { slug: tenantSlug, status: 'ACTIVE' },
+      publicTrackingToken: normalizedIdentifier,
+    };
+  }
+
+  private async generateTrackingToken(tenantId: string) {
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const token = `TK-${randomBytes(8).toString('hex').toUpperCase()}`;
+      const existing = await this.prisma.ticket.findFirst({
+        where: { tenantId, publicTrackingToken: token },
+        select: { id: true },
+      });
+      if (!existing) return token;
+    }
+
+    throw new Error('Tracking token uretilemedi.');
+  }
+
+  private requireCitizenMutableTicket(status: TicketStatus) {
+    if (status === TicketStatus.CLOSED || status === TicketStatus.REJECTED) {
+      throw new ForbiddenException(`${status} durumundaki basvuruya mesaj eklenemez.`);
+    }
   }
 
   private toPublicTicket(ticket: {
-    ticketNo: string;
+    publicTrackingToken: string | null;
     title: string;
     description: string;
     status: string;
@@ -133,7 +185,7 @@ export class PublicTicketService {
     messages?: Array<{ body: string; createdAt: Date; senderType: string }>;
   }) {
     return {
-      ticketNo: ticket.ticketNo,
+      trackingToken: ticket.publicTrackingToken,
       title: ticket.title,
       description: ticket.description,
       status: ticket.status,
@@ -143,7 +195,11 @@ export class PublicTicketService {
       categoryName: ticket.category?.name ?? null,
       resolutionDueAt: ticket.resolutionDueAt,
       createdAt: ticket.createdAt,
-      publicMessages: ticket.messages ?? [],
+      publicMessages: (ticket.messages ?? []).map((message) => ({
+        body: message.body,
+        createdAt: message.createdAt,
+        author: message.senderType === AuditActorType.CITIZEN ? 'citizen' : 'municipality',
+      })),
     };
   }
 }

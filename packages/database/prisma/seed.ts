@@ -4,37 +4,37 @@ import bcrypt from 'bcryptjs';
 const prisma = new PrismaClient();
 
 const departments = [
-  ['TEMIZLIK', 'Temizlik İşleri'],
-  ['FEN_ISLERI', 'Fen İşleri'],
-  ['PARK_BAHCELER', 'Park ve Bahçeler'],
-  ['ZABITA', 'Zabıta'],
-  ['SOSYAL_YARDIM', 'Sosyal Yardım'],
-  ['KULTUR_SOSYAL', 'Kültür ve Sosyal İşler'],
+  ['TEMIZLIK', 'Temizlik Isleri'],
+  ['FEN_ISLERI', 'Fen Isleri'],
+  ['PARK_BAHCELER', 'Park ve Bahceler'],
+  ['ZABITA', 'Zabita'],
+  ['SOSYAL_YARDIM', 'Sosyal Yardim'],
+  ['KULTUR_SOSYAL', 'Kultur ve Sosyal Isler'],
   ['SU_KANALIZASYON', 'Su ve Kanalizasyon'],
-  ['VETERINER', 'Veteriner İşleri'],
-  ['ULASIM', 'Ulaşım'],
+  ['VETERINER', 'Veteriner Isleri'],
+  ['ULASIM', 'Ulasim'],
   ['RUHSAT_DENETIM', 'Ruhsat ve Denetim'],
   ['MALI_HIZMETLER', 'Mali Hizmetler'],
-  ['BEYAZ_MASA', 'Beyaz Masa / Çağrı Merkezi'],
+  ['BEYAZ_MASA', 'Beyaz Masa / Cagri Merkezi'],
 ] as const;
 
 const categories = [
-  ['COP_TOPLAMA', 'Çöp toplama / konteyner', 'TEMIZLIK', TicketPriority.NORMAL],
-  ['YOL_KALDIRIM', 'Yol, kaldırım ve asfalt', 'FEN_ISLERI', TicketPriority.HIGH],
-  ['PARK_BAKIM', 'Park bakım ve oyun alanı', 'PARK_BAHCELER', TicketPriority.NORMAL],
-  ['GURULTU_ISGAL', 'Gürültü, işgal ve denetim', 'ZABITA', TicketPriority.HIGH],
-  ['SOKAK_HAYVANI', 'Sokak hayvanı ve veterinerlik', 'VETERINER', TicketPriority.NORMAL],
-  ['SU_ARIZA', 'Su ve kanalizasyon arızası', 'SU_KANALIZASYON', TicketPriority.URGENT],
-  ['TRAFIK_ULASIM', 'Trafik ve ulaşım', 'ULASIM', TicketPriority.HIGH],
-  ['GENEL_BASVURU', 'Genel başvuru', 'BEYAZ_MASA', TicketPriority.NORMAL],
+  ['COP_TOPLAMA', 'Cop toplama / konteyner', 'TEMIZLIK', TicketPriority.NORMAL],
+  ['YOL_KALDIRIM', 'Yol, kaldirim ve asfalt', 'FEN_ISLERI', TicketPriority.HIGH],
+  ['PARK_BAKIM', 'Park bakim ve oyun alani', 'PARK_BAHCELER', TicketPriority.NORMAL],
+  ['GURULTU_ISGAL', 'Gurultu, isgal ve denetim', 'ZABITA', TicketPriority.HIGH],
+  ['SOKAK_HAYVANI', 'Sokak hayvani ve veterinerlik', 'VETERINER', TicketPriority.NORMAL],
+  ['SU_ARIZA', 'Su ve kanalizasyon arizasi', 'SU_KANALIZASYON', TicketPriority.URGENT],
+  ['TRAFIK_ULASIM', 'Trafik ve ulasim', 'ULASIM', TicketPriority.HIGH],
+  ['GENEL_BASVURU', 'Genel basvuru', 'BEYAZ_MASA', TicketPriority.NORMAL],
 ] as const;
 
 const templates = [
-  ['TICKET_RECEIVED', 'Talebiniz alınmıştır. Başvuru numaranız: {{ticketNo}}.'],
-  ['TICKET_ROUTED', 'Talebiniz {{departmentName}} birimine aktarılmıştır. Başvuru numaranız: {{ticketNo}}.'],
-  ['TICKET_IN_PROGRESS', '{{ticketNo}} numaralı talebiniz için işlem devam etmektedir.'],
-  ['TICKET_RESOLVED', '{{ticketNo}} numaralı talebiniz çözümlenmiştir. Geri bildiriminiz bizim için değerlidir.'],
-  ['INFO_REQUESTED', '{{ticketNo}} numaralı talebiniz için ek bilgiye ihtiyaç duyuyoruz: {{question}}'],
+  ['TICKET_RECEIVED', 'Talebiniz alinmistir. Takip kodunuz: {{trackingToken}}.'],
+  ['TICKET_ROUTED', 'Talebiniz {{departmentName}} birimine aktarilmistir. Takip kodunuz: {{trackingToken}}.'],
+  ['TICKET_IN_PROGRESS', '{{trackingToken}} takip kodlu talebiniz icin islem devam etmektedir.'],
+  ['TICKET_RESOLVED', '{{trackingToken}} takip kodlu talebiniz cozumlenmistir. Geri bildiriminiz bizim icin degerlidir.'],
+  ['INFO_REQUESTED', '{{trackingToken}} takip kodlu talebiniz icin ek bilgiye ihtiyac duyuyoruz: {{question}}'],
 ] as const;
 
 async function main() {
@@ -119,11 +119,20 @@ async function main() {
   }
 
   for (const [key, body] of templates) {
-    await prisma.messageTemplate.upsert({
-      where: { tenantId_key_locale: { tenantId: tenant.id, key, locale: 'tr-TR' } },
-      update: { body, isActive: true },
-      create: { tenantId: tenant.id, key, locale: 'tr-TR', body },
+    const existingTemplate = await prisma.messageTemplate.findFirst({
+      where: { tenantId: tenant.id, key, locale: 'tr-TR', channel: null },
     });
+
+    if (existingTemplate) {
+      await prisma.messageTemplate.update({
+        where: { id: existingTemplate.id },
+        data: { body, isActive: true },
+      });
+    } else {
+      await prisma.messageTemplate.create({
+        data: { tenantId: tenant.id, key, locale: 'tr-TR', channel: null, body },
+      });
+    }
   }
 
   const passwordHash = await bcrypt.hash('ChangeMe123!', 12);
@@ -135,7 +144,7 @@ async function main() {
       tenantId: tenant.id,
       email: 'admin@demo.local',
       passwordHash,
-      fullName: 'Demo Belediye Yöneticisi',
+      fullName: 'Demo Belediye Yoneticisi',
       role: UserRole.TENANT_ADMIN,
     },
   });
@@ -147,7 +156,7 @@ async function main() {
       tenantId: tenant.id,
       email: 'readonly@demo.local',
       passwordHash,
-      fullName: 'Demo Salt Okuma Kullanıcısı',
+      fullName: 'Demo Salt Okuma Kullanicisi',
       role: UserRole.READ_ONLY,
     },
   });
@@ -159,7 +168,7 @@ async function main() {
       tenantId: tenant.id,
       email: 'manager@demo.local',
       passwordHash,
-      fullName: 'Demo Operasyon Yöneticisi',
+      fullName: 'Demo Operasyon Yonetici',
       role: UserRole.MANAGER,
     },
   });
@@ -171,7 +180,7 @@ async function main() {
       tenantId: tenant.id,
       email: 'operator@demo.local',
       passwordHash,
-      fullName: 'Demo Operatör Kullanıcısı',
+      fullName: 'Demo Operator Kullanicisi',
       role: UserRole.OPERATOR,
     },
   });
@@ -186,7 +195,7 @@ async function main() {
       tenantId: tenant.id,
       email: 'fen.staff@demo.local',
       passwordHash,
-      fullName: 'Demo Fen İşleri Personeli',
+      fullName: 'Demo Fen Isleri Personeli',
       role: UserRole.DEPARTMENT_STAFF,
     },
   });

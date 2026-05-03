@@ -1,4 +1,6 @@
+import { AuditActorType, type Prisma } from '@kentos/database';
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { CreateCategoryDto, UpdateCategoryDto } from './dto/category.dto.js';
 import { CreateDepartmentDto, UpdateDepartmentDto } from './dto/department.dto.js';
@@ -21,7 +23,7 @@ export class TenantsService {
       },
     });
 
-    if (!tenant) throw new NotFoundException('Belediye bulunamadı.');
+    if (!tenant) throw new NotFoundException('Belediye bulunamadi.');
     return tenant;
   }
 
@@ -50,23 +52,32 @@ export class TenantsService {
   }
 
   messageTemplates(tenantId: string) {
-    return this.prisma.messageTemplate.findMany({ where: { tenantId, isActive: true }, orderBy: { key: 'asc' } });
+    return this.prisma.messageTemplate.findMany({ where: { tenantId }, orderBy: { key: 'asc' } });
   }
 
-  createDepartment(tenantId: string, dto: CreateDepartmentDto) {
-    return this.prisma.department.create({
+  async createDepartment(user: AuthenticatedUser, dto: CreateDepartmentDto) {
+    const department = await this.prisma.department.create({
       data: {
-        tenantId,
+        tenantId: user.tenantId,
         code: dto.code.trim().toUpperCase(),
         name: dto.name.trim(),
         description: dto.description?.trim(),
       },
     });
+
+    await this.audit(user, 'tenant.department_created', undefined, {
+      departmentId: department.id,
+      code: department.code,
+      name: department.name,
+      description: department.description,
+    });
+
+    return department;
   }
 
-  async updateDepartment(tenantId: string, id: string, dto: UpdateDepartmentDto) {
-    await this.requireDepartment(tenantId, id);
-    return this.prisma.department.update({
+  async updateDepartment(user: AuthenticatedUser, id: string, dto: UpdateDepartmentDto) {
+    const existing = await this.requireDepartment(user.tenantId, id);
+    const department = await this.prisma.department.update({
       where: { id },
       data: {
         name: dto.name?.trim(),
@@ -74,13 +85,32 @@ export class TenantsService {
         isActive: dto.isActive,
       },
     });
+
+    await this.audit(
+      user,
+      'tenant.department_updated',
+      {
+        departmentId: existing.id,
+        name: existing.name,
+        description: existing.description,
+        isActive: existing.isActive,
+      },
+      {
+        departmentId: department.id,
+        name: department.name,
+        description: department.description,
+        isActive: department.isActive,
+      },
+    );
+
+    return department;
   }
 
-  async createCategory(tenantId: string, dto: CreateCategoryDto) {
-    if (dto.departmentId) await this.requireDepartment(tenantId, dto.departmentId);
-    return this.prisma.category.create({
+  async createCategory(user: AuthenticatedUser, dto: CreateCategoryDto) {
+    if (dto.departmentId) await this.requireDepartment(user.tenantId, dto.departmentId);
+    const category = await this.prisma.category.create({
       data: {
-        tenantId,
+        tenantId: user.tenantId,
         code: dto.code.trim().toUpperCase(),
         name: dto.name.trim(),
         departmentId: dto.departmentId,
@@ -88,12 +118,22 @@ export class TenantsService {
         description: dto.description?.trim(),
       },
     });
+
+    await this.audit(user, 'tenant.category_created', undefined, {
+      categoryId: category.id,
+      code: category.code,
+      name: category.name,
+      departmentId: category.departmentId,
+      defaultPriority: category.defaultPriority,
+    });
+
+    return category;
   }
 
-  async updateCategory(tenantId: string, id: string, dto: UpdateCategoryDto) {
-    await this.requireCategory(tenantId, id);
-    if (dto.departmentId) await this.requireDepartment(tenantId, dto.departmentId);
-    return this.prisma.category.update({
+  async updateCategory(user: AuthenticatedUser, id: string, dto: UpdateCategoryDto) {
+    const existing = await this.requireCategory(user.tenantId, id);
+    if (dto.departmentId) await this.requireDepartment(user.tenantId, dto.departmentId);
+    const category = await this.prisma.category.update({
       where: { id },
       data: {
         name: dto.name?.trim(),
@@ -103,14 +143,37 @@ export class TenantsService {
         isActive: dto.isActive,
       },
     });
+
+    await this.audit(
+      user,
+      'tenant.category_updated',
+      {
+        categoryId: existing.id,
+        name: existing.name,
+        departmentId: existing.departmentId,
+        defaultPriority: existing.defaultPriority,
+        description: existing.description,
+        isActive: existing.isActive,
+      },
+      {
+        categoryId: category.id,
+        name: category.name,
+        departmentId: category.departmentId,
+        defaultPriority: category.defaultPriority,
+        description: category.description,
+        isActive: category.isActive,
+      },
+    );
+
+    return category;
   }
 
-  async createSlaPolicy(tenantId: string, dto: CreateSlaPolicyDto) {
-    if (dto.departmentId) await this.requireDepartment(tenantId, dto.departmentId);
-    if (dto.categoryId) await this.requireCategory(tenantId, dto.categoryId);
-    return this.prisma.slaPolicy.create({
+  async createSlaPolicy(user: AuthenticatedUser, dto: CreateSlaPolicyDto) {
+    if (dto.departmentId) await this.requireDepartment(user.tenantId, dto.departmentId);
+    if (dto.categoryId) await this.requireCategory(user.tenantId, dto.categoryId);
+    const policy = await this.prisma.slaPolicy.create({
       data: {
-        tenantId,
+        tenantId: user.tenantId,
         priority: dto.priority,
         responseMinutes: dto.responseMinutes,
         resolutionMinutes: dto.resolutionMinutes,
@@ -118,11 +181,22 @@ export class TenantsService {
         categoryId: dto.categoryId,
       },
     });
+
+    await this.audit(user, 'tenant.sla_policy_created', undefined, {
+      slaPolicyId: policy.id,
+      priority: policy.priority,
+      responseMinutes: policy.responseMinutes,
+      resolutionMinutes: policy.resolutionMinutes,
+      departmentId: policy.departmentId,
+      categoryId: policy.categoryId,
+    });
+
+    return policy;
   }
 
-  async updateSlaPolicy(tenantId: string, id: string, dto: UpdateSlaPolicyDto) {
-    await this.requireSlaPolicy(tenantId, id);
-    return this.prisma.slaPolicy.update({
+  async updateSlaPolicy(user: AuthenticatedUser, id: string, dto: UpdateSlaPolicyDto) {
+    const existing = await this.requireSlaPolicy(user.tenantId, id);
+    const policy = await this.prisma.slaPolicy.update({
       where: { id },
       data: {
         responseMinutes: dto.responseMinutes,
@@ -130,40 +204,91 @@ export class TenantsService {
         isActive: dto.isActive,
       },
     });
+
+    await this.audit(
+      user,
+      'tenant.sla_policy_updated',
+      {
+        slaPolicyId: existing.id,
+        responseMinutes: existing.responseMinutes,
+        resolutionMinutes: existing.resolutionMinutes,
+        isActive: existing.isActive,
+      },
+      {
+        slaPolicyId: policy.id,
+        responseMinutes: policy.responseMinutes,
+        resolutionMinutes: policy.resolutionMinutes,
+        isActive: policy.isActive,
+      },
+    );
+
+    return policy;
   }
 
-  async updateMessageTemplate(tenantId: string, id: string, dto: UpdateMessageTemplateDto) {
-    await this.requireMessageTemplate(tenantId, id);
-    return this.prisma.messageTemplate.update({
+  async updateMessageTemplate(user: AuthenticatedUser, id: string, dto: UpdateMessageTemplateDto) {
+    const existing = await this.requireMessageTemplate(user.tenantId, id);
+    const template = await this.prisma.messageTemplate.update({
       where: { id },
       data: {
         body: dto.body,
         isActive: dto.isActive,
       },
     });
+
+    await this.audit(
+      user,
+      'tenant.message_template_updated',
+      {
+        messageTemplateId: existing.id,
+        key: existing.key,
+        body: existing.body,
+        isActive: existing.isActive,
+      },
+      {
+        messageTemplateId: template.id,
+        key: template.key,
+        body: template.body,
+        isActive: template.isActive,
+      },
+    );
+
+    return template;
   }
 
   private async requireDepartment(tenantId: string, id: string) {
     const department = await this.prisma.department.findFirst({ where: { tenantId, id } });
-    if (!department) throw new NotFoundException('Birim bulunamadı.');
+    if (!department) throw new NotFoundException('Birim bulunamadi.');
     return department;
   }
 
   private async requireCategory(tenantId: string, id: string) {
     const category = await this.prisma.category.findFirst({ where: { tenantId, id } });
-    if (!category) throw new NotFoundException('Kategori bulunamadı.');
+    if (!category) throw new NotFoundException('Kategori bulunamadi.');
     return category;
   }
 
   private async requireSlaPolicy(tenantId: string, id: string) {
     const policy = await this.prisma.slaPolicy.findFirst({ where: { tenantId, id } });
-    if (!policy) throw new NotFoundException('SLA politikası bulunamadı.');
+    if (!policy) throw new NotFoundException('SLA politikasi bulunamadi.');
     return policy;
   }
 
   private async requireMessageTemplate(tenantId: string, id: string) {
     const template = await this.prisma.messageTemplate.findFirst({ where: { tenantId, id } });
-    if (!template) throw new NotFoundException('Mesaj şablonu bulunamadı.');
+    if (!template) throw new NotFoundException('Mesaj sablonu bulunamadi.');
     return template;
+  }
+
+  private audit(user: AuthenticatedUser, action: string, before?: Prisma.InputJsonValue, after?: Prisma.InputJsonValue) {
+    return this.prisma.auditLog.create({
+      data: {
+        tenantId: user.tenantId,
+        actorType: AuditActorType.USER,
+        actorUserId: user.id,
+        action,
+        before,
+        after,
+      },
+    });
   }
 }

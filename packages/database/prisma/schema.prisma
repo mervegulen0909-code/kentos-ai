@@ -173,7 +173,6 @@ model MessageTemplate {
 
   tenant    Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  @@unique([tenantId, key, locale])
   @@index([tenantId, channel])
 }
 
@@ -230,6 +229,7 @@ model Ticket {
   id                     String         @id @default(cuid())
   tenantId               String
   ticketNo               String
+  publicTrackingToken    String?
   citizenId              String?
   channel                ChannelType
   status                 TicketStatus   @default(NEW)
@@ -269,6 +269,7 @@ model Ticket {
   messages               TicketMessage[]
 
   @@unique([tenantId, ticketNo])
+  @@unique([tenantId, publicTrackingToken])
   @@index([tenantId, status, priority])
   @@index([tenantId, departmentId, status])
   @@index([tenantId, resolutionDueAt])

@@ -24,3 +24,7 @@ export type TenantContext = {
   tenantId: string;
   tenantSlug?: string;
 };
+
+export type NotificationJobData = {
+  messageId: string;
+};

@@ -2,6 +2,8 @@ import { ForbiddenException, Inject, Injectable, NotFoundException } from '@nest
 import { AuditActorType, MessageVisibility, TicketStatus, UserRole } from '@kentos/database';
 import type { Prisma } from '@kentos/database';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
+import { NotificationQueueService } from './notification-queue.service.js';
+import { NotificationTemplateService } from './notification-template.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { AssignTicketDto } from './dto/assign-ticket.dto.js';
 import { CreateTicketMessageDto } from './dto/create-ticket-message.dto.js';
@@ -14,6 +16,8 @@ import { TicketNumberService } from './ticket-number.service.js';
 export class TicketsService {
   constructor(
     @Inject(PrismaService) private readonly prisma: PrismaService,
+    @Inject(NotificationQueueService) private readonly notifications: NotificationQueueService,
+    @Inject(NotificationTemplateService) private readonly templates: NotificationTemplateService,
     @Inject(SlaService) private readonly sla: SlaService,
     @Inject(TicketNumberService) private readonly ticketNumbers: TicketNumberService,
   ) {}
@@ -54,13 +58,15 @@ export class TicketsService {
   }
 
   async create(user: AuthenticatedUser, dto: CreateTicketDto) {
-    await this.requireDepartmentScope(user, dto.departmentId);
+    const relations = await this.validateTicketRelations(user.tenantId, dto);
+    await this.requireDepartmentScope(user, relations.departmentId);
+
     const priority = dto.priority ?? 'NORMAL';
     const deadlines = await this.sla.calculateDeadlines({
       tenantId: user.tenantId,
       priority,
-      departmentId: dto.departmentId,
-      categoryId: dto.categoryId,
+      departmentId: relations.departmentId,
+      categoryId: relations.categoryId,
     });
 
     const ticket = await this.prisma.ticket.create({
@@ -71,9 +77,9 @@ export class TicketsService {
         title: dto.title,
         description: dto.description,
         priority,
-        categoryId: dto.categoryId,
-        departmentId: dto.departmentId,
-        citizenId: dto.citizenId,
+        categoryId: relations.categoryId,
+        departmentId: relations.departmentId,
+        citizenId: relations.citizenId,
         addressText: dto.addressText,
         latitude: dto.latitude,
         longitude: dto.longitude,
@@ -108,23 +114,35 @@ export class TicketsService {
       },
     });
 
-    if (!ticket) throw new NotFoundException('Talep bulunamadı.');
+    if (!ticket) throw new NotFoundException('Talep bulunamadi.');
     return ticket;
   }
 
   async assign(user: AuthenticatedUser, id: string, dto: AssignTicketDto) {
     const ticket = await this.requireTicket(user, id);
     this.requireMutableTicket(ticket.status);
-    await this.requireDepartment(user.tenantId, dto.departmentId);
+    const department = await this.requireDepartment(user.tenantId, dto.departmentId);
     await this.requireDepartmentScope(user, dto.departmentId);
     if (dto.assignedToId) await this.requireAssignableUser(user.tenantId, dto.assignedToId, dto.departmentId);
+    const routedMessage = await this.templates.renderForTicket(ticket.id, 'TICKET_ROUTED', { departmentName: department.name });
 
-    return this.prisma.ticket.update({
+    const updatedTicket = await this.prisma.ticket.update({
       where: { id },
       data: {
         status: ticket.status === TicketStatus.NEW || ticket.status === TicketStatus.TRIAGED ? TicketStatus.ASSIGNED : ticket.status,
         departmentId: dto.departmentId,
         assignedToId: dto.assignedToId,
+        messages: routedMessage
+          ? {
+              create: {
+                tenantId: user.tenantId,
+                senderType: AuditActorType.SYSTEM,
+                visibility: MessageVisibility.PUBLIC,
+                body: routedMessage,
+                channel: ticket.channel,
+              },
+            }
+          : undefined,
         auditLogs: {
           create: {
             tenantId: user.tenantId,
@@ -136,7 +154,17 @@ export class TicketsService {
           },
         },
       },
+      include: {
+        messages: {
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+        },
+      },
     });
+
+    const latestPublicMessageId = routedMessage ? updatedTicket.messages?.[0]?.id : undefined;
+    if (latestPublicMessageId) await this.notifications.enqueueMessage(latestPublicMessageId);
+    return updatedTicket;
   }
 
   async addInternalNote(user: AuthenticatedUser, id: string, dto: CreateTicketMessageDto) {
@@ -175,16 +203,24 @@ export class TicketsService {
     });
 
     await this.audit(user, id, 'ticket.public_message_added', undefined, { messageId: message.id });
+    await this.notifications.enqueueMessage(message.id);
     return message;
   }
 
   async updateStatus(user: AuthenticatedUser, id: string, dto: UpdateTicketStatusDto) {
     const ticket = await this.requireTicket(user, id);
     if (!this.canTransition(ticket.status, dto.status)) {
-      throw new ForbiddenException(`${ticket.status} durumundan ${dto.status} durumuna geçiş desteklenmiyor.`);
+      throw new ForbiddenException(`${ticket.status} durumundan ${dto.status} durumuna gecis desteklenmiyor.`);
     }
 
+    const fallbackTemplateKey = this.statusTemplateKey(dto.status);
+    const fallbackPublicMessage = dto.publicMessage
+      ? null
+      : fallbackTemplateKey
+        ? await this.templates.renderForTicket(ticket.id, fallbackTemplateKey)
+        : null;
     const now = new Date();
+    const shouldCreatePublicMessage = Boolean(dto.publicMessage || fallbackPublicMessage);
     const updated = await this.prisma.ticket.update({
       where: { id },
       data: {
@@ -192,14 +228,14 @@ export class TicketsService {
         firstRespondedAt: ticket.firstRespondedAt ?? (dto.status !== TicketStatus.NEW ? now : null),
         resolvedAt: dto.status === TicketStatus.RESOLVED ? now : ticket.resolvedAt,
         closedAt: dto.status === TicketStatus.CLOSED ? now : ticket.closedAt,
-        messages: dto.publicMessage
+        messages: dto.publicMessage || fallbackPublicMessage
           ? {
               create: {
                 tenantId: user.tenantId,
-                senderType: AuditActorType.USER,
-                senderId: user.id,
+                senderType: dto.publicMessage ? AuditActorType.USER : AuditActorType.SYSTEM,
+                senderId: dto.publicMessage ? user.id : undefined,
                 visibility: MessageVisibility.PUBLIC,
-                body: dto.publicMessage,
+                body: dto.publicMessage ?? fallbackPublicMessage ?? '',
                 channel: ticket.channel,
               },
             }
@@ -215,8 +251,16 @@ export class TicketsService {
           },
         },
       },
+      include: {
+        messages: {
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+        },
+      },
     });
 
+    const latestPublicMessageId = shouldCreatePublicMessage ? updated.messages?.[0]?.id : undefined;
+    if (latestPublicMessageId) await this.notifications.enqueueMessage(latestPublicMessageId);
     return updated;
   }
 
@@ -230,7 +274,7 @@ export class TicketsService {
     const ticket = await this.prisma.ticket.findFirst({
       where: { id, tenantId: user.tenantId, departmentId: this.scopedDepartmentFilter(departmentScope) },
     });
-    if (!ticket) throw new NotFoundException('Talep bulunamadı.');
+    if (!ticket) throw new NotFoundException('Talep bulunamadi.');
     return ticket;
   }
 
@@ -252,13 +296,29 @@ export class TicketsService {
   private async requireDepartmentScope(user: AuthenticatedUser, departmentId?: string | null) {
     const departmentScope = await this.departmentScope(user);
     if (!departmentScope) return;
-    if (!departmentId || !departmentScope.includes(departmentId)) throw new ForbiddenException('Bu birim için işlem yetkiniz yok.');
+    if (!departmentId || !departmentScope.includes(departmentId)) throw new ForbiddenException('Bu birim icin islem yetkiniz yok.');
   }
 
   private async requireDepartment(tenantId: string, departmentId: string) {
     const department = await this.prisma.department.findFirst({ where: { id: departmentId, tenantId, isActive: true } });
-    if (!department) throw new NotFoundException('Birim bulunamadı.');
+    if (!department) throw new NotFoundException('Birim bulunamadi.');
     return department;
+  }
+
+  private async requireCategory(tenantId: string, categoryId: string) {
+    const category = await this.prisma.category.findFirst({
+      where: { id: categoryId, tenantId, isActive: true },
+    });
+    if (!category) throw new NotFoundException('Kategori bulunamadi.');
+    return category;
+  }
+
+  private async requireCitizen(tenantId: string, citizenId: string) {
+    const citizen = await this.prisma.citizen.findFirst({
+      where: { id: citizenId, tenantId },
+    });
+    if (!citizen) throw new NotFoundException('Vatandas bulunamadi.');
+    return citizen;
   }
 
   private async requireAssignableUser(tenantId: string, userId: string, departmentId: string) {
@@ -266,9 +326,9 @@ export class TicketsService {
       where: { id: userId, tenantId, isActive: true },
       include: { departments: true },
     });
-    if (!user) throw new NotFoundException('Kullanıcı bulunamadı.');
+    if (!user) throw new NotFoundException('Kullanici bulunamadi.');
     if (user.role === UserRole.DEPARTMENT_STAFF && !user.departments.some((department) => department.departmentId === departmentId)) {
-      throw new ForbiddenException('Kullanıcı bu birime atanamaz.');
+      throw new ForbiddenException('Kullanici bu birime atanamaz.');
     }
     return user;
   }
@@ -289,8 +349,26 @@ export class TicketsService {
 
   private requireMutableTicket(status: TicketStatus) {
     if (status === TicketStatus.CLOSED || status === TicketStatus.REJECTED) {
-      throw new ForbiddenException(`${status} durumundaki talep değiştirilemez.`);
+      throw new ForbiddenException(`${status} durumundaki talep degistirilemez.`);
     }
+  }
+
+  private async validateTicketRelations(tenantId: string, dto: CreateTicketDto) {
+    const [department, category, citizen] = await Promise.all([
+      dto.departmentId ? this.requireDepartment(tenantId, dto.departmentId) : Promise.resolve(null),
+      dto.categoryId ? this.requireCategory(tenantId, dto.categoryId) : Promise.resolve(null),
+      dto.citizenId ? this.requireCitizen(tenantId, dto.citizenId) : Promise.resolve(null),
+    ]);
+
+    if (category?.departmentId && department && category.departmentId !== department.id) {
+      throw new ForbiddenException('Kategori secilen birime ait degil.');
+    }
+
+    return {
+      departmentId: department?.id,
+      categoryId: category?.id,
+      citizenId: citizen?.id,
+    };
   }
 
   private slaState(resolutionDueAt: Date | null) {
@@ -314,5 +392,15 @@ export class TicketsService {
     };
 
     return from === to || transitions[from].includes(to);
+  }
+
+  private statusTemplateKey(status: TicketStatus) {
+    const templateKeys: Partial<Record<TicketStatus, string>> = {
+      ASSIGNED: 'TICKET_ROUTED',
+      IN_PROGRESS: 'TICKET_IN_PROGRESS',
+      RESOLVED: 'TICKET_RESOLVED',
+    };
+
+    return templateKeys[status] ?? null;
   }
 }
