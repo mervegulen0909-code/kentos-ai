@@ -447,3 +447,12 @@
 - **Result:** Passed for static verification, focused regression tests, Prisma generate, and full workspace build. `origin/master...master` is `0 0`.
 - **Next action:** If milestone release requires strict browser sign-off, complete the full manual scenarios in `docs/workflows/browser-smoke.md`; otherwise proceed with commit-ready cleanup and include the browser smoke status caveat in merge notes.
 - **Blocker:** Browser smoke evidence is partial for this cycle. Route/runtime readiness is verified, but full manual scenario coverage is not yet re-run end-to-end.
+
+## 2026-05-04 — Browser runtime readiness re-check checkpoint
+
+- **Action taken:** Re-checked local browser smoke runtime readiness by probing API/admin/citizen endpoints on QA ports.
+- **Files changed:** `docs/checklists/release-checklist.md`, `docs/workflows/autonomous-run-log.md`.
+- **Verification run:** `curl -sS -o /dev/null -w "%{http_code}" http://127.0.0.1:3110/api/v1/health`; `curl -sS -o /dev/null -w "%{http_code}" http://127.0.0.1:3111/login`; `curl -sS -o /dev/null -w "%{http_code}" http://127.0.0.1:3112/demo-belediye/report`.
+- **Result:** Passed for runtime readiness (`200/200/200`). Browser smoke status remains `partially run with gaps` until manual scenario coverage is fully re-run.
+- **Next action:** Run end-to-end manual browser scenarios if strict release sign-off requires `passed` instead of `partial`.
+- **Blocker:** Manual browser scenario coverage is still pending for this cycle.
