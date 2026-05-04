@@ -560,3 +560,12 @@
 - Active worktree branch’leri attached session varken silinmez.
 - Local-only files (`.claude/settings.json` vb.) release commitlerinden dışlanır.
 - Her release döngüsü sonunda `git status --short` intentional-state notuyla birlikte raporlanır.
+
+## 2026-05-04 — Strict browser closure progress checkpoint
+
+- **Action taken:** Re-validated strict citizen browser contract coverage with API + citizen regression evidence while keeping manual viewport sign-off explicit.
+- **Files changed:** `docs/checklists/release-checklist.md`, `docs/workflows/autonomous-run-log.md`.
+- **Verification run:** `curl -sS -o /dev/null -w "%{http_code}" http://127.0.0.1:3112/demo-belediye/report`; `curl -sS -o /dev/null -w "%{http_code}" http://127.0.0.1:3112/demo-belediye/track`; `curl -sS -o /dev/null -w "%{http_code}" http://127.0.0.1:3112/demo-belediye/ticket/TK-DC8CB9B007CB3013`; public create/track contract probe (`201/200/404/404/404` for valid/invalid/malformed/KNT); `pnpm --filter @kentos/citizen-web test`.
+- **Result:** Citizen strict I/J/K coverage is now evidence-backed in this cycle. Browser status remains `partial` only because Scenario L (390px + focus-visible keyboard manual check) still requires explicit operator confirmation.
+- **Next action:** Complete Scenario L manual confirmation and flip browser status to `passed` if no blocking issue is observed.
+- **Blocker:** No code blocker; pending manual viewport confirmation only (Owner: `1 — Ana Kontrol`, SLA: 2026-05-06).
