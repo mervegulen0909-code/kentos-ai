@@ -1,6 +1,7 @@
 import { ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { AuditActorType, MessageVisibility, TicketStatus, UserRole } from '@kentos/database';
 import type { Prisma } from '@kentos/database';
+import type { IntakeClassification } from '@kentos/shared';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import { NotificationQueueService } from './notification-queue.service.js';
 import { NotificationTemplateService } from './notification-template.service.js';
@@ -115,7 +116,25 @@ export class TicketsService {
     });
 
     if (!ticket) throw new NotFoundException('Talep bulunamadi.');
-    return ticket;
+
+    const followUpAudit = ticket.auditLogs.find((item) => item.action === 'ticket.ai_follow_up_evaluated');
+    const followUpAfter = this.asRecord(followUpAudit?.after);
+    const contactSignals = this.asRecord(followUpAfter?.citizenContact);
+
+    return {
+      ...ticket,
+      aiSummary: {
+        confidence: ticket.aiConfidence ? Number(ticket.aiConfidence) : null,
+        classification: (ticket.aiClassification as IntakeClassification | null) ?? null,
+        contactSignals: contactSignals
+          ? {
+              hasPhone: Boolean(contactSignals.hasPhone),
+              hasEmail: Boolean(contactSignals.hasEmail),
+              displayName: typeof contactSignals.displayName === 'string' ? contactSignals.displayName : null,
+            }
+          : null,
+      },
+    };
   }
 
   async assign(user: AuthenticatedUser, id: string, dto: AssignTicketDto) {
@@ -331,6 +350,10 @@ export class TicketsService {
       throw new ForbiddenException('Kullanici bu birime atanamaz.');
     }
     return user;
+  }
+
+  private asRecord(value: unknown): Record<string, unknown> | null {
+    return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
   }
 
   private audit(user: AuthenticatedUser, ticketId: string, action: string, before?: Prisma.InputJsonValue, after?: Prisma.InputJsonValue) {

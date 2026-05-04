@@ -1,4 +1,5 @@
 import { z } from 'zod';
+export const trackingTokenSchema = z.custom<`TK-${string}`>((value) => typeof value === 'string' && /^TK-[A-F0-9]{16}$/.test(value));
 
 export const intakeClassificationSchema = z.object({
   language: z.enum(['tr', 'en', 'unknown']),
@@ -26,10 +27,56 @@ export const intakeClassificationSchema = z.object({
   }),
   missingFields: z.array(z.enum(['description', 'location', 'contact', 'category', 'photo'])),
   followUpQuestion: z.string().nullable(),
-  statusTicketNo: z.string().nullable(),
+  statusTicketNo: trackingTokenSchema.nullable(),
   safetyFlags: z.array(z.enum(['threat', 'injury', 'fire', 'violence', 'animal_danger', 'none'])),
   confidence: z.number().min(0).max(1),
   reasoningSummary: z.string(),
 });
 
-export type IntakeClassification = z.infer<typeof intakeClassificationSchema>;
+export const intakeTenantOptionSchema = z.object({
+  id: z.string().min(1),
+  code: z.string().min(1),
+  name: z.string().min(1),
+  departmentId: z.string().min(1).nullable().optional(),
+});
+
+export const intakeTenantConfigSchema = z.object({
+  tenantId: z.string().min(1),
+  tenantSlug: z.string().min(1),
+  departments: z.array(intakeTenantOptionSchema),
+  categories: z.array(intakeTenantOptionSchema),
+});
+
+export const intakeMessageInputSchema = z.object({
+  text: z.string().min(1),
+  channel: z.enum(['WHATSAPP', 'CITIZEN_WEB', 'WEB_CHAT', 'MOBILE_APP']),
+  receivedAt: z.string().datetime(),
+  citizenContact: z
+    .object({
+      phone: z.string().nullable().optional(),
+      email: z.string().email().nullable().optional(),
+      displayName: z.string().nullable().optional(),
+    })
+    .optional(),
+});
+
+export const intakePromptEnvelopeSchema = z.object({
+  version: z.string().min(1),
+  system: z.string().min(1),
+  tenantContext: intakeTenantConfigSchema,
+  input: intakeMessageInputSchema,
+});
+
+export const publicTicketAiIntakeRequestSchema = z.object({
+  tenantContext: intakeTenantConfigSchema,
+  message: intakeMessageInputSchema,
+});
+
+export const publicTicketAiIntakeResultSchema = z.object({
+  provider: z.literal('stub'),
+  model: z.literal('deterministic-fallback'),
+  promptVersion: z.string().min(1),
+  classification: intakeClassificationSchema,
+  requestedAt: z.string().datetime(),
+  completedAt: z.string().datetime(),
+});

@@ -1,3 +1,5 @@
+import type { IntakeClassification, IntakeMissingField } from '@kentos/shared';
+
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:3100/api/v1';
 
 type ApiOptions = RequestInit & { token?: string };
@@ -42,12 +44,33 @@ export type TicketListItem = {
   department?: { name: string } | null;
 };
 
+type TicketAiSummary = {
+  confidence: number | null;
+  classification: IntakeClassification | null;
+  contactSignals: {
+    hasPhone: boolean;
+    hasEmail: boolean;
+    displayName: string | null;
+  } | null;
+};
+
 export type TicketDetail = TicketListItem & {
   description: string;
   addressText: string | null;
+  aiSummary?: TicketAiSummary | null;
   messages: Array<{ id: string; body: string; visibility: string; senderType: string; createdAt: string }>;
   auditLogs?: Array<{ id: string; action: string; createdAt: string }>;
 };
+
+export function formatMissingFieldLabel(field: IntakeMissingField) {
+  return {
+    category: 'Kategori',
+    contact: 'Iletisim',
+    description: 'Aciklama',
+    location: 'Konum',
+    photo: 'Foto',
+  }[field];
+}
 
 export type Department = { id: string; name: string; code: string; description?: string | null; isActive: boolean };
 export type Category = { id: string; name: string; code: string; departmentId?: string | null; defaultPriority: string; isActive: boolean; department?: Department | null };

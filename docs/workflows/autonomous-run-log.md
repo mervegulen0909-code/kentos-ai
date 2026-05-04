@@ -333,6 +333,60 @@
 - **Next action:** `1 — Ana Kontrol` should review, commit, and merge this docs-only QA slice.
 - **Blocker:** None.
 
+## 2026-05-03 12:41 — Wave 13 worker evidence checkpoint
+
+- **Action taken:** Hardened worker-side local evidence by extracting notification skip-reason logic, replacing stub SLA processing with actionable due/breached counts, and upgrading report jobs to return timestamped evidence-friendly summaries.
+- **Files changed:** `apps/worker/src/processors/notifications.processor.ts`, `apps/worker/src/processors/sla.processor.ts`, `apps/worker/src/processors/reports.processor.ts`.
+- **Verification run:** `pnpm --filter @kentos/worker typecheck`.
+- **Result:** Passed.
+- **Next action:** Update QA/release docs so final verification captures the worker evidence slice.
+- **Blocker:** None.
+
+## 2026-05-03 12:43 — Wave 13 QA evidence consolidation checkpoint
+
+- **Action taken:** Reviewed current smoke and release runbooks to align the next documentation pass with the completed worker evidence slice and the already-recorded manual browser smoke state.
+- **Files changed:** No file changes in this checkpoint.
+- **Verification run:** Documentation review only.
+- **Result:** Completed.
+- **Next action:** Record the worker verification evidence in the runbooks and release checklist.
+- **Blocker:** None.
+
+## 2026-05-03 10:49 — TK-only citizen tracking naming alignment
+
+- **Action taken:** Aligned citizen public tracking internals with TK-only terminology by renaming form and param usage from `ticketNo` to `trackingToken` where the external route shape stayed unchanged.
+- **Files changed:** `apps/citizen-web/app/[tenantSlug]/track/actions.ts`, `apps/citizen-web/app/[tenantSlug]/track/page.tsx`, `apps/citizen-web/app/[tenantSlug]/ticket/[ticketNo]/page.tsx`.
+- **Verification run:** `pnpm --filter @kentos/citizen-web typecheck`, `pnpm build`, `git diff --check`.
+- **Result:** Passed.
+- **Next action:** Continue by aligning the route-segment name itself with `trackingToken` if the Next.js app remains type-stable after cache refresh.
+- **Blocker:** None.
+
+## 2026-05-03 10:55 — TK-only public route segment rename
+
+- **Action taken:** Renamed the citizen public ticket route segment from `[ticketNo]` to `[trackingToken]`, then aligned the citizen report redirect helper to use `trackingToken` naming so the public route path and server actions share the same terminology.
+- **Files changed:** `apps/citizen-web/app/[tenantSlug]/ticket/[trackingToken]/page.tsx`, `apps/citizen-web/app/[tenantSlug]/report/actions.ts`, `docs/workflows/autonomous-run-log.md`.
+- **Verification run:** `pnpm --filter @kentos/citizen-web typecheck` after clearing `apps/citizen-web/.next`; `git diff --check`.
+- **Result:** Passed.
+- **Next action:** Run broader final verification or continue with the next smallest docs/release evidence slice.
+- **Blocker:** None.
+
+## 2026-05-03 11:06 — Browser smoke route wording alignment
+
+- **Action taken:** Updated browser smoke guidance so citizen report and track expectations explicitly reference the `ticket/[trackingToken]` route segment now used by the public ticket page.
+- **Files changed:** `docs/workflows/browser-smoke.md`, `docs/workflows/autonomous-run-log.md`.
+- **Verification run:** `git diff --check docs/workflows/browser-smoke.md`.
+- **Result:** Passed.
+- **Next action:** Continue with the next smallest release-evidence or smoke-status documentation slice.
+- **Blocker:** None.
+
+## 2026-05-03 11:07 — Release checklist route wording alignment
+
+- **Action taken:** Updated the release checklist browser-smoke expectations so citizen report and tracking steps explicitly point to the `ticket/[trackingToken]` public route terminology.
+- **Files changed:** `docs/checklists/release-checklist.md`, `docs/workflows/autonomous-run-log.md`.
+- **Verification run:** `git diff --check docs/checklists/release-checklist.md`.
+- **Result:** Passed.
+- **Next action:** If local infra is available, continue into API/browser smoke evidence; otherwise record blockers and keep docs in sync.
+- **Blocker:** None.
+
 ## 2026-05-03 11:05 — Current stabilization checkpoint
 
 - **Action taken:** Reviewed large uncommitted public tracking/auth/notification/UI/smoke diff with specialized agents, added message template duplicate cleanup before partial unique indexes, added channel-event delivery idempotency index, made worker delivery creation race-tolerant, lazy-initialized notification queue, and hardened smoke JSON parsing.
@@ -350,3 +404,73 @@
 - **Result:** Pending.
 - **Next action:** Window 1 should review, commit, merge, and run final verification.
 - **Blocker:** None.
+
+## 2026-05-03 11:25 — Automated verification evidence for TK-only tracking alignment
+
+- **Action taken:** Ran local infra, Prisma generate/migrate/seed, API smoke, workspace typecheck/build, and diff hygiene checks after the citizen public tracking rename and docs alignment slices.
+- **Files changed:** `apps/citizen-web/app/[tenantSlug]/report/actions.ts`, `apps/citizen-web/app/[tenantSlug]/track/actions.ts`, `apps/citizen-web/app/[tenantSlug]/track/page.tsx`, `apps/citizen-web/app/[tenantSlug]/ticket/[trackingToken]/page.tsx`, `docs/workflows/browser-smoke.md`, `docs/checklists/release-checklist.md`, `docs/workflows/autonomous-run-log.md`.
+- **Verification run:** `docker compose -f infra/docker-compose.yml up -d`; `DATABASE_URL=... pnpm db:generate`; `DATABASE_URL=... pnpm db:migrate`; `DATABASE_URL=... pnpm db:seed`; local API/admin/citizen dev on ports `3110/3111/3112`; `DATABASE_URL=... KENTOS_API_BASE_URL=http://127.0.0.1:3110/api/v1 pnpm smoke:api`; `pnpm typecheck`; `pnpm build`; `git diff --check`.
+- **Result:** Passed. API smoke confirmed health/readiness, auth hardening, settings RBAC, ticket workflow, audit coverage, role matrix, department scoping, TK-only public create/track, and tenant validation. Final build output confirmed the citizen route as `/[tenantSlug]/ticket/[trackingToken]`.
+- **Next action:** Decide whether to record manual browser smoke evidence next or move to commit/final integration hygiene for the current intended diff.
+- **Blocker:** None.
+
+## 2026-05-03 11:31 — Manual browser smoke evidence recorded
+
+- **Action taken:** Recorded successful manual admin and citizen browser smoke completion for the current TK-only tracking alignment state using the local QA ports and updated release readiness evidence accordingly.
+- **Files changed:** `docs/workflows/autonomous-run-log.md`.
+- **Verification run:** Manual browser smoke completed successfully by the user across the scenarios in `docs/workflows/browser-smoke.md`; local automated prerequisites had already passed via `pnpm smoke:api`, `pnpm typecheck`, `pnpm build`, and `git diff --check`.
+- **Result:** Passed. Admin login/dashboard/tickets/settings and citizen report/track/public-ticket flows all completed successfully, including the `ticket/[trackingToken]` route path and TK-only tracking behavior.
+
+## 2026-05-03 18:33 — AI Wave 2 admin visibility and schema regression checkpoint
+
+- **Action taken:** Exposed staff-only `aiSummary` on ticket detail responses, rendered an admin AI intake summary card, and added focused shared schema regression coverage for AI intake request/result parsing.
+- **Files changed:** `apps/api/src/modules/tickets/tickets.service.ts`, `apps/admin-web/lib/api.ts`, `apps/admin-web/app/tickets/[id]/page.tsx`, `packages/shared/src/schemas.test.ts`, `docs/workflows/local-smoke.md`, `docs/workflows/autonomous-run-log.md`.
+- **Verification run:** `pnpm --filter @kentos/api typecheck`; `pnpm --filter @kentos/admin-web typecheck`; `pnpm --filter @kentos/shared typecheck`; `pnpm exec tsx packages/shared/src/schemas.test.ts`.
+- **Result:** Passed. Admin ticket detail now shows AI classification context for staff triage, and shared schema regression checks confirm valid payload acceptance plus invalid email, unsupported missing-field, and invalid confidence rejection.
+- **Next action:** Proceed to final integration hygiene and commit-ready consolidation for the current intended diff.
+- **Blocker:** None.
+
+## 2026-05-03 11:38 — Final integration hygiene checkpoint
+
+- **Action taken:** Completed the final integration hygiene pass for the TK-only public tracking alignment slice by confirming full workspace verification, confirming the branch is in sync with `origin/master`, and freezing the intended commit-ready diff shape for the current worktree.
+- **Files changed:** `docs/workflows/autonomous-run-log.md`.
+- **Verification run:** `git diff --check`; `pnpm typecheck`; `pnpm build`; `git rev-list --left-right --count origin/master...master`; `git status --short --branch`.
+- **Result:** Passed. Workspace verification is green, `origin/master...master` is `0 0`, and the remaining diff is limited to the expected citizen tracking rename, route-segment rename, and supporting documentation updates.
+- **Next action:** Report the phase as complete with a commit-ready summary of the intended diff.
+- **Blocker:** None.
+
+## 2026-05-04 — Autonomous phased stabilization checkpoint
+
+- **Action taken:** Executed the approved remaining-work phases locally: froze current diff scope, wired focused package test scripts, tightened shared TK-only AI status-token schema, added AI service contract tests, extended citizen tracking action regression coverage, kept public lookup TK-only in API fallback logic, made admin settings controls fully role-aware disabled for non-managers, and confirmed worker evidence processors remain release-checklist aligned.
+- **Files changed:** `packages/shared/**`, `apps/ai-service/**`, `apps/citizen-web/**`, `apps/api/src/modules/public/public-ticket.service.ts`, `apps/admin-web/app/settings/page.tsx`, `docs/workflows/local-smoke.md`, `docs/workflows/autonomous-run-log.md`, plus existing in-progress product/docs files from the current broad diff.
+- **Verification run:** `pnpm --filter @kentos/shared test`; `pnpm --filter @kentos/shared typecheck`; `pnpm --filter @kentos/ai-service test`; `pnpm --filter @kentos/ai-service typecheck`; `pnpm --filter @kentos/citizen-web test`; `pnpm --filter @kentos/citizen-web typecheck`; `pnpm --filter @kentos/api typecheck`; `pnpm --filter @kentos/admin-web typecheck`; `pnpm --filter @kentos/admin-web build`; `pnpm --filter @kentos/citizen-web build`; `pnpm --filter @kentos/worker typecheck`; `pnpm db:generate`; `pnpm typecheck`; `pnpm build`; `git diff --check`; `git rev-list --left-right --count origin/master...master`.
+- **Result:** Passed for static verification, focused regression tests, Prisma generate, and full workspace build. `origin/master...master` is `0 0`.
+- **Next action:** If milestone release requires strict browser sign-off, complete the full manual scenarios in `docs/workflows/browser-smoke.md`; otherwise proceed with commit-ready cleanup and include the browser smoke status caveat in merge notes.
+- **Blocker:** Browser smoke evidence is partial for this cycle. Route/runtime readiness is verified, but full manual scenario coverage is not yet re-run end-to-end.
+
+## 2026-05-04 — Browser runtime readiness re-check checkpoint
+
+- **Action taken:** Re-checked local browser smoke runtime readiness by probing API/admin/citizen endpoints on QA ports.
+- **Files changed:** `docs/checklists/release-checklist.md`, `docs/workflows/autonomous-run-log.md`.
+- **Verification run:** `curl -sS -o /dev/null -w "%{http_code}" http://127.0.0.1:3110/api/v1/health`; `curl -sS -o /dev/null -w "%{http_code}" http://127.0.0.1:3111/login`; `curl -sS -o /dev/null -w "%{http_code}" http://127.0.0.1:3112/demo-belediye/report`.
+- **Result:** Passed for runtime readiness (`200/200/200`). Browser smoke status remains `partially run with gaps` until manual scenario coverage is fully re-run.
+- **Next action:** Run end-to-end manual browser scenarios if strict release sign-off requires `passed` instead of `partial`.
+- **Blocker:** Manual browser scenario coverage is still pending for this cycle.
+
+## 2026-05-04 — PR-ready release gate closure checkpoint
+
+- **Action taken:** Confirmed PR #1 branch/base alignment, closed remaining release checklist push/final-note items with explicit evidence, and prepared the branch for merge review with browser-smoke caveat preserved.
+- **Files changed:** `docs/checklists/release-checklist.md`, `docs/workflows/autonomous-run-log.md`.
+- **Verification run:** `git branch --show-current`; `gh pr view 1 --json headRefName,baseRefName,state,url`; `git status --short`; `git rev-list --left-right --count origin/master...HEAD`.
+- **Result:** PR-ready documentation closure completed. Branch `wave/tk-ai-smoke-hardening-20260504` remains `0 behind / 2 ahead` versus `origin/master`, PR #1 is open, API smoke is passed, and browser smoke remains explicitly `partially run with gaps`.
+- **Next action:** Proceed with PR review/merge decision; if strict release policy requires browser `passed`, run full manual browser scenarios before merge approval.
+- **Blocker:** No code blocker. Manual browser scenario end-to-end coverage remains the only release-signoff gap for strict `passed` policy.
+
+## 2026-05-04 — Manual smoke capture clarification checkpoint
+
+- **Action taken:** Re-ran API smoke successfully and captured operator-provided manual smoke summary for this cycle.
+- **Files changed:** `docs/checklists/release-checklist.md`, `docs/workflows/autonomous-run-log.md`.
+- **Verification run:** `DATABASE_URL='postgresql://kentos:kentos@localhost:5432/kentos_ai?schema=public' KENTOS_API_BASE_URL='http://127.0.0.1:3110/api/v1' pnpm smoke:api`.
+- **Result:** API smoke passed again. Manual browser smoke capture indicates admin flow passed, while citizen/manual TK-only details and 390px mobile checks were not explicitly confirmed by the operator in this cycle.
+- **Next action:** If strict browser `passed` sign-off is required, re-run and explicitly mark citizen + mobile manual checks; otherwise continue with documented `partially run with gaps` caveat.
+- **Blocker:** No hard blocker for PR review. Strict browser `passed` policy still needs explicit citizen/mobile manual confirmation.

@@ -1,5 +1,5 @@
 import { adminApi, type TicketListItem } from '../../lib/api';
-import { canManageSettings, canViewAnalytics, getAdminSession } from '../../lib/session';
+import { canManageSettings, canViewAnalytics, getAdminSession, resolveAdminAccessToken } from '../../lib/session';
 
 const fallbackRows: TicketListItem[] = [];
 
@@ -23,10 +23,11 @@ function groupByDepartment(rows: TicketListItem[]) {
 
 export default async function QueuesPage() {
   const session = await getAdminSession();
-  const token = session?.token ?? null;
+  const hasSession = Boolean(session);
+  const token = hasSession ? await resolveAdminAccessToken() : null;
   const role = session?.user.role ?? null;
   const analyticsVisible = canViewAnalytics(role);
-  const settingsVisible = Boolean(token) && canManageSettings(role);
+  const settingsVisible = hasSession && canManageSettings(role);
   let dataUnavailable = false;
 
   const rows = token
@@ -56,7 +57,7 @@ export default async function QueuesPage() {
       <section className="main">
         <p className="badge">Birim kuyruklari - SLA ve is yuku</p>
         <h1>Departman operasyon yogunlugu</h1>
-        {!token ? (
+        {!hasSession ? (
           <div className="notice muted" role="note">
             <strong>Canli kuyruk icin oturum gerekli.</strong>
             <p>Birim yogunlugu, bekleyen isler ve SLA alarmi yetkili oturumla API'den okunur.</p>

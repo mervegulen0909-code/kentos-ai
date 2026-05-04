@@ -38,8 +38,10 @@ const errorCopy: Record<string, FeedbackCopy> = {
 
 export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ success?: string; error?: string }> }) {
   const session = await getAdminSession();
-  const token = session?.token ?? null;
+  const hasSession = Boolean(session);
+  const token = session?.accessToken ?? null;
   const canEditSettings = canManageSettings(session?.user.role);
+  const controlsDisabled = !hasSession || !canEditSettings;
   const { success, error } = await searchParams;
   const [departments, categories, slaPolicies, templates] = token
     ? await Promise.all([
@@ -66,7 +68,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
           <p>{(errorCopy[error] ?? errorCopy.general).detail}</p>
         </div>
       ) : null}
-      {!token ? <p className="notice muted">Ayarlari duzenlemek icin giris yapin. Formlar guvenli bicimde pasif tutulur.</p> : null}
+      {!hasSession ? <p className="notice muted">Ayarlari duzenlemek icin giris yapin. Formlar guvenli bicimde pasif tutulur.</p> : null}
       {token ? (
         <div className="notice muted" role="note">
           <strong>{canEditSettings ? 'Ayar degisiklikleri yonetici roluyla acik.' : 'Bu oturum yalnizca goruntuleme modunda.'}</strong>
@@ -79,10 +81,10 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
           <form action={createDepartmentAction} style={{ display: 'grid', gap: 10, marginBottom: 18 }}>
             <PendingFieldset style={{ display: 'grid', gap: 10 }}>
               <input type="hidden" name="intent" value="create-department" />
-              <input name="code" placeholder="KOD" required />
-              <input name="name" placeholder="Departman adi" required />
-              <input name="description" placeholder="Aciklama" />
-              <PendingSubmitButton type="submit" disabled={!token || !canEditSettings} idleLabel="Departman ekle" pendingLabel="Ekleniyor..." />
+              <input name="code" placeholder="KOD" required disabled={controlsDisabled} />
+              <input name="name" placeholder="Departman adi" required disabled={controlsDisabled} />
+              <input name="description" placeholder="Aciklama" disabled={controlsDisabled} />
+              <PendingSubmitButton type="submit" disabled={controlsDisabled} idleLabel="Departman ekle" pendingLabel="Ekleniyor..." />
             </PendingFieldset>
           </form>
           {departments.map((department) => (
@@ -90,13 +92,13 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
               <PendingFieldset style={{ display: 'grid', gap: 8 }}>
                 <input type="hidden" name="intent" value="update-department" />
                 <input type="hidden" name="id" value={department.id} />
-                <input name="name" defaultValue={department.name} />
-                <input name="description" defaultValue={department.description ?? ''} placeholder="Aciklama" />
-                <select name="isActive" defaultValue={String(department.isActive)}>
+                <input name="name" defaultValue={department.name} disabled={controlsDisabled} />
+                <input name="description" defaultValue={department.description ?? ''} placeholder="Aciklama" disabled={controlsDisabled} />
+                <select name="isActive" defaultValue={String(department.isActive)} disabled={controlsDisabled}>
                   <option value="true">Aktif</option>
                   <option value="false">Pasif</option>
                 </select>
-                <PendingSubmitButton type="submit" disabled={!token || !canEditSettings} idleLabel={`${department.code} guncelle`} pendingLabel="Kaydediliyor..." />
+                <PendingSubmitButton type="submit" disabled={controlsDisabled} idleLabel={`${department.code} guncelle`} pendingLabel="Kaydediliyor..." />
               </PendingFieldset>
             </form>
           ))}
@@ -106,16 +108,16 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
           <form action={createCategoryAction} style={{ display: 'grid', gap: 10, marginBottom: 18 }}>
             <PendingFieldset style={{ display: 'grid', gap: 10 }}>
               <input type="hidden" name="intent" value="create-category" />
-              <input name="code" placeholder="KATEGORI_KODU" required />
-              <input name="name" placeholder="Kategori adi" required />
-              <select name="departmentId" defaultValue="">
+              <input name="code" placeholder="KATEGORI_KODU" required disabled={controlsDisabled} />
+              <input name="name" placeholder="Kategori adi" required disabled={controlsDisabled} />
+              <select name="departmentId" defaultValue="" disabled={controlsDisabled}>
                 <option value="">Departman secilmedi</option>
                 {departments.map((department) => <option key={department.id} value={department.id}>{department.name}</option>)}
               </select>
-              <select name="defaultPriority" defaultValue="NORMAL">
+              <select name="defaultPriority" defaultValue="NORMAL" disabled={controlsDisabled}>
                 {['LOW', 'NORMAL', 'HIGH', 'URGENT'].map((priority) => <option key={priority}>{priority}</option>)}
               </select>
-              <PendingSubmitButton type="submit" disabled={!token || !canEditSettings} idleLabel="Kategori ekle" pendingLabel="Ekleniyor..." />
+              <PendingSubmitButton type="submit" disabled={controlsDisabled} idleLabel="Kategori ekle" pendingLabel="Ekleniyor..." />
             </PendingFieldset>
           </form>
           {categories.map((category) => (
@@ -123,19 +125,19 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
               <PendingFieldset style={{ display: 'grid', gap: 8 }}>
                 <input type="hidden" name="intent" value="update-category" />
                 <input type="hidden" name="id" value={category.id} />
-                <input name="name" defaultValue={category.name} />
-                <select name="departmentId" defaultValue={category.departmentId ?? ''}>
+                <input name="name" defaultValue={category.name} disabled={controlsDisabled} />
+                <select name="departmentId" defaultValue={category.departmentId ?? ''} disabled={controlsDisabled}>
                   <option value="">Departman secilmedi</option>
                   {departments.map((department) => <option key={department.id} value={department.id}>{department.name}</option>)}
                 </select>
-                <select name="defaultPriority" defaultValue={category.defaultPriority}>
+                <select name="defaultPriority" defaultValue={category.defaultPriority} disabled={controlsDisabled}>
                   {['LOW', 'NORMAL', 'HIGH', 'URGENT'].map((priority) => <option key={priority}>{priority}</option>)}
                 </select>
-                <select name="isActive" defaultValue={String(category.isActive)}>
+                <select name="isActive" defaultValue={String(category.isActive)} disabled={controlsDisabled}>
                   <option value="true">Aktif</option>
                   <option value="false">Pasif</option>
                 </select>
-                <PendingSubmitButton type="submit" disabled={!token || !canEditSettings} idleLabel={`${category.code} guncelle`} pendingLabel="Kaydediliyor..." />
+                <PendingSubmitButton type="submit" disabled={controlsDisabled} idleLabel={`${category.code} guncelle`} pendingLabel="Kaydediliyor..." />
               </PendingFieldset>
             </form>
           ))}
@@ -145,20 +147,20 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
           <form action={createSlaPolicyAction} style={{ display: 'grid', gap: 10, marginBottom: 18 }}>
             <PendingFieldset style={{ display: 'grid', gap: 10 }}>
               <input type="hidden" name="intent" value="create-sla" />
-              <select name="priority" defaultValue="NORMAL">
+              <select name="priority" defaultValue="NORMAL" disabled={controlsDisabled}>
                 {['LOW', 'NORMAL', 'HIGH', 'URGENT'].map((priority) => <option key={priority}>{priority}</option>)}
               </select>
-              <input name="responseMinutes" type="number" min={1} defaultValue={240} />
-              <input name="resolutionMinutes" type="number" min={1} defaultValue={4320} />
-              <select name="departmentId" defaultValue="">
+              <input name="responseMinutes" type="number" min={1} defaultValue={240} disabled={controlsDisabled} />
+              <input name="resolutionMinutes" type="number" min={1} defaultValue={4320} disabled={controlsDisabled} />
+              <select name="departmentId" defaultValue="" disabled={controlsDisabled}>
                 <option value="">Genel politika</option>
                 {departments.map((department) => <option key={department.id} value={department.id}>{department.name}</option>)}
               </select>
-              <select name="categoryId" defaultValue="">
+              <select name="categoryId" defaultValue="" disabled={controlsDisabled}>
                 <option value="">Kategori secilmedi</option>
                 {categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
               </select>
-              <PendingSubmitButton type="submit" disabled={!token || !canEditSettings} idleLabel="SLA politikasi ekle" pendingLabel="Ekleniyor..." />
+              <PendingSubmitButton type="submit" disabled={controlsDisabled} idleLabel="SLA politikasi ekle" pendingLabel="Ekleniyor..." />
             </PendingFieldset>
           </form>
           {slaPolicies.length ? slaPolicies.map((policy) => (
@@ -167,13 +169,13 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
                 <input type="hidden" name="intent" value="update-sla" />
                 <input type="hidden" name="id" value={policy.id} />
                 <strong>{policy.priority} - {policy.department?.name ?? 'Genel'} - {policy.category?.name ?? 'Tum kategoriler'}</strong>
-                <input name="responseMinutes" type="number" min={1} defaultValue={policy.responseMinutes} />
-                <input name="resolutionMinutes" type="number" min={1} defaultValue={policy.resolutionMinutes} />
-                <select name="isActive" defaultValue={String(policy.isActive)}>
+                <input name="responseMinutes" type="number" min={1} defaultValue={policy.responseMinutes} disabled={controlsDisabled} />
+                <input name="resolutionMinutes" type="number" min={1} defaultValue={policy.resolutionMinutes} disabled={controlsDisabled} />
+                <select name="isActive" defaultValue={String(policy.isActive)} disabled={controlsDisabled}>
                   <option value="true">Aktif</option>
                   <option value="false">Pasif</option>
                 </select>
-                <PendingSubmitButton type="submit" disabled={!token || !canEditSettings} idleLabel="SLA guncelle" pendingLabel="Kaydediliyor..." />
+                <PendingSubmitButton type="submit" disabled={controlsDisabled} idleLabel="SLA guncelle" pendingLabel="Kaydediliyor..." />
               </PendingFieldset>
             </form>
           )) : <p style={{ color: 'var(--muted)' }}>SLA politikasi yok.</p>}
@@ -189,12 +191,12 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
                 <input type="hidden" name="intent" value="update-template" />
                 <input type="hidden" name="id" value={template.id} />
                 <strong>{template.key}</strong>
-                <textarea name="body" defaultValue={template.body} rows={3} />
-                <select name="isActive" defaultValue={String(template.isActive)}>
+                <textarea name="body" defaultValue={template.body} rows={3} disabled={controlsDisabled} />
+                <select name="isActive" defaultValue={String(template.isActive)} disabled={controlsDisabled}>
                   <option value="true">Aktif</option>
                   <option value="false">Pasif</option>
                 </select>
-                <PendingSubmitButton type="submit" disabled={!token || !canEditSettings} idleLabel="Sablonu guncelle" pendingLabel="Kaydediliyor..." />
+                <PendingSubmitButton type="submit" disabled={controlsDisabled} idleLabel="Sablonu guncelle" pendingLabel="Kaydediliyor..." />
               </PendingFieldset>
             </form>
           ))}

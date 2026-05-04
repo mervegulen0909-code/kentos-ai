@@ -17,8 +17,15 @@ The current smoke script verifies:
 - Public citizen ticket create and public-safe TK tracking-code lookup.
 - Public tracking is TK-only: `KNT-*` internal ticket numbers must not work on public lookup endpoints.
 - Public responses do not leak internal notes, audit logs, AI reasoning, internal ticket numbers, IDs, tokens, or tenant internals.
+- Admin ticket detail now surfaces an AI intake summary with classification confidence, intent, suggested routing, missing fields, and follow-up prompt context for staff-only triage.
 
 The smoke must not call non-local endpoints, send WhatsApp/email/social messages, deploy, push, or mutate production data.
+
+Worker evidence notes for the current local verification baseline:
+
+- Notification worker verification currently means `pnpm --filter @kentos/worker typecheck` passes and the processor returns explicit skip reasons for non-deliverable public-message jobs.
+- SLA worker verification currently means the processor reports timestamped counts for actionable tickets that are already breached or due within the next hour.
+- Reports worker verification currently means the processor returns an evidence-friendly timestamped acceptance summary for local QA and release reporting.
 
 ## Start local infrastructure
 
@@ -130,6 +137,16 @@ Run this scope when ticket mutations, audit writers, or public/private message b
 - Denied mutations either create no audit entry or create an intentional security-relevant audit entry; document which behavior is expected.
 - Citizen public tracking never returns audit entries or internal notes.
 - Audit read failures are reported as QA blockers and are not masked by editing smoke expectations.
+
+## AI intake and TK-only regression evidence
+
+For the current AI/TK-only baseline, contract and parser regression coverage means:
+
+- `pnpm --filter @kentos/api typecheck` passes after keeping `aiSummary` staff-only on ticket detail.
+- `pnpm --filter @kentos/admin-web typecheck` passes after rendering the admin-side AI intake summary card.
+- `pnpm --filter @kentos/shared test` prints `shared intake schema tests passed` and proves valid intake payloads parse while invalid email, unsupported `missingFields`, out-of-range confidence, and legacy `KNT-*` status references are rejected.
+- `pnpm --filter @kentos/ai-service test` prints `ai service intake tests passed` and proves deterministic fallback classification preserves canonical TK tracking tokens for status queries.
+- `pnpm --filter @kentos/citizen-web test` prints `track actions checks passed` and proves citizen tracking redirects only canonical TK tokens while rejecting malformed and legacy internal ticket numbers.
 
 ## Manual endpoint probes
 

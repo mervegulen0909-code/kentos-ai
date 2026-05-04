@@ -13,6 +13,18 @@ function externalMessageId(to: string) {
   return `${prefix}-${Date.now()}-${to}`;
 }
 
+export function getNotificationSkipReason(message: {
+  senderType: string;
+  visibility: string;
+  ticket: { citizen: { phone: string | null } | null };
+}) {
+  const to = message.ticket.citizen?.phone?.trim();
+  if (!to) return 'missing_phone';
+  if (message.senderType === 'CITIZEN') return 'citizen_originated';
+  if (message.visibility !== 'PUBLIC') return 'non_public';
+  return null;
+}
+
 export async function processNotificationJob(job: { name: string; data: NotificationJobData }) {
   const message = await prisma.ticketMessage.findFirst({
     where: { id: job.data.messageId },
@@ -29,9 +41,10 @@ export async function processNotificationJob(job: { name: string; data: Notifica
     return { processor: 'notifications', job: job.name, skipped: 'message_not_found' };
   }
 
+  const skipReason = getNotificationSkipReason(message);
   const to = message.ticket.citizen?.phone?.trim();
-  if (!to || message.senderType === 'CITIZEN' || message.visibility !== 'PUBLIC') {
-    return { processor: 'notifications', job: job.name, skipped: 'not_deliverable' };
+  if (skipReason || !to) {
+    return { processor: 'notifications', job: job.name, skipped: skipReason ?? 'not_deliverable' };
   }
 
   const provider = providerName();

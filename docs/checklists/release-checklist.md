@@ -68,14 +68,23 @@ Run browser smoke when admin or citizen UI routes, forms, auth/session, settings
 - [ ] Admin ticket list renders rows or designed empty state.
 - [ ] Admin ticket detail supports assignment, internal note, public message, status transition, refresh persistence, and audit timeline.
 - [ ] Admin settings supports department/category/SLA/message-template create or update flows currently in scope.
-- [ ] Citizen report creates a ticket and redirects to the public ticket page.
-- [ ] Citizen tracking finds the same public ticket by TK tracking code only.
+- [ ] Citizen report creates a ticket and redirects to the public ticket page under the `ticket/[trackingToken]` route.
+- [ ] Citizen tracking finds the same public ticket by TK tracking code only under the `ticket/[trackingToken]` route.
 - [ ] Citizen invalid ticket state is public-safe and helpful.
 - [ ] Citizen pages do not expose internal notes, audit logs, AI reasoning, stack traces, secrets, or tenant internals.
 - [ ] Browser console has no unexpected errors on the smoke path.
 - [ ] Narrow mobile viewport has no blocking layout breakage.
 
-## 7. QA Smoke Runner window behavior
+## 7. Worker evidence regression
+
+Run this scope when queue processors, notification delivery guardrails, or worker-local operational summaries change.
+
+- [ ] `pnpm --filter @kentos/worker typecheck`
+- [ ] Notification processor returns explicit skip reasons for non-deliverable public-message jobs.
+- [ ] SLA processor returns actionable `breached` and `dueSoon` counts with a timestamped summary.
+- [ ] Reports processor returns a timestamped acceptance summary suitable for QA/release evidence.
+
+## 8. QA Smoke Runner window behavior
 
 - [ ] QA window only edits allowed docs/checklists/workflow files unless separately authorized.
 - [ ] QA window does not modify `apps/**`, `packages/**`, `scripts/smoke-api.mjs`, production env files, or secrets.
@@ -84,7 +93,7 @@ Run browser smoke when admin or citizen UI routes, forms, auth/session, settings
 - [ ] If the same smoke failure repeats twice, QA stops and reports a root-cause hypothesis instead of changing app code.
 - [ ] UI completion claims include browser/manual smoke status or an explicit note that it was not run.
 
-## 8. Push gate
+## 9. Push gate
 
 Do not push unless the user explicitly asks for it. The default team policy is milestone-end push, not push-after-each-merge.
 
@@ -95,30 +104,30 @@ Do not push unless the user explicitly asks for it. The default team policy is m
 
 Before the milestone push decision:
 
-- [ ] Record `git rev-list --left-right --count origin/master...master` output for the final `master` ahead count.
-- [ ] Confirm `pnpm typecheck` passed on final `master`.
-- [ ] Confirm `pnpm build` passed on final `master`.
-- [ ] Record API smoke as passed, or record a precise blocked reason such as `Docker daemon unavailable`.
-- [ ] Record browser smoke status: passed, partially run with gaps, blocked, or explicitly not run.
-- [ ] Confirm `git status --short` contains only intentional state.
-- [ ] Confirm no secrets, production env files, credentials, or real tokens are staged.
-- [ ] Confirm local tool cache directories such as `.codex/` and `.playwright-mcp/` are ignored or otherwise not staged.
+- [x] Record `git rev-list --left-right --count origin/master...master` output for the final `master` ahead count. Latest local evidence: `0 0` on 2026-05-04.
+- [x] Confirm `pnpm typecheck` passed on final `master`. Latest local evidence: passed on 2026-05-04.
+- [x] Confirm `pnpm build` passed on final `master`. Latest local evidence: passed on 2026-05-04.
+- [x] Record API smoke as passed, or record a precise blocked reason such as `Docker daemon unavailable`. Latest local evidence: passed on 2026-05-04 with `DATABASE_URL='postgresql://kentos:kentos@localhost:5432/kentos_ai?schema=public' KENTOS_API_BASE_URL='http://127.0.0.1:3110/api/v1' pnpm smoke:api`.
+- [x] Record browser smoke status: passed, partially run with gaps, blocked, or explicitly not run. Latest local evidence: partially run with gaps on 2026-05-04 — API/admin/citizen routes on ports `3110/3111/3112` returned 200, admin manual smoke was reported as passed by the control window, but citizen/manual TK-only details and 390px mobile checks were not explicitly confirmed in this cycle.
+- [x] Confirm `git status --short` contains only intentional state. Latest local evidence: broad intended product/docs diff plus untracked Roo mode files that must be explicitly included or ignored before commit.
+- [x] Confirm no secrets, production env files, credentials, or real tokens are staged. Latest local evidence: no staging performed; `.env*` remains ignored by policy.
+- [x] Confirm local tool cache directories such as `.codex/` and `.playwright-mcp/` are ignored or otherwise not staged. Latest local evidence: `.gitignore` now includes `.roo/` and `.roomodes`, and `git status --short` no longer shows those Roo local files as untracked (2026-05-04).
 
 Before push:
 
-- [ ] Confirm branch name and target remote.
-- [ ] Confirm final verification results.
-- [ ] Confirm `git status --short` contains only intentional changes.
-- [ ] Confirm no secrets or production env files are staged.
-- [ ] Confirm whether the action is branch push only or PR creation/update.
+- [x] Confirm branch name and target remote. Latest local evidence: current branch is `wave/tk-ai-smoke-hardening-20260504`, target remote is `origin`, and PR base/head is `master <- wave/tk-ai-smoke-hardening-20260504` (`gh pr view 1 --json headRefName,baseRefName,state,url`, 2026-05-04).
+- [x] Confirm final verification results. Latest local evidence: final static verification remained passed (`pnpm typecheck`, `pnpm build` on 2026-05-04), API smoke passed on 2026-05-04, and browser status remains explicitly `partially run with gaps` with runtime readiness reconfirmed (`200/200/200`).
+- [x] Confirm `git status --short` contains only intentional changes. Latest local evidence: only local `.claude/settings.json` remains unstaged and intentionally excluded from release/docs commits; branch content for PR is intentional.
+- [x] Confirm no secrets or production env files are staged. Latest local evidence: no `.env*`, credentials, or production secret files are staged; policy remains `.env*` ignored.
+- [x] Confirm whether the action is branch push only or PR creation/update. Latest local evidence: branch push and PR update were performed for PR #1 (`https://github.com/filizgulen1966-tech/kentos-ai/pull/1`).
 
-## 9. Final merge note
+## 10. Final merge note
 
 Record the final note with:
 
-- [ ] Branches merged and order.
-- [ ] Conflicts and how they were resolved.
-- [ ] Verification commands and pass/fail results.
-- [ ] API smoke result or reason it was not run.
-- [ ] Browser smoke result or reason it was not run.
-- [ ] Remaining blockers and owner.
+- [x] Branches merged and order. Latest local evidence: this release candidate is prepared on `wave/tk-ai-smoke-hardening-20260504` and opened as PR #1 into `master`; no additional branch merge chain is required before PR review/merge.
+- [x] Conflicts and how they were resolved. Latest local evidence: no unresolved merge conflicts remain in the current PR branch.
+- [x] Verification commands and pass/fail results. Latest local evidence: `pnpm db:generate` passed, `pnpm typecheck` passed, `pnpm build` passed, API health/runtime probes passed, and docs record browser status as partial with explicit gaps.
+- [x] API smoke result or reason it was not run. Latest local evidence: API smoke passed on 2026-05-04 (`DATABASE_URL='postgresql://kentos:kentos@localhost:5432/kentos_ai?schema=public' KENTOS_API_BASE_URL='http://127.0.0.1:3110/api/v1' pnpm smoke:api`).
+- [x] Browser smoke result or reason it was not run. Latest local evidence: `partially run with gaps`; runtime readiness reconfirmed (`3110/3111/3112 -> 200/200/200`), full manual scenario set not yet fully re-run in this cycle.
+- [x] Remaining blockers and owner. Latest local evidence: only blocker is full manual browser scenario coverage for strict `passed` sign-off; owner is `1 — Ana Kontrol` / release control window.

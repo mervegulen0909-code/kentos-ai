@@ -9,6 +9,10 @@ const errorCopy: Record<string, { title: string; detail: string }> = {
     title: 'Kod biçimi tanınmadı.',
     detail: 'Takip kodunu TK-AB12CD34EF56AB78 benzeri biçimde girin.',
   },
+  lowercase: {
+    title: 'Kod küçük harflerle girildi.',
+    detail: 'Kod otomatik olarak büyük harfe çevrilir, ancak başındaki TK- bölümünü ve toplam uzunluğu kontrol edin.',
+  },
 };
 
 export default async function TrackPage({ params, searchParams }: { params: Promise<{ tenantSlug: string }>; searchParams: Promise<{ error?: string }> }) {
@@ -29,9 +33,9 @@ export default async function TrackPage({ params, searchParams }: { params: Prom
           </div>
         ) : null}
         <div className={`field ${error ? 'field-error' : ''}`}>
-          <label htmlFor="ticketNo">Takip kodu</label>
-          <input id="ticketNo" name="ticketNo" placeholder="TK-1A2B3C4D5E6F7A8B" required aria-describedby="ticketNo-help" aria-invalid={Boolean(error)} inputMode="text" autoCapitalize="characters" />
-          <small id="ticketNo-help">Başvurular yalnızca size verilen gizli takip koduyla sorgulanır.</small>
+          <label htmlFor="trackingToken">Takip kodu</label>
+          <input id="trackingToken" name="trackingToken" placeholder="TK-1A2B3C4D5E6F7A8B" required aria-describedby="trackingToken-help" aria-invalid={Boolean(error)} inputMode="text" autoCapitalize="characters" autoCorrect="off" maxLength={19} />
+          <small id="trackingToken-help">Başvurular yalnızca size verilen gizli takip koduyla sorgulanır.</small>
         </div>
         <button className="cta" type="submit">Durumu sorgula</button>
       </form>
