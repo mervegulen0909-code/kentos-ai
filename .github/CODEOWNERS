@@ -1,0 +1,15 @@
+# Default ownership
+* @filizgulen1966-tech
+
+# Core backend and contracts
+/apps/api/ @filizgulen1966-tech
+/packages/shared/ @filizgulen1966-tech
+/packages/database/ @filizgulen1966-tech
+
+# UI surfaces
+/apps/admin-web/ @filizgulen1966-tech
+/apps/citizen-web/ @filizgulen1966-tech
+
+# Release operations docs
+/docs/checklists/ @filizgulen1966-tech
+/docs/workflows/ @filizgulen1966-tech

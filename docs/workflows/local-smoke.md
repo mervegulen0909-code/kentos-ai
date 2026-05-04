@@ -186,6 +186,26 @@ pnpm build
 
 If `pnpm build` takes too long or is blocked by an unrelated in-progress change, stop and report the exact blocker instead of claiming completion.
 
+## Evidence status contract
+
+Use this status enum for local smoke evidence:
+
+- `passed`: completed with expected result
+- `partial`: partially completed with explicit gaps
+- `blocked`: could not complete due to external blocker
+- `not_run`: intentionally not executed in this cycle
+
+Every local smoke checkpoint must include:
+
+- Status
+- Evidence date
+- Owner
+- SLA (required when status is `partial` or `blocked`)
+- Exact verification command(s)
+- One-line result and remaining gap/blocker summary
+
+No checkpoint should be marked as `passed` when required checks are unknown or unconfirmed.
+
 ## QA Smoke Runner window rules
 
 A QA Smoke Runner window verifies and documents; it does not develop features.

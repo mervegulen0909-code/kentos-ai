@@ -2,6 +2,24 @@
 
 This checklist verifies the real admin and citizen browser flows against a local API. It is manual today; do not report UI work as complete unless this checklist was run or the final report explicitly says browser smoke was not run.
 
+## Strict browser status contract
+
+Allowed browser status enum:
+
+- `passed`
+- `partial`
+- `blocked`
+- `not_run`
+
+Strict `passed` requires explicit confirmation of all citizen and mobile critical checks below:
+
+- Scenario I (Citizen report)
+- Scenario J (Citizen track, including TK-only and legacy `KNT-*` rejection)
+- Scenario K (Public-safe citizen ticket details)
+- Scenario L (390px mobile viewport checks)
+
+If any of the above is missing, uncertain, or skipped, browser status must be recorded as `partial` (or `blocked` if there is an external blocker). Each run must record: evidence date, owner, and SLA for unresolved gaps.
+
 ## Start local services
 
 Start infrastructure and seed the demo tenant:

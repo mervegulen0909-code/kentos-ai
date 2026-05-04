@@ -75,6 +75,35 @@ Run browser smoke when admin or citizen UI routes, forms, auth/session, settings
 - [ ] Browser console has no unexpected errors on the smoke path.
 - [ ] Narrow mobile viewport has no blocking layout breakage.
 
+### Browser status rule (strict)
+
+- [ ] Record browser status using only: `passed`, `partial`, `blocked`, `not_run`.
+- [ ] Mark browser status as `passed` only when citizen Scenarios I/J/K and mobile Scenario L are explicitly confirmed.
+- [ ] If any citizen/mobile critical scenario is unconfirmed, record `partial` with explicit gap.
+- [ ] Include evidence date, owner, and SLA for unresolved gaps (`partial`/`blocked`).
+- [ ] Do not claim UI completion as `passed` while browser status is `partial` or `blocked`.
+
+### Release evidence snapshot (required per cycle)
+
+- [ ] Branch and ahead/behind count recorded.
+- [ ] Static verification summary recorded (`db:generate`, `typecheck`, `build`).
+- [ ] API smoke status recorded with command + result.
+- [ ] Browser smoke status recorded with enum + gaps/blockers.
+- [ ] Owner and SLA recorded for each open gap/blocker.
+- [ ] Local-only file exclusions recorded (for example `.claude/settings.json`).
+- [ ] Risk level for the cycle recorded (`low`/`medium`/`high`) with one-line reason.
+- [ ] Rollback note recorded when any `partial` or `blocked` status exists.
+- [ ] Merge decision state recorded (`go`/`hold`) with rationale.
+- [ ] Snapshot location linked from run-log checkpoint.
+
+### Branch/worktree housekeeping guardrail
+
+- [ ] Merged feature branches are deleted locally and on remote unless explicitly preserved.
+- [ ] Active worktree branches are not deleted while attached to another session.
+- [ ] Local release operations keep `.claude/settings.json` and other local-only state out of staged release commits.
+- [ ] `git status --short` is clean or intentionally documented before final release report.
+- [ ] Housekeeping completion is logged in `docs/workflows/autonomous-run-log.md`.
+- [ ] Owner and SLA are set for unresolved housekeeping exceptions.
 ## 7. Worker evidence regression
 
 Run this scope when queue processors, notification delivery guardrails, or worker-local operational summaries change.

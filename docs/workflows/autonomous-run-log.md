@@ -509,3 +509,31 @@
   - SLA: 2026-05-09
   - Done criteria: `.claude/settings.json` stays explicitly local-only and excluded from release diffs/commits.
   - Risk reduction: **Low** (reduces accidental noise commits).
+
+## 2026-05-04 — Principal hardening package checkpoint
+
+- **Action taken:** Introduced technical enforce scaffolding (`.github/workflows/ci.yml`, PR template, CODEOWNERS), replaced placeholder package tests with deterministic typecheck-based scripts, and standardized strict smoke evidence contract across release workflows.
+- **Files changed:** `.github/workflows/ci.yml`, `.github/pull_request_template.md`, `.github/CODEOWNERS`, `apps/admin-web/package.json`, `apps/api/package.json`, `apps/worker/package.json`, `docs/checklists/release-checklist.md`, `docs/workflows/browser-smoke.md`, `docs/workflows/local-smoke.md`, `docs/workflows/autonomous-run-log.md`.
+- **Verification run:** `pnpm --filter @kentos/admin-web test`; `pnpm --filter @kentos/api test`; `pnpm --filter @kentos/worker test`; `pnpm db:generate`; `pnpm typecheck`; `pnpm build`; `DATABASE_URL='postgresql://kentos:kentos@localhost:5432/kentos_ai?schema=public' KENTOS_API_BASE_URL='http://127.0.0.1:3110/api/v1' pnpm smoke:api`.
+- **Result:** Passed. Package-level replacement tests are deterministic and green, static verification is green, and API smoke is green after workspace-owned QA processes were recycled to release a Prisma generate lock.
+- **Next action:** Keep strict browser `passed` policy enforcement by requiring explicit citizen I/J/K and mobile L confirmations in each release cycle; otherwise force `partial` with owner/SLA.
+- **Blocker:** No code blocker. Browser strict-pass confirmation remains process-controlled by manual evidence completeness.
+
+### Release evidence snapshot template (standard)
+
+- **Branch / sync:** `<branch>`, `origin/master...master = <ahead/behind>`
+- **Static checks:** `db:generate=<status>`, `typecheck=<status>`, `build=<status>`
+- **API smoke:** `<passed|partial|blocked|not_run>` + command/result
+- **Browser smoke:** `<passed|partial|blocked|not_run>` + explicit scenario coverage and gaps
+- **Open gaps owner/SLA:** `<owner>`, `<sla>`
+- **Risk:** `<low|medium|high>` + one-line reason
+- **Rollback note:** `<if needed>`
+- **Merge decision:** `<go|hold>` + rationale
+- **Snapshot source:** `docs/checklists/release-checklist.md` / current checkpoint id
+
+### Housekeeping operating rule
+
+- Merge sonrası feature branch’leri local + remote temizlenir unless explicit keep decision.
+- Active worktree branch’leri attached session varken silinmez.
+- Local-only files (`.claude/settings.json` vb.) release commitlerinden dışlanır.
+- Her release döngüsü sonunda `git status --short` intentional-state notuyla birlikte raporlanır.

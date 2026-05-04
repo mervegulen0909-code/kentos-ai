@@ -8,7 +8,7 @@
     "dev": "tsx src/main.ts",
     "lint": "tsc -p tsconfig.json --noEmit",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "echo 'Worker tests pending'"
+    "test": "pnpm typecheck"
   },
   "dependencies": {
     "@kentos/shared": "workspace:*",

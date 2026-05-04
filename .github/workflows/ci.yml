@@ -1,0 +1,81 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [master]
+  push:
+    branches: [master]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: kentos
+          POSTGRES_PASSWORD: kentos
+          POSTGRES_DB: kentos_ai
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U kentos -d kentos_ai"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    env:
+      DATABASE_URL: postgresql://kentos:kentos@localhost:5432/kentos_ai?schema=public
+      KENTOS_API_BASE_URL: http://127.0.0.1:3110/api/v1
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Prisma generate
+        run: pnpm db:generate
+
+      - name: Database migrate
+        run: pnpm db:migrate
+
+      - name: Database seed
+        run: pnpm db:seed
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Build
+        run: pnpm build
+
+      - name: Start API for smoke
+        run: DATABASE_URL="$DATABASE_URL" PORT=3110 pnpm --filter @kentos/api dev > api.log 2>&1 &
+
+      - name: Wait for API health
+        run: |
+          for i in {1..60}; do
+            if curl -fsS http://127.0.0.1:3110/api/v1/health >/dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "API health check timed out"
+          tail -n 200 api.log || true
+          exit 1
+
+      - name: API smoke
+        run: pnpm smoke:api
