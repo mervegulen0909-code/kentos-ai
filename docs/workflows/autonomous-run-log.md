@@ -465,3 +465,12 @@
 - **Result:** PR-ready documentation closure completed. Branch `wave/tk-ai-smoke-hardening-20260504` remains `0 behind / 2 ahead` versus `origin/master`, PR #1 is open, API smoke is passed, and browser smoke remains explicitly `partially run with gaps`.
 - **Next action:** Proceed with PR review/merge decision; if strict release policy requires browser `passed`, run full manual browser scenarios before merge approval.
 - **Blocker:** No code blocker. Manual browser scenario end-to-end coverage remains the only release-signoff gap for strict `passed` policy.
+
+## 2026-05-04 — Manual smoke capture clarification checkpoint
+
+- **Action taken:** Re-ran API smoke successfully and captured operator-provided manual smoke summary for this cycle.
+- **Files changed:** `docs/checklists/release-checklist.md`, `docs/workflows/autonomous-run-log.md`.
+- **Verification run:** `DATABASE_URL='postgresql://kentos:kentos@localhost:5432/kentos_ai?schema=public' KENTOS_API_BASE_URL='http://127.0.0.1:3110/api/v1' pnpm smoke:api`.
+- **Result:** API smoke passed again. Manual browser smoke capture indicates admin flow passed, while citizen/manual TK-only details and 390px mobile checks were not explicitly confirmed by the operator in this cycle.
+- **Next action:** If strict browser `passed` sign-off is required, re-run and explicitly mark citizen + mobile manual checks; otherwise continue with documented `partially run with gaps` caveat.
+- **Blocker:** No hard blocker for PR review. Strict browser `passed` policy still needs explicit citizen/mobile manual confirmation.
