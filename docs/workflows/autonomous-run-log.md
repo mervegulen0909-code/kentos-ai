@@ -608,7 +608,16 @@ Eksik schema ile yazılan checkpoint release kanıtı sayılmaz.
 
 ### Local-only drift branch decision
 
-- `wave/api-hardening`: attempted cleanup; deletion blocked because branch is attached to worktree `C:/Users/arfgl/OneDrive/Desktop/chatbot-api-wave`.
-- `wave/qa-smoke`: attempted cleanup; deletion blocked because branch is attached to worktree `C:/Users/arfgl/OneDrive/Desktop/chatbot-qa-wave`.
-- `wave/ui-polish`: attempted cleanup; deletion blocked because branch is attached to worktree `C:/Users/arfgl/OneDrive/Desktop/chatbot-ui-wave`.
-- Rationale: branch cleanup policy is active, but attached worktree safety guard prevents deletion until those worktrees are intentionally removed/detached.
+- `wave/api-hardening`: worktree detachment completed; local branch deleted.
+- `wave/qa-smoke`: stale worktree metadata pruned from active list; local branch deleted.
+- `wave/ui-polish`: stale worktree metadata pruned from active list; local branch deleted.
+- Rationale: cleanup policy was enforced without touching active `master`; stale worktree metadata cleanup emitted Windows permission warnings but active worktree list now contains only the main repo path.
+
+## 2026-05-04 — Worktree cleanup execution checkpoint
+
+- **Action taken:** Executed approved worktree cleanup policy, safely detached `wave/*` worktrees, and deleted local `wave/*` branches after detachment.
+- **Files changed:** `docs/workflows/autonomous-run-log.md`.
+- **Verification run:** `git branch -vv`; `git worktree list`; `git worktree remove --force <path>`; `git worktree prune --verbose`; `git branch -d wave/api-hardening wave/qa-smoke wave/ui-polish`.
+- **Result:** Passed with expected platform caveat. Local branch cleanup completed and only `master` remains as active worktree in list output.
+- **Next action:** Optionally remove leftover non-registered filesystem folders (`chatbot-qa-wave`, `chatbot-ui-wave`) manually if still present on disk.
+- **Blocker:** No release blocker; only non-critical Windows permission warnings during stale `.git/worktrees/*` metadata deletion.
