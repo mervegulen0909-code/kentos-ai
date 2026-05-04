@@ -524,9 +524,9 @@
 - **Action taken:** Investigated failing first CI run, identified API smoke timeout cause, and hardened CI workflow by adding Redis service + `REDIS_URL` env for smoke conditions.
 - **Files changed:** `.github/workflows/ci.yml`.
 - **Verification run:** `gh run view 25313463623 --log-failed`; `gh run list --workflow ci.yml --limit 3`.
-- **Result:** Root cause confirmed (`UND_ERR_HEADERS_TIMEOUT` during smoke ticket workflow). Fix pushed as commit `c4dec0c`. New CI run `25314803370` started and is queued/running at this checkpoint time.
-- **Next action:** Confirm run `25314803370` completes green, then enforce branch protection with required check `CI / verify` and required PR review count `1`.
-- **Blocker:** CI green confirmation is pending completion of run `25314803370`.
+- **Result:** Root cause confirmed (`UND_ERR_HEADERS_TIMEOUT` during smoke ticket workflow). Redis + `REDIS_URL` CI fix pushed as commit `c4dec0c`; follow-up commit `4903a73` triggered run `25314830599`, and the latest two CI runs are green (`25314803370`, `25314830599`).
+- **Next action:** Enforce branch protection with required check `verify` and required PR review count `1` as soon as repository plan supports branch protection APIs/settings.
+- **Blocker:** GitHub branch protection API returns `403` (`Upgrade to GitHub Pro or make this repository public to enable this feature`), so technical enforcement cannot be applied from this repo plan despite green CI.
 
 ### Branch protection baseline (to apply when CI is green)
 
