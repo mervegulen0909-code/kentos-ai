@@ -97,14 +97,14 @@ Run this scope when queue processors, notification delivery guardrails, or worke
 
 Do not push unless the user explicitly asks for it. The default team policy is milestone-end push, not push-after-each-merge.
 
-- [ ] It is acceptable for local `master` to be ahead of `origin/master` while a milestone is still in progress.
-- [ ] Record merge order and verification locally, then wait for the milestone-end push decision.
+- [x] It is acceptable for local `master` to be ahead of `origin/master` while a milestone is still in progress. Latest local evidence: temporary ahead state was used only during PR preparation and was closed after PR merge/pullback to sync.
+- [x] Record merge order and verification locally, then wait for the milestone-end push decision. Latest local evidence: verification and release notes are recorded in `docs/workflows/autonomous-run-log.md`, and PR #1 merge order is documented.
 
 ### Milestone push final gate
 
 Before the milestone push decision:
 
-- [x] Record `git rev-list --left-right --count origin/master...master` output for the final `master` ahead count. Latest local evidence: `0 0` on 2026-05-04.
+- [x] Record `git rev-list --left-right --count origin/master...master` output for the final `master` ahead count. Latest local evidence: `0 0` on 2026-05-04 after PR #1 merge sync.
 - [x] Confirm `pnpm typecheck` passed on final `master`. Latest local evidence: passed on 2026-05-04.
 - [x] Confirm `pnpm build` passed on final `master`. Latest local evidence: passed on 2026-05-04.
 - [x] Record API smoke as passed, or record a precise blocked reason such as `Docker daemon unavailable`. Latest local evidence: passed on 2026-05-04 with `DATABASE_URL='postgresql://kentos:kentos@localhost:5432/kentos_ai?schema=public' KENTOS_API_BASE_URL='http://127.0.0.1:3110/api/v1' pnpm smoke:api`.

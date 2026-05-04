@@ -474,3 +474,38 @@
 - **Result:** API smoke passed again. Manual browser smoke capture indicates admin flow passed, while citizen/manual TK-only details and 390px mobile checks were not explicitly confirmed by the operator in this cycle.
 - **Next action:** If strict browser `passed` sign-off is required, re-run and explicitly mark citizen + mobile manual checks; otherwise continue with documented `partially run with gaps` caveat.
 - **Blocker:** No hard blocker for PR review. Strict browser `passed` policy still needs explicit citizen/mobile manual confirmation.
+
+## 2026-05-04 — Post-merge stabilization and next-wave planning checkpoint
+
+- **Action taken:** Completed post-merge stabilization on `master`, re-ran full workspace static verification, re-ran API smoke, captured current release-signoff status, and formalized next-wave risk-reduction plan with owner/SLA.
+- **Files changed:** `docs/checklists/release-checklist.md`, `docs/workflows/autonomous-run-log.md`.
+- **Verification run:** `git branch --show-current`; `git rev-list --left-right --count origin/master...master`; `pnpm typecheck`; `pnpm build`; `DATABASE_URL='postgresql://kentos:kentos@localhost:5432/kentos_ai?schema=public' KENTOS_API_BASE_URL='http://127.0.0.1:3110/api/v1' pnpm smoke:api`.
+- **Result:** Passed. `master` is synced with `origin/master` (`0 0`), typecheck/build are green, and API smoke is green. Browser sign-off remains `partially run with gaps` because explicit citizen + 390px manual confirmations are still pending.
+- **Next action:** Execute Week-1 strict smoke closure wave and record explicit citizen/mobile confirmations.
+- **Blocker:** No code blocker; only strict browser `passed` policy gap remains.
+
+### Week-1 execution plan (owner/SLA/risk)
+
+- **Task 1 — Strict browser smoke closure (citizen + mobile explicit confirmation)**
+  - Owner: `1 — Ana Kontrol`
+  - SLA: 2026-05-06
+  - Done criteria: `docs/workflows/browser-smoke.md` scenarios I/J/K/L explicitly marked as passed/failed with notes; release checklist browser status updated accordingly.
+  - Risk reduction: **High** (reduces release acceptance ambiguity and regression escape risk).
+
+- **Task 2 — Playwright-lite smoke skeleton proposal (no heavy download without explicit approval)**
+  - Owner: `1 — Ana Kontrol`
+  - SLA: 2026-05-08
+  - Done criteria: minimal proposal/checklist for automating login/report/track happy path with clear prerequisites and blockers documented.
+  - Risk reduction: **Medium** (reduces repeated manual effort and operator variance).
+
+- **Task 3 — Release evidence standardization pass**
+  - Owner: `1 — Ana Kontrol`
+  - SLA: 2026-05-09
+  - Done criteria: checklist + run-log evidence phrasing standardized so pass/partial/blocked states are one-look readable.
+  - Risk reduction: **Medium** (reduces miscommunication and audit friction).
+
+- **Task 4 — Local workspace hygiene guardrail**
+  - Owner: `1 — Ana Kontrol`
+  - SLA: 2026-05-09
+  - Done criteria: `.claude/settings.json` stays explicitly local-only and excluded from release diffs/commits.
+  - Risk reduction: **Low** (reduces accidental noise commits).
