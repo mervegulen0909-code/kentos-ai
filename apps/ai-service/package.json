@@ -8,7 +8,7 @@
     "dev": "tsx src/main.ts",
     "lint": "tsc -p tsconfig.json --noEmit",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "echo 'AI service tests pending'"
+    "test": "tsx src/main.test.ts"
   },
   "dependencies": {
     "@kentos/shared": "workspace:*"

@@ -1,0 +1,143 @@
+import { publicTicketAiIntakeRequestSchema, publicTicketAiIntakeResultSchema } from './schemas.js';
+import type { PublicTicketAiIntakeRequest, PublicTicketAiIntakeResult } from './types.js';
+
+function buildValidRequest(): PublicTicketAiIntakeRequest {
+  return {
+    tenantContext: {
+      tenantId: 'tenant-1',
+      tenantSlug: 'kadikoy',
+      departments: [
+        { id: 'dep-1', code: 'FEN', name: 'Fen Isleri' },
+        { id: 'dep-2', code: 'ZABITA', name: 'Zabita' },
+      ],
+      categories: [
+        { id: 'cat-1', code: 'YOL', name: 'Yol Bakim', departmentId: 'dep-1' },
+        { id: 'cat-2', code: 'TEMIZLIK', name: 'Temizlik', departmentId: 'dep-2' },
+      ],
+    },
+    message: {
+      text: 'Moda Caddesi uzerinde cokme var, donus icin 5551234567 numarasindan ulasabilirsiniz.',
+      channel: 'CITIZEN_WEB',
+      receivedAt: '2026-05-03T12:00:00.000Z',
+      citizenContact: {
+        phone: '+905551234567',
+        email: 'vatandas@example.org',
+        displayName: 'Ayse Yilmaz',
+      },
+    },
+  };
+}
+
+function buildValidResult(): PublicTicketAiIntakeResult {
+  return {
+    provider: 'stub',
+    model: 'deterministic-fallback',
+    promptVersion: 'intake-classifier.v1',
+    requestedAt: '2026-05-03T12:00:00.000Z',
+    completedAt: '2026-05-03T12:00:01.000Z',
+    classification: {
+      language: 'tr',
+      intent: 'new_ticket',
+      title: 'Yolda cokme bildirimi',
+      description: 'Moda Caddesi uzerinde cokme var.',
+      requestType: 'complaint',
+      categoryCode: 'YOL',
+      departmentCode: 'FEN',
+      priority: 'HIGH',
+      urgencyReason: 'Yaya guvenligi riski olusturuyor.',
+      addressText: 'Moda Caddesi',
+      neighborhoodName: 'Caferaga',
+      location: {
+        latitude: 40.9871,
+        longitude: 29.0277,
+        accuracyMeters: 15,
+      },
+      citizenContact: {
+        phone: '+905551234567',
+        email: 'vatandas@example.org',
+        displayName: 'Ayse Yilmaz',
+      },
+      missingFields: [],
+      followUpQuestion: null,
+      statusTicketNo: null,
+      safetyFlags: ['none'],
+      confidence: 0.92,
+      reasoningSummary: 'Metin yol bozulmasi ve lokasyon bilgisi iceriyor.',
+    },
+  };
+}
+
+function assert(condition: unknown, message: string): asserts condition {
+  if (!condition) throw new Error(message);
+}
+
+function testValidRequestSchema() {
+  const parsed = publicTicketAiIntakeRequestSchema.safeParse(buildValidRequest());
+  assert(parsed.success, 'valid intake request should parse');
+  assert(parsed.data.message.citizenContact?.email === 'vatandas@example.org', 'email should survive parsing');
+}
+
+function testRejectInvalidRequestEmail() {
+  const invalid = buildValidRequest();
+  invalid.message.citizenContact = {
+    ...invalid.message.citizenContact,
+    email: 'not-an-email',
+  };
+
+  const parsed = publicTicketAiIntakeRequestSchema.safeParse(invalid);
+  assert(!parsed.success, 'invalid email should fail request parsing');
+}
+
+function testValidResultSchema() {
+  const parsed = publicTicketAiIntakeResultSchema.safeParse(buildValidResult());
+  assert(parsed.success, 'valid intake result should parse');
+  assert(parsed.data.classification.confidence === 0.92, 'confidence should survive parsing');
+}
+
+function testRejectInvalidMissingField() {
+  const invalid = buildValidResult() as PublicTicketAiIntakeResult & {
+    classification: Omit<PublicTicketAiIntakeResult['classification'], 'missingFields'> & { missingFields: string[] };
+  };
+  invalid.classification = {
+    ...invalid.classification,
+    missingFields: ['unsupported_field'],
+  } as typeof invalid.classification;
+
+  const parsed = publicTicketAiIntakeResultSchema.safeParse(invalid);
+  assert(!parsed.success, 'unsupported missing field should fail result parsing');
+}
+
+function testRejectInvalidConfidence() {
+  const invalid = buildValidResult();
+  invalid.classification = {
+    ...invalid.classification,
+    confidence: 1.4,
+  };
+
+  const parsed = publicTicketAiIntakeResultSchema.safeParse(invalid);
+  assert(!parsed.success, 'confidence above 1 should fail result parsing');
+}
+
+function testRejectLegacyStatusTicketNo() {
+  const valid = buildValidResult();
+  const invalid = {
+    ...valid,
+    classification: {
+      ...valid.classification,
+      intent: 'status_query',
+      statusTicketNo: 'KNT-2026-000001',
+    },
+  };
+
+  const parsed = publicTicketAiIntakeResultSchema.safeParse(invalid);
+  assert(!parsed.success, 'legacy internal ticket numbers should fail AI result parsing');
+}
+
+testValidRequestSchema();
+testRejectInvalidRequestEmail();
+testValidResultSchema();
+testRejectInvalidMissingField();
+testRejectInvalidConfidence();
+testRejectLegacyStatusTicketNo();
+
+console.log('shared intake schema tests passed');

@@ -1,5 +1,5 @@
 import { adminApi } from '../../lib/api';
-import { getSessionToken } from '../../lib/session';
+import { resolveAdminAccessToken } from '../../lib/session';
 
 const fallbackRows: Array<{
   id: string;
@@ -29,7 +29,7 @@ const slaCopy: Record<string, string> = {
 };
 
 export default async function TicketsPage() {
-  const token = await getSessionToken();
+  const token = await resolveAdminAccessToken();
   let dataUnavailable = false;
   const rows = token
     ? await adminApi.tickets(token).catch(() => {

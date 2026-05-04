@@ -1,5 +1,5 @@
 import { adminApi } from '../lib/api';
-import { canManageSettings, canViewAnalytics, getAdminSession } from '../lib/session';
+import { canManageSettings, canViewAnalytics, getAdminSession, resolveAdminAccessToken } from '../lib/session';
 
 const fallbackOverview = { totalOpen: 0, slaBreached: 0, resolvedToday: 0 };
 const fallbackTickets: Array<{
@@ -30,20 +30,22 @@ const slaCopy: Record<string, string> = {
 
 export default async function AdminHome() {
   const session = await getAdminSession();
+  const hasSession = Boolean(session);
   const role = session?.user.role ?? null;
   const analyticsVisible = canViewAnalytics(role);
-  const settingsVisible = Boolean(session?.token) && canManageSettings(role);
+  const token = hasSession ? await resolveAdminAccessToken() : null;
+  const settingsVisible = hasSession && canManageSettings(role);
   let dataUnavailable = false;
 
-  const [overview, tickets] = session?.token
+  const [overview, tickets] = token
     ? await Promise.all([
         analyticsVisible
-          ? adminApi.overview(session.token).catch(() => {
+          ? adminApi.overview(token).catch(() => {
               dataUnavailable = true;
               return fallbackOverview;
             })
           : Promise.resolve(fallbackOverview),
-        adminApi.tickets(session.token).catch(() => {
+        adminApi.tickets(token).catch(() => {
           dataUnavailable = true;
           return fallbackTickets;
         }),
@@ -70,13 +72,13 @@ export default async function AdminHome() {
         <h2 style={{ fontSize: 'clamp(2.8rem, 8vw, 7rem)', lineHeight: 0.9, letterSpacing: '-.06em', maxWidth: 900 }}>
           Yetkili ekiplerin talep yuku, SLA alarmi ve RBAC kapsami tek ekranda.
         </h2>
-        {!session ? (
+        {!hasSession ? (
           <div className="notice muted" role="note">
             <strong>Canli dashboard icin oturum gerekli.</strong>
             <p>Env token fallback kaldirildi. Bu ekran artik yalnizca session cookie ile gelen yetkili akisla calisiyor.</p>
           </div>
         ) : null}
-        {session && !analyticsVisible ? (
+        {hasSession && !analyticsVisible ? (
           <div className="notice muted" role="note">
             <strong>Bu rolde analytics ozeti kapali.</strong>
             <p>Dashboard kuyruk gorunumu acik kalir; rapor kartlari yalnizca yonetici rollerine sunulur.</p>

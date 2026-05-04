@@ -1,5 +1,5 @@
 import { adminApi } from '../../lib/api';
-import { canManageSettings, canViewAnalytics, getAdminSession } from '../../lib/session';
+import { canManageSettings, canViewAnalytics, getAdminSession, resolveAdminAccessToken } from '../../lib/session';
 
 const fallbackOverview = {
   totalOpen: 0,
@@ -7,14 +7,16 @@ const fallbackOverview = {
   resolvedToday: 0,
   slaBreached: 0,
   slaDueSoon: 0,
+  byStatus: [] as Array<{ status: string; count: number }>,
 };
 
 export default async function ReportsPage() {
   const session = await getAdminSession();
-  const token = session?.token ?? null;
+  const hasSession = Boolean(session);
+  const token = hasSession ? await resolveAdminAccessToken() : null;
   const role = session?.user.role ?? null;
   const analyticsVisible = canViewAnalytics(role);
-  const settingsVisible = Boolean(token) && canManageSettings(role);
+  const settingsVisible = hasSession && canManageSettings(role);
   let dataUnavailable = false;
 
   const overview = token && analyticsVisible
@@ -25,6 +27,9 @@ export default async function ReportsPage() {
     : fallbackOverview;
 
   const noOperationalData = !overview.totalOpen && !overview.openedToday && !overview.resolvedToday && !overview.slaBreached && !overview.slaDueSoon;
+  const statusRows = overview.byStatus
+    .slice()
+    .sort((left, right) => right.count - left.count);
 
   return (
     <main className="shell">
@@ -42,13 +47,13 @@ export default async function ReportsPage() {
       <section className="main">
         <p className="badge">Operasyon raporlari - SLA ve cozum gorunumu</p>
         <h1>Gunluk belediye operasyon raporu</h1>
-        {!token ? (
+        {!hasSession ? (
           <div className="notice muted" role="note">
             <strong>Canli rapor icin oturum gerekli.</strong>
             <p>Yetkili kullanici girisi yapilana kadar ham API hatasi veya ic veri gosterilmez.</p>
           </div>
         ) : null}
-        {token && !analyticsVisible ? (
+        {hasSession && !analyticsVisible ? (
           <div className="notice muted" role="note">
             <strong>Bu rolde raporlar kapali.</strong>
             <p>Analytics endpointleri yalnizca yonetici rollerine acik. Ticket kuyrugu ve detay ekranlari kullanilabilir kalir.</p>
@@ -83,6 +88,24 @@ export default async function ReportsPage() {
                 <p className="kpi" style={{ color: overview.slaBreached ? 'var(--danger)' : 'var(--accent)' }}>{overview.slaBreached}</p>
                 <p style={{ color: 'var(--muted)' }}>Suresi asilmis ve yonetici takibi isteyen kayitlar.</p>
               </article>
+            </section>
+            <section className="card" style={{ marginTop: 18 }}>
+              <h2>Durum dagilimi</h2>
+              {statusRows.length ? (
+                <div className="responsive-list">
+                  {statusRows.map((row) => (
+                    <div className="queue-row" key={row.status}>
+                      <strong>{row.status}</strong>
+                      <span>{row.count} kayit</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="empty-state">
+                  <strong>Durum dagilimi hazir degil.</strong>
+                  <p>Canli ticket verisi olustukca hangi asamada ne kadar kayit oldugu burada gorulecek.</p>
+                </div>
+              )}
             </section>
             <section className="card" style={{ marginTop: 18 }}>
               <h2>Operasyon yorumu</h2>

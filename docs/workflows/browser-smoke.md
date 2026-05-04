@@ -127,7 +127,7 @@ Admin expected markers:
 
 1. Open `http://127.0.0.1:3112/demo-belediye/report`.
 2. Submit a report with realistic Turkish description, address, and phone.
-3. Confirm redirect to `/demo-belediye/ticket/<trackingToken>` where the token matches `TK-[A-F0-9]{16}`.
+3. Confirm redirect to `/demo-belediye/ticket/<trackingToken>` where the route segment is backed by `app/[tenantSlug]/ticket/[trackingToken]` and the token matches `TK-[A-F0-9]{16}`.
 4. Record the generated TK tracking code for the QA report.
 5. Confirm the report flow works without staff authentication.
 6. Confirm required-field validation copy is Turkish-first and does not expose backend internals.
@@ -135,7 +135,7 @@ Admin expected markers:
 ### Scenario J — Citizen track
 
 1. Open `http://127.0.0.1:3112/demo-belediye/track`.
-2. Enter the same TK tracking code and confirm navigation to the same public ticket page.
+2. Enter the same TK tracking code and confirm navigation to the same public ticket page under the `ticket/[trackingToken]` route.
 3. Submit the tracking form with a missing tracking code and confirm inline copy explains what is required.
 4. Submit a malformed tracking code and confirm the format error is calm, Turkish-first, and does not leak lookup internals.
 5. Try an obviously invalid but well-formed TK tracking code and confirm the not-found state is citizen-safe and helpful.
@@ -178,4 +178,5 @@ During the smoke, also watch for:
 
 - Auth/session is local MVP, not production SSO.
 - File upload, map picker, WhatsApp send, and external notification delivery are not part of this browser smoke.
+- Worker evidence for notifications/SLA/reports is tracked separately through local typecheck and runbook evidence; browser smoke does not validate queue execution directly.
 - The browser flow is manual until a later automated Playwright/Cypress wave.

@@ -1,4 +1,4 @@
-import { adminApi } from '../../../lib/api';
+import { adminApi, formatMissingFieldLabel } from '../../../lib/api';
 import { canAssignTickets, canMutateTickets, getAdminSession, isReadOnlyRole } from '../../../lib/session';
 import { PendingFieldset, PendingSubmitButton } from '../../components/form-controls';
 import { addInternalNoteAction, addPublicMessageAction, assignTicketAction, updateStatusAction } from '../actions';
@@ -45,7 +45,18 @@ const dateFormatter = new Intl.DateTimeFormat('tr-TR', {
   timeStyle: 'short',
 });
 
+const confidenceFormatter = new Intl.NumberFormat('tr-TR', {
+  style: 'percent',
+  maximumFractionDigits: 0,
+});
+
 type FeedbackCopy = { title: string; detail: string };
+
+const quickStatusActions = [
+  { action: updateStatusAction, intent: 'status', status: 'WAITING_INFO', label: 'Bilgi iste', pendingLabel: 'Isteniyor...', placeholder: 'Vatandastan istenen bilgiyi kisaca yazin' },
+  { action: updateStatusAction, intent: 'status', status: 'RESOLVED', label: 'Cozum bildir', pendingLabel: 'Bildiriliyor...', placeholder: 'Vatandasa gidecek cozum mesajini yazin' },
+  { action: updateStatusAction, intent: 'status', status: 'REJECTED', label: 'Reddet', pendingLabel: 'Reddediliyor...', placeholder: 'Reddetme gerekcesini vatandas dilinde yazin' },
+];
 
 const successCopy: Record<string, FeedbackCopy> = {
   'status-updated': {
@@ -107,7 +118,8 @@ export default async function TicketDetailPage({
   const { id } = await params;
   const { success, error } = await searchParams;
   const session = await getAdminSession();
-  const token = session?.token ?? null;
+  const hasSession = Boolean(session);
+  const token = session?.accessToken ?? null;
   const role = session?.user.role ?? null;
   const ticket = token ? await adminApi.ticket(token, id).catch(() => null) : null;
   const auditLog = token ? await adminApi.auditLog(token, id).catch(() => []) : [];
@@ -117,6 +129,8 @@ export default async function TicketDetailPage({
   const canUpdateTicket = Boolean(ticket && !isTerminal && canMutateTickets(role));
   const canAssignTicket = Boolean(ticket && !isTerminal && canAssignTickets(role));
   const readOnlyRole = isReadOnlyRole(role);
+  const aiSummary = ticket?.aiSummary ?? null;
+  const aiClassification = aiSummary?.classification ?? null;
 
   return (
     <main className="main">
@@ -180,13 +194,51 @@ export default async function TicketDetailPage({
                 <PendingSubmitButton type="submit" disabled={!canAssignTicket || !departments.length} idleLabel="Birime ata" pendingLabel="Ataniyor..." />
               </PendingFieldset>
             </form>
-          ) : <p style={{ color: 'var(--muted)' }}>Atama icin oturum gerekli.</p>}
+          ) : <p style={{ color: 'var(--muted)' }}>{hasSession ? 'Talep verisi alinamadi; erisim veya API durumu kontrol edilmeli.' : 'Atama icin oturum gerekli.'}</p>}
+        </section>
+        <section className="card">
+          <h2>AI intake ozeti</h2>
+          {aiClassification ? (
+            <div style={{ display: 'grid', gap: 10 }}>
+              <p><strong>Niyet:</strong> {aiClassification.intent}</p>
+              <p><strong>Oncelik:</strong> {aiClassification.priority}</p>
+              <p><strong>Guven:</strong> {aiSummary?.confidence != null ? confidenceFormatter.format(aiSummary.confidence) : 'Bilinmiyor'}</p>
+              <p><strong>Onerilen kategori:</strong> {aiClassification.categoryCode ?? 'Yok'}</p>
+              <p><strong>Onerilen birim:</strong> {aiClassification.departmentCode ?? 'Yok'}</p>
+              <p><strong>Adres/cozumleme:</strong> {aiClassification.addressText ?? 'Yok'}</p>
+              <p><strong>Takip no sorgusu:</strong> {aiClassification.statusTicketNo ?? 'Yok'}</p>
+              <p><strong>Iletisim sinyali:</strong> {aiSummary?.contactSignals ? `${aiSummary.contactSignals.hasPhone ? 'Telefon var' : 'Telefon yok'} - ${aiSummary.contactSignals.hasEmail ? 'E-posta var' : 'E-posta yok'}${aiSummary.contactSignals.displayName ? ` - ${aiSummary.contactSignals.displayName}` : ''}` : 'Audit sinyali yok'}</p>
+              <p><strong>Eksik alanlar:</strong> {aiClassification.missingFields.length ? aiClassification.missingFields.map((field) => formatMissingFieldLabel(field)).join(', ') : 'Yok'}</p>
+              <p><strong>Takip sorusu:</strong> {aiClassification.followUpQuestion ?? 'Gerekmedi'}</p>
+              <p><strong>Ozet:</strong> {aiClassification.reasoningSummary}</p>
+            </div>
+          ) : (
+            <p style={{ color: 'var(--muted)' }}>Bu talep icin AI intake ozeti bulunmuyor.</p>
+          )}
         </section>
         <section className="card">
           <h2>Mesajlar</h2>
           {ticket?.messages?.length ? ticket.messages.map((message) => (
             <p key={message.id}><strong>{message.visibility === 'INTERNAL' ? 'Ic not' : 'Vatandas mesaji'}</strong> - {message.body}</p>
           )) : <p style={{ color: 'var(--muted)' }}>Mesaj yok.</p>}
+        </section>
+        <section className="card">
+          <h2>Hizli aksiyonlar</h2>
+          {ticket ? (
+            <div style={{ display: 'grid', gap: 12 }}>
+              {quickStatusActions.map((quickAction) => (
+                <form key={quickAction.status} action={quickAction.action} style={{ display: 'grid', gap: 10 }}>
+                  <PendingFieldset style={{ display: 'grid', gap: 10 }}>
+                    <input type="hidden" name="intent" value={quickAction.intent} />
+                    <input type="hidden" name="ticketId" value={ticket.id} />
+                    <input type="hidden" name="status" value={quickAction.status} />
+                    <textarea name="publicMessage" rows={3} placeholder={quickAction.placeholder} disabled={!canUpdateTicket} />
+                    <PendingSubmitButton type="submit" disabled={!canUpdateTicket || !statusOptions.includes(quickAction.status)} idleLabel={quickAction.label} pendingLabel={quickAction.pendingLabel} />
+                  </PendingFieldset>
+                </form>
+              ))}
+            </div>
+          ) : <p style={{ color: 'var(--muted)' }}>{hasSession ? 'Hizli aksiyonlar icin talep detayi yuklenemedi.' : 'Hizli aksiyonlar icin oturum gerekli.'}</p>}
         </section>
         <section className="card">
           <h2>Ic not ekle</h2>

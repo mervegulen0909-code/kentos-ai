@@ -28,7 +28,8 @@ export async function loginAction(formData: FormData) {
     });
 
     await setAdminSession({
-      token: result.accessToken,
+      accessToken: result.accessToken,
+      refreshToken: result.refreshToken,
       user: {
         fullName: result.user.fullName,
         email: result.user.email,

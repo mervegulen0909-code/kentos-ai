@@ -53,8 +53,8 @@ async function getTicketState(tenantSlug: string, trackingToken: string): Promis
   }
 }
 
-export default async function PublicTicketPage({ params }: { params: Promise<{ tenantSlug: string; ticketNo: string }> }) {
-  const { tenantSlug, ticketNo: trackingToken } = await params;
+export default async function PublicTicketPage({ params }: { params: Promise<{ tenantSlug: string; trackingToken: string }> }) {
+  const { tenantSlug, trackingToken } = await params;
   const ticketState = await getTicketState(tenantSlug, trackingToken);
   const ticket = ticketState.kind === 'success' ? ticketState.ticket : null;
   const statusMessage = ticket ? (citizenStatusCopy[ticket.status] ?? citizenStatusCopy.NEW) : null;
