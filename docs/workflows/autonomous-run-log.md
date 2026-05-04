@@ -456,3 +456,12 @@
 - **Result:** Passed for runtime readiness (`200/200/200`). Browser smoke status remains `partially run with gaps` until manual scenario coverage is fully re-run.
 - **Next action:** Run end-to-end manual browser scenarios if strict release sign-off requires `passed` instead of `partial`.
 - **Blocker:** Manual browser scenario coverage is still pending for this cycle.
+
+## 2026-05-04 — PR-ready release gate closure checkpoint
+
+- **Action taken:** Confirmed PR #1 branch/base alignment, closed remaining release checklist push/final-note items with explicit evidence, and prepared the branch for merge review with browser-smoke caveat preserved.
+- **Files changed:** `docs/checklists/release-checklist.md`, `docs/workflows/autonomous-run-log.md`.
+- **Verification run:** `git branch --show-current`; `gh pr view 1 --json headRefName,baseRefName,state,url`; `git status --short`; `git rev-list --left-right --count origin/master...HEAD`.
+- **Result:** PR-ready documentation closure completed. Branch `wave/tk-ai-smoke-hardening-20260504` remains `0 behind / 2 ahead` versus `origin/master`, PR #1 is open, API smoke is passed, and browser smoke remains explicitly `partially run with gaps`.
+- **Next action:** Proceed with PR review/merge decision; if strict release policy requires browser `passed`, run full manual browser scenarios before merge approval.
+- **Blocker:** No code blocker. Manual browser scenario end-to-end coverage remains the only release-signoff gap for strict `passed` policy.
