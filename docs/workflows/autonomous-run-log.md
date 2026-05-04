@@ -519,6 +519,29 @@
 - **Next action:** Keep strict browser `passed` policy enforcement by requiring explicit citizen I/J/K and mobile L confirmations in each release cycle; otherwise force `partial` with owner/SLA.
 - **Blocker:** No code blocker. Browser strict-pass confirmation remains process-controlled by manual evidence completeness.
 
+## 2026-05-04 — CI stabilization follow-up checkpoint
+
+- **Action taken:** Investigated failing first CI run, identified API smoke timeout cause, and hardened CI workflow by adding Redis service + `REDIS_URL` env for smoke conditions.
+- **Files changed:** `.github/workflows/ci.yml`.
+- **Verification run:** `gh run view 25313463623 --log-failed`; `gh run list --workflow ci.yml --limit 3`.
+- **Result:** Root cause confirmed (`UND_ERR_HEADERS_TIMEOUT` during smoke ticket workflow). Fix pushed as commit `c4dec0c`. New CI run `25314803370` started and is queued/running at this checkpoint time.
+- **Next action:** Confirm run `25314803370` completes green, then enforce branch protection with required check `CI / verify` and required PR review count `1`.
+- **Blocker:** CI green confirmation is pending completion of run `25314803370`.
+
+### Branch protection baseline (to apply when CI is green)
+
+- Base branch: `master`
+- Require pull request before merge: `enabled`
+- Required approving reviews: `1`
+- Dismiss stale approvals on new commits: `enabled`
+- Require status checks before merge: `enabled`
+- Required checks: `CI / verify`
+- Restrict direct pushes to `master`: `enabled`
+- Allow force pushes: `disabled`
+- Allow branch deletion: `disabled` for `master`
+- Require linear history: optional (team preference)
+- Require conversation resolution before merge: `enabled` (recommended)
+
 ### Release evidence snapshot template (standard)
 
 - **Branch / sync:** `<branch>`, `origin/master...master = <ahead/behind>`
