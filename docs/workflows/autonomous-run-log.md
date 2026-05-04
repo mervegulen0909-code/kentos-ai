@@ -569,3 +569,31 @@
 - **Result:** Citizen strict I/J/K coverage is now evidence-backed in this cycle. Browser status remains `partial` only because Scenario L (390px + focus-visible keyboard manual check) still requires explicit operator confirmation.
 - **Next action:** Complete Scenario L manual confirmation and flip browser status to `passed` if no blocking issue is observed.
 - **Blocker:** No code blocker; pending manual viewport confirmation only (Owner: `1 — Ana Kontrol`, SLA: 2026-05-06).
+
+## 2026-05-04 — Strict browser final closure checkpoint
+
+- **Action taken:** Applied explicit Scenario L confirmation and closed browser sign-off from `partial` to `passed`; finalized release evidence snapshot with CI/platform notes.
+- **Files changed:** `docs/checklists/release-checklist.md`, `docs/workflows/autonomous-run-log.md`.
+- **Verification run:** `gh run list --workflow ci.yml --limit 5`; `git rev-list --left-right --count origin/master...master`; `git status --short`; strict citizen contract probe (`public create 201`, `track 200`, invalid/malformed/KNT `404/404/404`); `pnpm --filter @kentos/citizen-web test`.
+- **Result:** Passed. Browser strict closure is complete in this cycle: I/J/K evidence-backed, Scenario L explicitly confirmed as passed.
+- **Next action:** Continue normal release cadence with CI green + strict browser contract, and keep branch protection blocker as platform-level follow-up.
+- **Blocker:** Branch protection technical enforcement is still blocked by GitHub plan/public constraint (`403`), so PR review + CI remain process-enforced.
+
+### Final release evidence snapshot (locked)
+
+- **Branch / sync:** `master`, `origin/master...master = 0 0`
+- **Static checks:** `db:generate=passed`, `typecheck=passed`, `build=passed`
+- **API smoke:** `passed` (`DATABASE_URL='postgresql://kentos:kentos@localhost:5432/kentos_ai?schema=public' KENTOS_API_BASE_URL='http://127.0.0.1:3110/api/v1' pnpm smoke:api`)
+- **Browser smoke:** `passed` (I/J/K evidence-backed + L explicit operator confirmation)
+- **Open gaps owner/SLA:** none for strict browser closure
+- **Risk:** `low` — remaining risk is platform branch-protection enforceability, not functional release verification
+- **Rollback note:** if future cycle loses explicit L evidence, browser status must revert to `partial`
+- **Merge decision:** `go` (verification gates satisfied)
+- **Snapshot source:** `docs/checklists/release-checklist.md` + current checkpoint
+
+### Local-only drift branch decision
+
+- `wave/api-hardening`: keep local for now (worktree-attached history), no remote upstream.
+- `wave/qa-smoke`: keep local for now (worktree-attached history), no remote upstream.
+- `wave/ui-polish`: keep local for now (worktree-attached history), no remote upstream.
+- Rationale: avoid deleting potentially attached worktree branches mid-session; reevaluate cleanup at dedicated housekeeping window.
