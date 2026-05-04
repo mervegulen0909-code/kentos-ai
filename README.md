@@ -76,6 +76,18 @@ See [docs/workflows/local-smoke.md](docs/workflows/local-smoke.md) for local API
 
 For multi-surface work with orchestrated parallel execution, see [docs/workflows/parallel-agent-mode.md](docs/workflows/parallel-agent-mode.md).
 
+## Operational governance cadence
+
+- Weekly `stability hour`: smoke kırıkları, CI güvenilirliği, release evidence kalitesi ve açık owner/SLA maddeleri gözden geçirilir.
+- Her release döngüsünde evidence snapshot zorunludur: branch sync, static checks, API smoke, browser status, risk, rollback, merge kararı.
+- Strict browser `passed` yalnız citizen I/J/K + mobile L explicit kanıtıyla verilir; eksik kanıtta durum `partial` kalır.
+- Branch protection teknik enforce mümkün değilse (platform/plan kısıtı), PR review + CI doğrulaması süreçsel olarak zorunlu uygulanır.
+
+Referanslar:
+- [docs/checklists/release-checklist.md](docs/checklists/release-checklist.md)
+- [docs/workflows/autonomous-run-log.md](docs/workflows/autonomous-run-log.md)
+- [docs/releases/RELEASE_NOTES.md](docs/releases/RELEASE_NOTES.md)
+
 ## Claude Code Agent OS
 
 This project includes a local Claude Code operating system for autonomous waves, agent roles, workflow commands, hooks policy, MCP policy, parallel-session rules, and other-project installation guidance.

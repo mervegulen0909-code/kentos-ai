@@ -145,7 +145,7 @@ Before the milestone push decision:
 Before push:
 
 - [x] Confirm branch name and target remote. Latest local evidence: current branch is `wave/tk-ai-smoke-hardening-20260504`, target remote is `origin`, and PR base/head is `master <- wave/tk-ai-smoke-hardening-20260504` (`gh pr view 1 --json headRefName,baseRefName,state,url`, 2026-05-04).
-- [x] Confirm final verification results. Latest local evidence: final static verification remained passed (`pnpm typecheck`, `pnpm build` on 2026-05-04), API smoke passed on 2026-05-04, and browser status remains explicitly `partially run with gaps` with runtime readiness reconfirmed (`200/200/200`).
+- [x] Confirm final verification results. Latest local evidence: final static verification remained passed (`pnpm typecheck`, `pnpm build` on 2026-05-04), API smoke passed on 2026-05-04, and browser status is `passed` with strict citizen I/J/K + Scenario L confirmation recorded.
 - [x] Confirm `git status --short` contains only intentional changes. Latest local evidence: only local `.claude/settings.json` remains unstaged and intentionally excluded from release/docs commits; branch content for PR is intentional.
 - [x] Confirm no secrets or production env files are staged. Latest local evidence: no `.env*`, credentials, or production secret files are staged; policy remains `.env*` ignored.
 - [x] Confirm whether the action is branch push only or PR creation/update. Latest local evidence: branch push and PR update were performed for PR #1 (`https://github.com/filizgulen1966-tech/kentos-ai/pull/1`).
@@ -156,7 +156,7 @@ Record the final note with:
 
 - [x] Branches merged and order. Latest local evidence: this release candidate is prepared on `wave/tk-ai-smoke-hardening-20260504` and opened as PR #1 into `master`; no additional branch merge chain is required before PR review/merge.
 - [x] Conflicts and how they were resolved. Latest local evidence: no unresolved merge conflicts remain in the current PR branch.
-- [x] Verification commands and pass/fail results. Latest local evidence: `pnpm db:generate` passed, `pnpm typecheck` passed, `pnpm build` passed, API health/runtime probes passed, and docs record browser status as partial with explicit gaps.
+- [x] Verification commands and pass/fail results. Latest local evidence: `pnpm db:generate` passed, `pnpm typecheck` passed, `pnpm build` passed, API health/runtime probes passed, strict citizen contract checks passed, and Scenario L explicit confirmation moved browser status to `passed`.
 - [x] API smoke result or reason it was not run. Latest local evidence: API smoke passed on 2026-05-04 (`DATABASE_URL='postgresql://kentos:kentos@localhost:5432/kentos_ai?schema=public' KENTOS_API_BASE_URL='http://127.0.0.1:3110/api/v1' pnpm smoke:api`).
-- [x] Browser smoke result or reason it was not run. Latest local evidence: `partially run with gaps`; runtime readiness reconfirmed (`3110/3111/3112 -> 200/200/200`), full manual scenario set not yet fully re-run in this cycle.
-- [x] Remaining blockers and owner. Latest local evidence: only blocker is full manual browser scenario coverage for strict `passed` sign-off; owner is `1 — Ana Kontrol` / release control window.
+- [x] Browser smoke result or reason it was not run. Latest local evidence: `passed` with citizen I/J/K evidence and explicit Scenario L (390px + focus-visible/keyboard) confirmation.
+- [x] Remaining blockers and owner. Latest local evidence: no functional release blocker; platform-only blocker remains branch protection API enforcement (`403`) and is tracked as governance follow-up by `1 — Ana Kontrol`.

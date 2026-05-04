@@ -61,9 +61,16 @@ This project uses the Agent OS docs in `docs/agent-os/` and templates in `.claud
 
 ## Parallel work rule
 
-This folder is currently not a git repository. Do not use git worktree until the project is initialized as git. Without git, multiple sessions must avoid editing the same files and must hand off through `docs/workflows/autonomous-run-log.md` or `.claude/templates/handoff.md`.
+This project is a git repository and uses multiple local worktrees for parallel execution windows. Keep write scopes non-overlapping and log handoffs in `docs/workflows/autonomous-run-log.md`.
 
 When the user explicitly asks for parallel mode, multi-agent mode, or orchestrated agent execution, follow `docs/workflows/parallel-agent-mode.md` and keep worker write scopes non-overlapping.
+
+## Weekly governance cadence
+
+- Run a weekly stability window for smoke reliability, CI health, and release evidence quality.
+- Keep owner/SLA fields explicit for every unresolved `partial` or `blocked` release checkpoint.
+- Keep `.claude/settings.json` and other local-only files outside release commits.
+- If branch protection enforcement is platform-blocked, treat PR review + CI green as mandatory process gates and record this in release notes.
 
 ## UI quality bar
 

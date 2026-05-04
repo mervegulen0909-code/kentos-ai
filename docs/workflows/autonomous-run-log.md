@@ -561,6 +561,21 @@
 - Local-only files (`.claude/settings.json` vb.) release commitlerinden dışlanır.
 - Her release döngüsü sonunda `git status --short` intentional-state notuyla birlikte raporlanır.
 
+### Checkpoint minimum schema (enforced)
+
+Her release checkpoint kaydı şu alanları zorunlu içerir:
+
+- `Status`: `passed | partial | blocked | not_run`
+- `Owner`
+- `SLA` (status `partial` veya `blocked` ise zorunlu)
+- `Next review date`
+- `Escalation owner`
+- `Verification run` (komut seti)
+- `Result` (tek paragraf)
+- `Blocker` (yoksa `none`)
+
+Eksik schema ile yazılan checkpoint release kanıtı sayılmaz.
+
 ## 2026-05-04 — Strict browser closure progress checkpoint
 
 - **Action taken:** Re-validated strict citizen browser contract coverage with API + citizen regression evidence while keeping manual viewport sign-off explicit.
@@ -593,7 +608,7 @@
 
 ### Local-only drift branch decision
 
-- `wave/api-hardening`: keep local for now (worktree-attached history), no remote upstream.
-- `wave/qa-smoke`: keep local for now (worktree-attached history), no remote upstream.
-- `wave/ui-polish`: keep local for now (worktree-attached history), no remote upstream.
-- Rationale: avoid deleting potentially attached worktree branches mid-session; reevaluate cleanup at dedicated housekeeping window.
+- `wave/api-hardening`: attempted cleanup; deletion blocked because branch is attached to worktree `C:/Users/arfgl/OneDrive/Desktop/chatbot-api-wave`.
+- `wave/qa-smoke`: attempted cleanup; deletion blocked because branch is attached to worktree `C:/Users/arfgl/OneDrive/Desktop/chatbot-qa-wave`.
+- `wave/ui-polish`: attempted cleanup; deletion blocked because branch is attached to worktree `C:/Users/arfgl/OneDrive/Desktop/chatbot-ui-wave`.
+- Rationale: branch cleanup policy is active, but attached worktree safety guard prevents deletion until those worktrees are intentionally removed/detached.
