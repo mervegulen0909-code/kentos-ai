@@ -12,6 +12,7 @@ export type AdminSessionUser = {
   fullName: string;
   email: string;
   role: string;
+  tenantSlug?: string;
 };
 
 export type AdminSession = {

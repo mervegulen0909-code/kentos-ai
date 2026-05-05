@@ -49,4 +49,9 @@ Thumbs.db
 .playwright-mcp/
 .roo/
 .roomodes
+.tools/
 HANDOFF_PROMPT.md
+
+# Playwright outputs
+playwright-report/
+test-results/

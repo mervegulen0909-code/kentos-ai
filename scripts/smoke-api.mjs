@@ -4,6 +4,7 @@ const databaseRequire = createRequire(new URL('../packages/database/package.json
 const { PrismaClient } = databaseRequire('@prisma/client');
 
 const baseUrl = process.env.KENTOS_API_BASE_URL ?? 'http://127.0.0.1:3110/api/v1';
+const internalApiKey = process.env.INTERNAL_API_KEY ?? 'change-me-internal';
 const prisma = new PrismaClient();
 
 function section(name) {
@@ -313,16 +314,22 @@ const analyticsCategories = await request('/analytics/categories', { token });
 assert(Array.isArray(analyticsCategories.body), 'Admin analytics categories response is not an array.');
 const analyticsNeighborhoods = await request('/analytics/neighborhoods', { token });
 assert(Array.isArray(analyticsNeighborhoods.body), 'Admin analytics neighborhoods response is not an array.');
+const analyticsChannels = await request('/analytics/channels', { token });
+assert(Array.isArray(analyticsChannels.body), 'Admin analytics channels response is not an array.');
 const managerAnalyticsOverview = await request('/analytics/overview', { token: managerToken });
 assert(typeof managerAnalyticsOverview.body.totalOpen === 'number', 'Manager analytics overview missing totalOpen.');
 const managerAnalyticsDepartments = await request('/analytics/departments', { token: managerToken });
 assert(Array.isArray(managerAnalyticsDepartments.body), 'Manager analytics departments response is not an array.');
+const managerAnalyticsChannels = await request('/analytics/channels', { token: managerToken });
+assert(Array.isArray(managerAnalyticsChannels.body), 'Manager analytics channels response is not an array.');
 await expectStatus('/analytics/overview', 403, { token: operatorToken });
 await expectStatus('/analytics/departments', 403, { token: operatorToken });
+await expectStatus('/analytics/channels', 403, { token: operatorToken });
 await expectStatus('/analytics/overview', 403, { token: departmentStaffToken });
+await expectStatus('/analytics/channels', 403, { token: departmentStaffToken });
 await expectStatus('/analytics/overview', 403, { token: readOnlyToken });
 const forbiddenAnalyticsKeys = ['citizen', 'citizens', 'citizenId', 'phone', 'email', 'auditLogs', 'messages', 'internalNotes', 'aiRuns', 'aiClassification'];
-const analyticsPayload = JSON.stringify([analyticsOverview.body, analyticsDepartments.body, analyticsCategories.body, analyticsNeighborhoods.body, managerAnalyticsOverview.body, managerAnalyticsDepartments.body]);
+const analyticsPayload = JSON.stringify([analyticsOverview.body, analyticsDepartments.body, analyticsCategories.body, analyticsNeighborhoods.body, analyticsChannels.body, managerAnalyticsOverview.body, managerAnalyticsDepartments.body, managerAnalyticsChannels.body]);
 for (const key of forbiddenAnalyticsKeys) {
   assert(!analyticsPayload.includes(`"${key}"`), `Analytics response leaked ${key}.`);
 }
@@ -637,8 +644,51 @@ const existingPublicContactCitizen = await prisma.citizen.create({
     email: `existing-${unique}@example.test`,
   },
 });
+await expectStatus('/internal/channel-ingest', 403, {
+  method: 'POST',
+  body: JSON.stringify({
+    tenantId: login.body.user.tenantId,
+    channel: 'WHATSAPP',
+    provider: 'baileys',
+    externalConversationId: `wa-smoke-${unique}`,
+    externalMessageId: `wa-msg-${unique}`,
+    text: 'Atatürk Mahallesi 12. Sokak önünde kaldırım çöktü. Telefonum ' + publicPhone,
+    receivedAt: new Date().toISOString(),
+    citizenContact: { phone: publicPhone, displayName: `WhatsApp Basvuran ${unique}` },
+  }),
+});
+const whatsappIngest = await request('/internal/channel-ingest', {
+  method: 'POST',
+  headers: { 'x-kentos-internal-key': internalApiKey },
+  body: JSON.stringify({
+    tenantId: login.body.user.tenantId,
+    channel: 'WHATSAPP',
+    provider: 'baileys',
+    externalConversationId: `wa-smoke-${unique}`,
+    externalMessageId: `wa-msg-${unique}`,
+    text: 'Atatürk Mahallesi 12. Sokak önünde kaldırım çöktü. Telefonum ' + publicPhone,
+    receivedAt: new Date().toISOString(),
+    citizenContact: { phone: publicPhone, displayName: `WhatsApp Basvuran ${unique}` },
+  }),
+});
+assert(whatsappIngest.body.channel === 'WHATSAPP', 'WhatsApp ingest did not preserve channel.');
+assert(whatsappIngest.body.trackingToken || whatsappIngest.body.followUpQuestion, 'WhatsApp ingest did not return a ticket or follow-up state.');
+console.log('whatsapp_internal_ingest', whatsappIngest.status, whatsappIngest.body.state);
+
+await expectStatus('/public/demo-belediye/tickets', 403, {
+  method: 'POST',
+  headers: { Origin: 'https://kotu-ornek.invalid' },
+  body: JSON.stringify({
+    description: 'Atatürk Mahallesi 12. Sokak önünde kaldırım çöktü.',
+    displayName: `Blocked Origin ${unique}`,
+    phone: publicPhone,
+    addressText: 'Atatürk Mahallesi 12. Sokak',
+  }),
+});
+
 const publicTicket = await request('/public/demo-belediye/tickets', {
   method: 'POST',
+  headers: { Origin: 'http://localhost:3002' },
   body: JSON.stringify({
     description: 'Atatürk Mahallesi 12. Sokak önünde kaldırım çöktü.',
     displayName: `Public Basvuran ${unique}`,

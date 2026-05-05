@@ -47,17 +47,35 @@ export const intakeTenantConfigSchema = z.object({
   categories: z.array(intakeTenantOptionSchema),
 });
 
+export const intakeChannelSchema = z.enum(['WHATSAPP', 'CITIZEN_WEB', 'WEB_CHAT', 'MOBILE_APP']);
+
+export const intakeCitizenContactSchema = z.object({
+  phone: z.string().nullable().optional(),
+  email: z.string().email().nullable().optional(),
+  displayName: z.string().nullable().optional(),
+});
+
 export const intakeMessageInputSchema = z.object({
   text: z.string().min(1),
-  channel: z.enum(['WHATSAPP', 'CITIZEN_WEB', 'WEB_CHAT', 'MOBILE_APP']),
+  channel: intakeChannelSchema,
   receivedAt: z.string().datetime(),
-  citizenContact: z
-    .object({
-      phone: z.string().nullable().optional(),
-      email: z.string().email().nullable().optional(),
-      displayName: z.string().nullable().optional(),
-    })
-    .optional(),
+  citizenContact: intakeCitizenContactSchema.optional(),
+});
+
+export const channelIntakeEnvelopeSchema = z.object({
+  tenantId: z.string().min(1).optional(),
+  tenantSlug: z.string().min(1).optional(),
+  channel: intakeChannelSchema,
+  provider: z.string().min(1),
+  externalConversationId: z.string().min(1).optional(),
+  externalMessageId: z.string().min(1).optional(),
+  text: z.string().min(1),
+  receivedAt: z.string().datetime(),
+  citizenContact: intakeCitizenContactSchema.optional(),
+  raw: z.unknown().optional(),
+}).refine((value) => Boolean(value.tenantId || value.tenantSlug), {
+  message: 'tenantId veya tenantSlug zorunludur',
+  path: ['tenantSlug'],
 });
 
 export const intakePromptEnvelopeSchema = z.object({

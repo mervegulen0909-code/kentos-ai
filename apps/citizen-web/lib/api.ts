@@ -41,10 +41,39 @@ export type CreatePublicTicketInput = {
   phone?: string;
   email?: string;
   addressText?: string;
+  channel?: 'CITIZEN_WEB' | 'WEB_CHAT' | 'MOBILE_APP';
+};
+
+export type PublicConversation = {
+  conversationId: string;
+  channel: 'CITIZEN_WEB' | 'WEB_CHAT' | 'MOBILE_APP';
+  state: 'OPEN' | 'TICKET_CREATED';
+  assistantMessage: string | null;
+  missingFields: string[];
+  followUpQuestion: string | null;
+  trackingToken: string | null;
+};
+
+export type StartPublicConversationInput = {
+  channel?: 'CITIZEN_WEB' | 'WEB_CHAT' | 'MOBILE_APP';
+  displayName?: string;
+  contact?: string;
+  initialMessage?: string;
+};
+
+export type SendPublicConversationMessageInput = {
+  text: string;
+  displayName?: string;
+  phone?: string;
+  email?: string;
 };
 
 export const citizenApi = {
   createTicket: (tenantSlug: string, input: CreatePublicTicketInput) =>
     apiFetch<PublicTicket>(`/public/${tenantSlug}/tickets`, { method: 'POST', body: JSON.stringify(input) }),
   getTicket: (tenantSlug: string, ticketIdentifier: string) => apiFetch<PublicTicket>(`/public/${tenantSlug}/tickets/${ticketIdentifier}`),
+  startConversation: (tenantSlug: string, input: StartPublicConversationInput) =>
+    apiFetch<PublicConversation>(`/public/${tenantSlug}/conversations`, { method: 'POST', body: JSON.stringify(input) }),
+  sendConversationMessage: (tenantSlug: string, conversationId: string, input: SendPublicConversationMessageInput) =>
+    apiFetch<PublicConversation>(`/public/${tenantSlug}/conversations/${conversationId}/messages`, { method: 'POST', body: JSON.stringify(input) }),
 };

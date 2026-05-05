@@ -31,6 +31,19 @@ export type NotificationJobData = {
 
 export type IntakeChannel = 'WHATSAPP' | 'CITIZEN_WEB' | 'WEB_CHAT' | 'MOBILE_APP';
 
+export type ChannelIntakeEnvelope = {
+  tenantId?: string;
+  tenantSlug?: string;
+  channel: IntakeChannel;
+  provider: string;
+  externalConversationId?: string;
+  externalMessageId?: string;
+  text: string;
+  receivedAt: string;
+  citizenContact?: IntakeCitizenContact;
+  raw?: unknown;
+};
+
 export type TenantOption = {
   id: string;
   code: string;

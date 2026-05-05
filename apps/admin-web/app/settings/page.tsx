@@ -1,4 +1,4 @@
-import { adminApi } from '../../lib/api';
+import { adminApi, type WidgetEmbedConfig } from '../../lib/api';
 import { canManageSettings, getAdminSession } from '../../lib/session';
 import { PendingFieldset, PendingSubmitButton } from '../components/form-controls';
 import {
@@ -23,6 +23,17 @@ const successCopy: Record<string, FeedbackCopy> = {
   'template-updated': { title: 'Mesaj sablonu kaydedildi.', detail: 'Vatandasla paylasilan standart metin guncel haliyle kullanilacak.' },
 };
 
+function buildWidgetEmbedConfig(tenantSlug: string): WidgetEmbedConfig {
+  const scriptPath = '/widget.js';
+  const previewPath = `/widget/${tenantSlug}`;
+  return {
+    tenantSlug,
+    scriptPath,
+    previewPath,
+    scriptSnippet: `<script src="${scriptPath}" data-tenant="${tenantSlug}" data-label="Belediye asistanı" async></script>`,
+  };
+}
+
 const errorCopy: Record<string, FeedbackCopy> = {
   session: { title: 'Oturum bulunamadi.', detail: 'Ayar degisikligi icin yeniden giris yapin; guvenlik nedeniyle islem gonderilmedi.' },
   'create-department': { title: 'Departman eklenemedi.', detail: 'Kod benzersiz olmali; kod ve ad alanlarini bos birakmayin.' },
@@ -43,6 +54,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
   const canEditSettings = canManageSettings(session?.user.role);
   const controlsDisabled = !hasSession || !canEditSettings;
   const { success, error } = await searchParams;
+  const widgetEmbed = buildWidgetEmbedConfig(session?.user.tenantSlug ?? 'demo-belediye');
   const [departments, categories, slaPolicies, templates] = token
     ? await Promise.all([
         adminApi.departments(token).catch(() => []),
@@ -75,6 +87,32 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
           <p>{canEditSettings ? 'Token client componente tasinmadan guvenli server action akisi kullanilir.' : 'Backend tarafinda kesin izin matrisi olmadikca frontend yalnizca yonetici benzeri rollere ayar mutasyonu affordancei acar.'}</p>
         </div>
       ) : null}
+      <section className="card widget-install-card">
+        <p className="badge">Web asistani kurulumu</p>
+        <h2>Belediye sitesine tek script ile ekle</h2>
+        <p style={{ color: 'var(--muted)', maxWidth: 820 }}>
+          Bu kodu belediye sitesinin kapanis <code>{'</body>'}</code> etiketinden hemen once ekleyin. Widget iframe icinde acilir, tenant slug degeriyle izole calisir ve vatandas mesajlarini <strong>WEB_CHAT</strong> kanalindan mevcut ticket omurgasina aktarir.
+        </p>
+        <div className="install-code-grid">
+          <div>
+            <strong>Kurulum kodu</strong>
+            <pre className="install-code" aria-label="Widget kurulum kodu">{widgetEmbed.scriptSnippet}</pre>
+          </div>
+          <div className="install-checklist">
+            <strong>Kurulum kontrolu</strong>
+            <ul>
+              <li>Tenant: <code>{widgetEmbed.tenantSlug}</code></li>
+              <li>Script: <code>{widgetEmbed.scriptPath}</code></li>
+              <li>Onizleme: <a href={widgetEmbed.previewPath}>{widgetEmbed.previewPath}</a></li>
+              <li>Beklenen kanal: <code>WEB_CHAT</code></li>
+            </ul>
+          </div>
+        </div>
+        <div className="notice muted" role="note">
+          <strong>Guvenlik notu</strong>
+          <p>Canli kurulumdan once tenant origin allowlist ve abuse/rate-limit politikasi ayrica sertlestirilmeli; bu kart teknik ekibe dogru embed kodunu verir.</p>
+        </div>
+      </section>
       <div className="grid">
         <section className="card">
           <h2>Departmanlar</h2>

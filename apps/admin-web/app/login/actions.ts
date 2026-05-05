@@ -34,6 +34,7 @@ export async function loginAction(formData: FormData) {
         fullName: result.user.fullName,
         email: result.user.email,
         role: result.user.role,
+        tenantSlug,
       },
     });
   } catch {

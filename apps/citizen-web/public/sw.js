@@ -1,0 +1,57 @@
+const CACHE_NAME = 'kentos-citizen-v1';
+const APP_SHELL = ['/', '/demo-belediye/report', '/demo-belediye/track', '/manifest.webmanifest', '/icon.svg'];
+
+self.addEventListener('install', (event) => {
+  event.waitUntil(
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)).then(() => self.skipWaiting()),
+  );
+});
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    caches.keys().then((keys) =>
+      Promise.all(keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))).then(() => self.clients.claim()),
+    ),
+  );
+});
+
+self.addEventListener('fetch', (event) => {
+  if (event.request.method !== 'GET') {
+    return;
+  }
+
+  const requestUrl = new URL(event.request.url);
+  if (requestUrl.origin !== self.location.origin) {
+    return;
+  }
+
+  event.respondWith(
+    fetch(event.request)
+      .then((response) => {
+        const clone = response.clone();
+        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+        return response;
+      })
+      .catch(async () => {
+        const cached = await caches.match(event.request);
+        if (cached) {
+          return cached;
+        }
+
+        if (event.request.mode === 'navigate') {
+          return (
+            (await caches.match('/demo-belediye/report')) ||
+            new Response('Offline', {
+              status: 503,
+              headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+            })
+          );
+        }
+
+        return new Response('Offline', {
+          status: 503,
+          headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+        });
+      }),
+  );
+});

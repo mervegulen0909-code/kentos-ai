@@ -1,5 +1,19 @@
 # Autonomous Run Log
 
+## Checkpoint schema (mandatory)
+
+Her yeni release/verification checkpoint en az şu alanları içermelidir:
+
+- **Owner:** checkpoint sahibı
+- **Status:** `passed` / `partial` / `blocked` / `not_run`
+- **SLA:** yalnız açık gap/blocker varsa zorunlu
+- **Action taken:** yapılan iş
+- **Files changed:** etkilenen dosyalar
+- **Verification run:** komut veya CI job adı
+- **Result:** net sonuç
+- **Next action:** sıradaki iş
+- **Blocker:** yoksa `None`
+
 ## 2026-04-30 15:00 — Run start checkpoint
 
 - **Action taken:** Approved autonomous implementation plan recorded; started Sprint 1 execution loop.
@@ -621,3 +635,125 @@ Eksik schema ile yazılan checkpoint release kanıtı sayılmaz.
 - **Result:** Passed with expected platform caveat. Local branch cleanup completed and only `master` remains as active worktree in list output.
 - **Next action:** Optionally remove leftover non-registered filesystem folders (`chatbot-qa-wave`, `chatbot-ui-wave`) manually if still present on disk.
 - **Blocker:** No release blocker; only non-critical Windows permission warnings during stale `.git/worktrees/*` metadata deletion.
+
+## 2026-05-05 — PDF-style assistant Phase 0/1 checkpoint
+
+- **Owner:** `1 — Ana Kontrol`
+- **Status:** passed
+- **Action taken:** Started the autonomous phased product conversion from `plan.md`; made public ticket creation channel-aware for `CITIZEN_WEB`/`WEB_CHAT`/`MOBILE_APP`, routed widget-origin submissions through `WEB_CHAT`, added a tenant iframe embed loader at `/widget.js`, and upgraded the widget preview into a working ticket-submission shell with success/error feedback.
+- **Files changed:** `apps/api/src/modules/public/dto/create-public-ticket.dto.ts`, `apps/api/src/modules/public/public-ticket.service.ts`, `apps/citizen-web/lib/api.ts`, `apps/citizen-web/app/widget/**`, `apps/citizen-web/app/globals.css`, `docs/workflows/autonomous-run-log.md`.
+- **Verification run:** `pnpm --filter @kentos/api typecheck`; `pnpm --filter @kentos/citizen-web typecheck`; `pnpm --filter @kentos/citizen-web build`.
+- **Result:** Passed. API and citizen-web typechecks are green, and Next build confirms `/widget.js` is static plus `/widget/[tenantSlug]` is dynamic and buildable.
+- **Next action:** Continue Phase 2 by adding conversation session API endpoints that persist pre-ticket chat state and only create a ticket once required fields are complete.
+- **Blocker:** None.
+
+## 2026-05-05 — PDF-style assistant Phase 2 conversation checkpoint
+
+- **Owner:** `1 — Ana Kontrol`
+- **Status:** passed
+- **Action taken:** Added public conversation start/message endpoints on the existing public module, persisted pre-ticket chat state in `Conversation.context`, reused the deterministic intake classifier for follow-up/missing-field decisions, and connected the widget submit action to the conversation API before ticket creation.
+- **Files changed:** `apps/api/src/modules/public/public-conversation.controller.ts`, `apps/api/src/modules/public/public-conversation.service.ts`, `apps/api/src/modules/public/dto/create-public-conversation.dto.ts`, `apps/api/src/modules/public/dto/send-public-conversation-message.dto.ts`, `apps/api/src/modules/public/public-ticket.module.ts`, `apps/citizen-web/lib/api.ts`, `apps/citizen-web/app/widget/**`, `docs/workflows/autonomous-run-log.md`.
+- **Verification run:** `pnpm --filter @kentos/api typecheck`; `pnpm --filter @kentos/citizen-web typecheck`; `pnpm --filter @kentos/citizen-web build`.
+- **Result:** Passed. Conversation endpoints are type-safe, widget client/server action compiles, and the citizen build remains green with `/widget.js` and `/widget/[tenantSlug]` present.
+- **Next action:** Run local API smoke with the new conversation endpoints once local DB/API services are available, then continue Phase 3 by extracting a shared channel intake envelope for WhatsApp gateway handoff.
+- **Blocker:** None.
+
+## 2026-05-05 — PDF-style assistant Phase 3 channel envelope checkpoint
+
+- **Owner:** `1 — Ana Kontrol`
+- **Status:** passed
+- **Action taken:** Added a shared channel intake envelope schema/type, converted WhatsApp normalized inbound messages into channel-neutral intake envelopes without putting business rules in the gateway, exported a gateway `handleWebhook` boundary, and added an internal conversation-service ingest path for future provider handoff.
+- **Files changed:** `packages/shared/src/schemas.ts`, `packages/shared/src/types.ts`, `apps/whatsapp-gateway/src/intake-forwarder.ts`, `apps/whatsapp-gateway/src/main.ts`, `apps/api/src/modules/public/public-conversation.service.ts`, `docs/workflows/autonomous-run-log.md`.
+- **Verification run:** `pnpm --filter @kentos/shared typecheck`; `pnpm --filter @kentos/whatsapp-gateway typecheck`; `pnpm --filter @kentos/api typecheck`; `pnpm --filter @kentos/shared test`; `git diff --check`.
+- **Result:** Passed. Shared schema tests remain green, WhatsApp gateway compiles with the new normalize-and-forward boundary, API compiles with envelope ingestion support, and diff hygiene is clean apart from existing CRLF warnings.
+- **Next action:** Continue Phase 4 by exposing a safe internal webhook/API handoff path for WhatsApp envelopes and adding smoke coverage around text-only inbound message ingestion.
+- **Blocker:** None.
+
+## 2026-05-05 — PDF-style assistant Phase 4 WhatsApp handoff checkpoint
+
+- **Owner:** `1 — Ana Kontrol`
+- **Status:** passed
+- **Action taken:** Added an internal `POST /internal/channel-ingest` endpoint protected by `x-kentos-internal-key`, wired it to conversation envelope ingestion, extended the WhatsApp gateway forwarder to deliver envelopes to the API when `KENTOS_API_BASE_URL` and `INTERNAL_API_KEY` are configured, and added smoke coverage for unauthorized plus authorized text-only WhatsApp ingest.
+- **Files changed:** `apps/api/src/modules/public/internal-channel.controller.ts`, `apps/api/src/modules/public/dto/ingest-channel-envelope.dto.ts`, `apps/api/src/modules/public/public-ticket.module.ts`, `apps/whatsapp-gateway/src/intake-forwarder.ts`, `apps/whatsapp-gateway/src/main.ts`, `scripts/smoke-api.mjs`, `docs/workflows/autonomous-run-log.md`.
+- **Verification run:** `pnpm --filter @kentos/api typecheck`; `pnpm --filter @kentos/whatsapp-gateway typecheck`; `node --check scripts/smoke-api.mjs`; `git diff --check`.
+- **Result:** Passed. API and gateway compile, smoke script syntax is valid, and diff hygiene is clean apart from existing CRLF warnings. Runtime API smoke was not run in this slice.
+- **Next action:** Run full local API smoke against a live seeded DB/API, then continue Phase 5 by surfacing channel/automation metrics in admin analytics.
+- **Blocker:** None.
+
+## 2026-05-05 — PDF-style assistant Phase 5 analytics checkpoint
+
+- **Owner:** `1 — Ana Kontrol`
+- **Status:** passed
+- **Action taken:** Started local infra, prepared the local DB, verified the Phase 4 WhatsApp internal ingest path with live API smoke, added `/analytics/channels` for channel-level ticket/conversation/public-message/AI-message counts and automation rate, wired the admin API client type, and expanded API smoke RBAC/leak checks for channel analytics.
+- **Files changed:** `apps/api/src/modules/analytics/analytics.controller.ts`, `apps/api/src/modules/analytics/analytics.service.ts`, `apps/admin-web/lib/api.ts`, `scripts/smoke-api.mjs`, `docs/workflows/autonomous-run-log.md`.
+- **Verification run:** `docker compose -f infra/docker-compose.yml up -d`; `DATABASE_URL=... pnpm db:generate`; `DATABASE_URL=... pnpm db:migrate`; `DATABASE_URL=... pnpm db:seed`; local API on port `3110`; `DATABASE_URL=... KENTOS_API_BASE_URL=http://127.0.0.1:3110/api/v1 INTERNAL_API_KEY=... pnpm smoke:api`; `pnpm --filter @kentos/api typecheck`; `pnpm --filter @kentos/admin-web typecheck`; `node --check scripts/smoke-api.mjs`; `git diff --check`.
+- **Result:** Passed. Live smoke now covers unauthorized/authorized WhatsApp ingest and analytics channel RBAC. Static API/admin checks pass, and diff hygiene is clean apart from existing CRLF warnings.
+- **Next action:** Continue Phase 6 by surfacing widget embed/self-serve settings in admin UI, or run full workspace `pnpm typecheck && pnpm build` before a commit-ready checkpoint.
+- **Blocker:** None.
+
+## 2026-05-05 — PDF-style assistant Phase 6 self-serve widget checkpoint
+
+- **Owner:** `1 — Ana Kontrol`
+- **Status:** passed
+- **Action taken:** Added a self-serve widget installation card to admin settings with tenant-aware script snippet, preview path, expected `WEB_CHAT` channel notes, and production security caveat; persisted `tenantSlug` in admin session state from login so the settings page can generate tenant-specific embed code.
+- **Files changed:** `apps/admin-web/app/settings/page.tsx`, `apps/admin-web/app/globals.css`, `apps/admin-web/app/login/actions.ts`, `apps/admin-web/lib/session.ts`, `apps/admin-web/lib/api.ts`, `docs/workflows/autonomous-run-log.md`.
+- **Verification run:** `pnpm --filter @kentos/admin-web typecheck`; `pnpm --filter @kentos/admin-web build`; `pnpm --filter @kentos/api typecheck`; `pnpm --filter @kentos/citizen-web build`; `git diff --check`.
+- **Result:** Passed. Admin settings compiles/builds with the install card, citizen widget routes still build, API typecheck remains green, and diff hygiene is clean apart from existing CRLF warnings.
+- **Next action:** Run full workspace `pnpm typecheck && pnpm build` for commit-ready consolidation, then continue Phase 8 security hardening with widget origin allowlist/rate-limit decisions.
+- **Blocker:** None.
+
+## 2026-05-05 — PDF-style assistant Phase 8 public hardening checkpoint
+
+- **Owner:** `1 — Ana Kontrol`
+- **Status:** passed
+- **Action taken:** Ran full workspace typecheck/build, then added `PublicChannelGuard` for public ticket/conversation endpoints with env-driven widget origin allowlist and in-memory per-tenant/IP rate limiting; documented env defaults and expanded API smoke with blocked-origin plus allowed-origin public ticket coverage.
+- **Files changed:** `apps/api/src/common/guards/public-channel.guard.ts`, `apps/api/src/modules/public/public-ticket.controller.ts`, `apps/api/src/modules/public/public-conversation.controller.ts`, `apps/api/src/modules/public/public-ticket.module.ts`, `.env.example`, `scripts/smoke-api.mjs`, `docs/workflows/autonomous-run-log.md`.
+- **Verification run:** `pnpm typecheck`; `pnpm build`; `pnpm --filter @kentos/api typecheck`; `pnpm --filter @kentos/api build`; local API on port `3110` with `WIDGET_ORIGIN_ALLOWLIST` and rate-limit env; `DATABASE_URL=... KENTOS_API_BASE_URL=http://127.0.0.1:3110/api/v1 INTERNAL_API_KEY=... pnpm smoke:api`; `git diff --check`.
+- **Result:** Passed after fixing Nest guard injection. Live smoke now confirms unauthorized origin is rejected and allowed origin can create a public ticket; full workspace typecheck/build also passed before the hardening slice.
+- **Next action:** Continue Phase 9 release consolidation by updating release notes/checklists for the widget/chat/WhatsApp/analytics/security slices and running final full verification.
+- **Blocker:** None.
+
+## 2026-05-05 — PDF-style assistant Phase 9 release consolidation checkpoint
+
+- **Owner:** `1 — Ana Kontrol`
+- **Status:** passed
+- **Action taken:** Updated release notes, release checklist, and Playwright-lite plan for the widget/chat/WhatsApp/analytics/security product wave; ran final static verification and final live API smoke after clearing workspace-owned API dev processes that held the Prisma Windows DLL.
+- **Files changed:** `docs/releases/RELEASE_NOTES.md`, `docs/checklists/release-checklist.md`, `docs/workflows/playwright-lite-plan.md`, `docs/workflows/autonomous-run-log.md`.
+- **Verification run:** `pnpm db:generate` initially failed with Prisma Windows DLL `EPERM`; stopped workspace-owned `@kentos/api dev`/`tsx watch src/main.ts` processes; reran `pnpm db:generate`; `pnpm typecheck`; `pnpm build`; local API on port `3110`; `DATABASE_URL=... KENTOS_API_BASE_URL=http://127.0.0.1:3110/api/v1 INTERNAL_API_KEY=... pnpm smoke:api`; `git diff --check`.
+- **Result:** Static verification and final API smoke passed. Browser smoke later passed via Playwright smoke on QA ports covering admin login, admin widget install card, citizen report, citizen track, and citizen widget preview.
+- **Next action:** Keep release evidence current through final commit/PR hygiene and re-run smoke if code changes after this checkpoint.
+- **Blocker:** None.
+
+### Phase 9 release evidence snapshot
+
+- **Branch / sync:** local `master`; broad intentional working-tree diff remains uncommitted.
+- **Static checks:** `db:generate=passed after clearing Prisma DLL lock`, `typecheck=passed`, `build=passed`.
+- **API smoke:** `passed` with WhatsApp internal ingest, channel analytics RBAC, blocked-origin, allowed-origin, public ticket/TK tracking, role matrix, audit, and public-safe response coverage.
+- **Browser smoke:** `passed` via `pnpm exec playwright test --config=playwright.smoke.config.ts --workers=1` on QA ports `3110/3111/3112`.
+- **Open gaps owner/SLA:** none.
+- **Risk:** `low` — static, API smoke, and browser smoke are green; remaining risk is normal review/commit hygiene.
+- **Rollback note:** remove tenant site widget script to disable embedded assistant; classic citizen report/track routes remain available.
+- **Merge decision:** `go` for verified local milestone; final commit/PR hygiene still required before push.
+- **Snapshot source:** `docs/releases/RELEASE_NOTES.md`, `docs/checklists/release-checklist.md`, current checkpoint.
+
+## 2026-05-05 — PDF-style assistant browser closure checkpoint
+
+- **Owner:** `1 — Ana Kontrol`
+- **Status:** passed
+- **Action taken:** Added Playwright smoke coverage for admin widget install and citizen widget preview, fixed the widget server action boundary by moving non-async initial state out of the `use server` file, ran targeted widget browser smoke, then ran the full no-webserver Playwright smoke set on QA ports.
+- **Files changed:** `tests/e2e/admin-widget-install.spec.ts`, `tests/e2e/citizen-widget.spec.ts`, `playwright.config.ts`, `playwright.smoke.config.ts`, `apps/citizen-web/app/widget/[tenantSlug]/actions.ts`, `apps/citizen-web/app/widget/[tenantSlug]/widget-chat-form.tsx`, `docs/releases/RELEASE_NOTES.md`, `docs/workflows/autonomous-run-log.md`.
+- **Verification run:** `pnpm --filter @kentos/citizen-web typecheck`; `pnpm --filter @kentos/citizen-web build`; targeted `pnpm exec playwright test tests/e2e/admin-widget-install.spec.ts tests/e2e/citizen-widget.spec.ts --config=playwright.smoke.config.ts --workers=1`; full `pnpm exec playwright test --config=playwright.smoke.config.ts --workers=1`; `pnpm typecheck`; `pnpm build`; `git diff --check`.
+- **Result:** Passed. Full Playwright smoke passed 5/5 scenarios: admin login, admin widget install, citizen report, citizen TK track, and citizen widget preview. Static typecheck/build passed after E2E additions.
+- **Next action:** Final commit/PR hygiene: review intended diff, exclude local-only/tool cache files, and commit when requested.
+- **Blocker:** None.
+
+## 2026-05-05 — PDF-style assistant commit-ready hygiene checkpoint
+
+- **Owner:** `1 — Ana Kontrol`
+- **Status:** passed
+- **Action taken:** Classified the broad working-tree diff for commit readiness, added `.tools/` to `.gitignore` to exclude Android/platform-tool cache and zip artifacts, confirmed untracked product/test files are intentional, and re-ran diff hygiene.
+- **Files changed:** `.gitignore`, `docs/workflows/autonomous-run-log.md` plus the product/docs/test files already listed in Phase 0-9 checkpoints.
+- **Verification run:** `git status --short`; `git diff --stat`; `git diff --check`; `git diff --name-only`.
+- **Result:** Passed. `.tools/` no longer appears in `git status`; diff hygiene is clean apart from CRLF warnings. Remaining untracked files are intentional product/test/docs additions: public conversation/internal ingest files, widget routes/actions, PWA files, WhatsApp forwarder, Playwright configs/tests, and workflow docs.
+- **Next action:** If committing, stage only intentional product/docs/test files; do not stage generated Playwright output or local tool caches. Run `pnpm typecheck`, `pnpm build`, and API/browser smoke again if code changes before commit.
+- **Blocker:** None.

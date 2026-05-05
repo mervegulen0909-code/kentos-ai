@@ -34,6 +34,22 @@ export type AnalyticsOverview = {
   byStatus: Array<{ status: string; count: number }>;
 };
 
+export type AnalyticsChannelSummary = {
+  channel: string;
+  tickets: number;
+  conversations: number;
+  publicMessages: number;
+  aiMessages: number;
+  automationRate: number;
+};
+
+export type WidgetEmbedConfig = {
+  tenantSlug: string;
+  scriptPath: string;
+  previewPath: string;
+  scriptSnippet: string;
+};
+
 export type TicketListItem = {
   id: string;
   ticketNo: string;
@@ -80,6 +96,7 @@ export type AuditLogItem = { id: string; action: string; createdAt: string; befo
 
 export const adminApi = {
   overview: (token: string) => apiFetch<AnalyticsOverview>('/analytics/overview', { token }),
+  channelSummary: (token: string) => apiFetch<AnalyticsChannelSummary[]>('/analytics/channels', { token }),
   tickets: (token: string) => apiFetch<TicketListItem[]>('/tickets', { token }),
   ticket: (token: string, id: string) => apiFetch<TicketDetail>(`/tickets/${id}`, { token }),
   auditLog: (token: string, id: string) => apiFetch<AuditLogItem[]>(`/tickets/${id}/audit-log`, { token }),

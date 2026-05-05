@@ -46,6 +46,8 @@ Run local API smoke when API, database, auth, RBAC, tenant settings, ticket work
 - [ ] Smoke verifies authenticated ticket create, assignment, internal note, public message, status transition, and audit log.
 - [ ] Smoke verifies public citizen ticket create and TK tracking-code lookup.
 - [ ] Smoke verifies legacy/internal `KNT-*` ticket numbers do not work on public lookup endpoints.
+- [ ] Smoke verifies WhatsApp/internal channel ingest rejects missing internal key and accepts authorized text-only envelope handoff.
+- [ ] Smoke verifies public widget/ticket endpoint rejects disallowed `Origin` and accepts allowlisted widget origin.
 
 ## 5. Role and RBAC regression
 
@@ -68,6 +70,8 @@ Run browser smoke when admin or citizen UI routes, forms, auth/session, settings
 - [ ] Admin ticket list renders rows or designed empty state.
 - [ ] Admin ticket detail supports assignment, internal note, public message, status transition, refresh persistence, and audit timeline.
 - [ ] Admin settings supports department/category/SLA/message-template create or update flows currently in scope.
+- [ ] Admin settings shows tenant-specific widget embed script, preview path, expected `WEB_CHAT` channel, and production origin/rate-limit caveat.
+- [ ] Citizen widget preview opens at `/widget/[tenantSlug]`, submits via conversation flow, and returns either follow-up or TK tracking state without raw errors.
 - [ ] Citizen report creates a ticket and redirects to the public ticket page under the `ticket/[trackingToken]` route.
 - [ ] Citizen tracking finds the same public ticket by TK tracking code only under the `ticket/[trackingToken]` route.
 - [ ] Citizen invalid ticket state is public-safe and helpful.
@@ -87,8 +91,9 @@ Run browser smoke when admin or citizen UI routes, forms, auth/session, settings
 
 - [ ] Branch and ahead/behind count recorded.
 - [ ] Static verification summary recorded (`db:generate`, `typecheck`, `build`).
-- [ ] API smoke status recorded with command + result.
-- [ ] Browser smoke status recorded with enum + gaps/blockers.
+- [ ] API smoke status recorded with command + result, including channel ingest and origin guard coverage when public/widget endpoints changed.
+- [ ] UI E2E status recorded with command + CI job result (`ui-e2e`).
+- [ ] Browser smoke status recorded with enum + gaps/blockers; widget/admin-install UI changes require explicit browser note.
 - [ ] Owner and SLA recorded for each open gap/blocker.
 - [ ] Local-only file exclusions recorded (for example `.claude/settings.json`).
 - [ ] Risk level for the cycle recorded (`low`/`medium`/`high`) with one-line reason.
