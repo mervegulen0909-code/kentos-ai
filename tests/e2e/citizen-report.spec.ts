@@ -14,6 +14,6 @@ test('citizen report submits and redirects to TK tracking page', async ({ page }
   await page.getByRole('button', { name: 'Başvuruyu oluştur' }).click();
 
   await page.waitForURL(/\/demo-belediye\/ticket\/TK-[A-F0-9]{16}$/);
-  await expect(page.getByText(/Takip kodunuz:/i)).toBeVisible();
+  await expect(page.getByText(/Takip kodunuz:/i).first()).toBeVisible();
   await expect(page.getByText(/Playwright Vatandas/i)).toHaveCount(0);
 });

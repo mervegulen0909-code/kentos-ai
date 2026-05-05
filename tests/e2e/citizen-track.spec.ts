@@ -14,7 +14,7 @@ test('citizen track accepts TK tokens and rejects legacy KNT values', async ({ p
     timeout: 45_000,
     waitUntil: 'domcontentloaded',
   });
-  await expect(page.getByText(`Takip kodunuz: ${trackingToken}`)).toBeVisible();
+  await expect(page.getByText(`Takip kodunuz: ${trackingToken}`).first()).toBeVisible();
 
   await gotoCitizenTrack(page);
   await page.getByLabel('Takip kodu').fill('KNT-2026-0001');
