@@ -40,6 +40,10 @@ jobs:
       DATABASE_URL: postgresql://kentos:kentos@localhost:5432/kentos_ai?schema=public
       REDIS_URL: redis://localhost:6379
       KENTOS_API_BASE_URL: http://127.0.0.1:3110/api/v1
+      INTERNAL_API_KEY: change-me-internal
+      WIDGET_ORIGIN_ALLOWLIST: http://localhost:3002,http://127.0.0.1:3002
+      PUBLIC_RATE_LIMIT_MAX: 240
+      PUBLIC_RATE_LIMIT_WINDOW_MS: 60000
 
     steps:
       - name: Checkout
