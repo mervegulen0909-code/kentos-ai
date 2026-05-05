@@ -9,6 +9,7 @@ Manuel browser smoke yükünü azaltmak için üç kritik happy-path akışı ot
 1. Admin login smoke
 2. Citizen report submit + TK redirect smoke
 3. Citizen track TK-only smoke
+4. Widget preview smoke
 
 ## Kapsam dışı (bu dalgada)
 
@@ -45,9 +46,16 @@ Manuel browser smoke yükünü azaltmak için üç kritik happy-path akışı ot
 - Geçerli TK ile başarı
 - Legacy `KNT-*` ile invalid/not-found
 
+### Senaryo 4 — Widget preview + embed shell
+
+- `http://127.0.0.1:3112/widget/demo-belediye`
+- Widget composer görünür
+- Mesaj submit güvenli başarı/follow-up state döndürür
+- Raw API hata metni veya internal alan görünmez
+
 ## Durum sözleşmesi
 
-- `passed`: üç senaryo da yeşil
+- `passed`: dört senaryo da yeşil
 - `partial`: en az bir senaryo eksik/atlanmış
 - `blocked`: environment blocker
 - `not_run`: bu dalgada çalıştırılmadı
@@ -65,4 +73,24 @@ Her koşuda şu alanlar zorunlu:
 
 ## Uygulama notu
 
-Bu dalga yalnız plan seviyesidir. Playwright bağımlılığı, browser binary indirmesi ve gerçek test dosyası ekleme adımı açık kullanıcı onayı olmadan başlatılmamalıdır.
+Bu dalga artık plan seviyesinden uygulama seviyesine taşındı. Minimum kurulum şu sözleşmeyle korunur:
+
+- Tek browser hedefi: Chromium
+- İlk CI kapsamı: admin login, citizen report/track ve widget preview kritik senaryolari
+- Job adı: `ui-e2e`
+- Fail davranışı: herhangi bir senaryo kırmızıysa PR kararı kırmızı
+- Kanıt kaydı: owner / tarih / komut / sonuç / blocker-SLA alanları PR ve run-log içinde zorunlu
+
+## CI entegrasyonu
+
+- Workflow: [`.github/workflows/ci.yml`](.github/workflows/ci.yml)
+- Komut: `pnpm e2e`
+- Browser install: `pnpm e2e:install`
+- Beklenen PR sinyali: `CI / ui-e2e`
+
+## Seed varsayımları
+
+- Tenant: `demo-belediye`
+- Admin user: `admin@demo.local`
+- Admin password: `ChangeMe123!`
+- Citizen public flow canlı API üstünden gerçek ticket üretir; fixture ile statik sahte token kullanılmaz.

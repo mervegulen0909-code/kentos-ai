@@ -1,4 +1,4 @@
-import { adminApi } from '../../lib/api';
+import { adminApi, type WidgetEmbedConfig, type WidgetSettings } from '../../lib/api';
 import { canManageSettings, getAdminSession } from '../../lib/session';
 import { PendingFieldset, PendingSubmitButton } from '../components/form-controls';
 import {
@@ -9,6 +9,7 @@ import {
   updateDepartmentAction,
   updateSlaPolicyAction,
   updateTemplateAction,
+  updateWidgetSettingsAction,
 } from './actions';
 
 type FeedbackCopy = { title: string; detail: string };
@@ -21,7 +22,19 @@ const successCopy: Record<string, FeedbackCopy> = {
   'sla-created': { title: 'SLA politikasi eklendi.', detail: 'Yanit ve cozum sureleri uygun talepler icin izlenmeye basladi.' },
   'sla-updated': { title: 'SLA politikasi kaydedildi.', detail: 'Sure ve aktiflik degisiklikleri sonraki SLA degerlendirmelerinde kullanilacak.' },
   'template-updated': { title: 'Mesaj sablonu kaydedildi.', detail: 'Vatandasla paylasilan standart metin guncel haliyle kullanilacak.' },
+  'widget-updated': { title: 'Widget ayarlari kaydedildi.', detail: 'Baslik, karsilama metni ve origin izin listesi yeni widget isteklerinde kullanilacak.' },
 };
+
+function buildWidgetEmbedConfig(settings: WidgetSettings): WidgetEmbedConfig {
+  const scriptPath = '/widget.js';
+  const previewPath = `/widget/${settings.tenantSlug}`;
+  return {
+    ...settings,
+    scriptPath,
+    previewPath,
+    scriptSnippet: `<script src="${scriptPath}" data-tenant="${settings.tenantSlug}" data-label="${settings.widgetTitle}" async></script>`,
+  };
+}
 
 const errorCopy: Record<string, FeedbackCopy> = {
   session: { title: 'Oturum bulunamadi.', detail: 'Ayar degisikligi icin yeniden giris yapin; guvenlik nedeniyle islem gonderilmedi.' },
@@ -32,6 +45,7 @@ const errorCopy: Record<string, FeedbackCopy> = {
   'create-sla': { title: 'SLA politikasi eklenemedi.', detail: 'Yanit ve cozum sureleri 1 dakikadan buyuk olmali; ayni kapsamda cakisan politika olabilir.' },
   'update-sla': { title: 'SLA politikasi kaydedilemedi.', detail: 'Sure degerlerini ve aktiflik durumunu kontrol edip tekrar deneyin.' },
   'update-template': { title: 'Sablon kaydedilemedi.', detail: 'Vatandas mesaji bos olmamali; metni sade ve islem odakli tutun.' },
+  'update-widget': { title: 'Widget ayarlari kaydedilemedi.', detail: 'Baslik, karsilama metni ve origin satirlarini kontrol edip tekrar deneyin.' },
   forbidden: { title: 'Ayar degisikligi bu rol icin kapali.', detail: 'Frontend ayar mutasyonlarini yonetici rolleriyle sinirlandiriyor; son yetki kontrolu yine backend tarafinda.' },
   general: { title: 'Ayar kaydedilemedi.', detail: 'Baglanti, yetki veya kayit durumunu kontrol edip islemi tekrar deneyin.' },
 };
@@ -43,14 +57,23 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
   const canEditSettings = canManageSettings(session?.user.role);
   const controlsDisabled = !hasSession || !canEditSettings;
   const { success, error } = await searchParams;
-  const [departments, categories, slaPolicies, templates] = token
+  const fallbackWidgetSettings: WidgetSettings = {
+    tenantSlug: session?.user.tenantSlug ?? 'demo-belediye',
+    widgetEnabled: true,
+    widgetTitle: 'Belediye asistanı',
+    widgetWelcome: 'Merhaba, belediyeye iletmek istediğiniz konuyu yazın.',
+    widgetAllowedOrigins: [],
+  };
+  const [departments, categories, slaPolicies, templates, widgetSettings] = token
     ? await Promise.all([
         adminApi.departments(token).catch(() => []),
         adminApi.categories(token).catch(() => []),
         adminApi.slaPolicies(token).catch(() => []),
         adminApi.messageTemplates(token).catch(() => []),
+        adminApi.widgetSettings(token).catch(() => fallbackWidgetSettings),
       ])
-    : [[], [], [], []];
+    : [[], [], [], [], fallbackWidgetSettings];
+  const widgetEmbed = buildWidgetEmbedConfig(widgetSettings);
 
   return (
     <main className="main">
@@ -75,6 +98,58 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
           <p>{canEditSettings ? 'Token client componente tasinmadan guvenli server action akisi kullanilir.' : 'Backend tarafinda kesin izin matrisi olmadikca frontend yalnizca yonetici benzeri rollere ayar mutasyonu affordancei acar.'}</p>
         </div>
       ) : null}
+      <section className="card widget-install-card">
+        <p className="badge">Web asistani kurulumu</p>
+        <h2>Belediye sitesine tek script ile ekle</h2>
+        <p style={{ color: 'var(--muted)', maxWidth: 820 }}>
+          Bu kodu belediye sitesinin kapanis <code>{'</body>'}</code> etiketinden hemen once ekleyin. Widget iframe icinde acilir, tenant slug degeriyle izole calisir ve vatandas mesajlarini <strong>WEB_CHAT</strong> kanalindan mevcut ticket omurgasina aktarir.
+        </p>
+        <div className="install-code-grid">
+          <div>
+            <strong>Kurulum kodu</strong>
+            <pre className="install-code" aria-label="Widget kurulum kodu">{widgetEmbed.scriptSnippet}</pre>
+          </div>
+          <div className="install-checklist">
+            <strong>Kurulum kontrolu</strong>
+            <ul>
+              <li>Tenant: <code>{widgetEmbed.tenantSlug}</code></li>
+              <li>Script: <code>{widgetEmbed.scriptPath}</code></li>
+              <li>Onizleme: <a href={widgetEmbed.previewPath}>{widgetEmbed.previewPath}</a></li>
+              <li>Beklenen kanal: <code>WEB_CHAT</code></li>
+              <li>Durum: <code>{widgetEmbed.widgetEnabled ? 'Aktif' : 'Pasif'}</code></li>
+            </ul>
+          </div>
+        </div>
+        <form action={updateWidgetSettingsAction} style={{ display: 'grid', gap: 12, marginTop: 18 }}>
+          <PendingFieldset style={{ display: 'grid', gap: 12 }}>
+            <input type="hidden" name="intent" value="update-widget" />
+            <label style={{ display: 'grid', gap: 6 }}>
+              Widget durumu
+              <select name="widgetEnabled" defaultValue={String(widgetEmbed.widgetEnabled)} disabled={controlsDisabled}>
+                <option value="true">Aktif</option>
+                <option value="false">Pasif</option>
+              </select>
+            </label>
+            <label style={{ display: 'grid', gap: 6 }}>
+              Widget basligi
+              <input name="widgetTitle" defaultValue={widgetEmbed.widgetTitle} disabled={controlsDisabled} />
+            </label>
+            <label style={{ display: 'grid', gap: 6 }}>
+              Karsilama metni
+              <textarea name="widgetWelcome" rows={3} defaultValue={widgetEmbed.widgetWelcome} disabled={controlsDisabled} />
+            </label>
+            <label style={{ display: 'grid', gap: 6 }}>
+              Origin izin listesi — her satira bir origin
+              <textarea name="widgetAllowedOrigins" rows={3} defaultValue={widgetEmbed.widgetAllowedOrigins.join('\n')} placeholder="https://www.belediye.gov.tr" disabled={controlsDisabled} />
+            </label>
+            <PendingSubmitButton type="submit" disabled={controlsDisabled} idleLabel="Widget ayarlarini kaydet" pendingLabel="Kaydediliyor..." />
+          </PendingFieldset>
+        </form>
+        <div className="notice muted" role="note">
+          <strong>Guvenlik notu</strong>
+          <p>Origin izin listesi tenant ayari olarak saklanir; env allowlist sadece operasyonel ek izin katmani olarak kalir.</p>
+        </div>
+      </section>
       <div className="grid">
         <section className="card">
           <h2>Departmanlar</h2>

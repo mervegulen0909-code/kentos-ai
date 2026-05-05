@@ -173,6 +173,7 @@ export class PublicTicketService {
         })
       : null;
 
+    const channel = dto.channel ?? ChannelType.CITIZEN_WEB;
     const aiInput: PublicTicketAiIntakeRequest = {
       tenantContext: {
         tenantId: tenant.id,
@@ -182,7 +183,7 @@ export class PublicTicketService {
       },
       message: {
         text: dto.description,
-        channel: 'CITIZEN_WEB',
+        channel,
         receivedAt: new Date().toISOString(),
         citizenContact: {
           phone: normalizedPhone,
@@ -200,7 +201,7 @@ export class PublicTicketService {
         ticketNo: await this.ticketNumbers.nextTicketNo(tenant.id),
         publicTrackingToken: await this.generateTrackingToken(tenant.id),
         citizenId: citizen?.id,
-        channel: ChannelType.CITIZEN_WEB,
+        channel,
         title: dto.title ?? aiResult.classification.title,
         description: dto.description,
         addressText: dto.addressText ?? aiResult.classification.addressText ?? undefined,
@@ -215,7 +216,7 @@ export class PublicTicketService {
               tenantId: tenant.id,
               actorType: AuditActorType.CITIZEN,
               action: 'ticket.public_created',
-              after: { channel: ChannelType.CITIZEN_WEB },
+              after: { channel },
             },
             {
               tenantId: tenant.id,
@@ -257,7 +258,7 @@ export class PublicTicketService {
           senderType: AuditActorType.SYSTEM,
           visibility: MessageVisibility.PUBLIC,
           body: createdMessage,
-          channel: ChannelType.CITIZEN_WEB,
+          channel,
         },
       });
       await this.notifications.enqueueMessage(message.id);
@@ -305,7 +306,7 @@ export class PublicTicketService {
         senderType: AuditActorType.CITIZEN,
         visibility: MessageVisibility.PUBLIC,
         body: dto.body,
-        channel: ChannelType.CITIZEN_WEB,
+        channel: ticket.channel,
       },
     });
 

@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { TicketStatus } from '@kentos/database';
+import { AuditActorType, MessageVisibility, TicketStatus } from '@kentos/database';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 
@@ -95,5 +95,45 @@ export class AnalyticsService {
       name: neighborhood.name,
       tickets: neighborhood._count.tickets,
     }));
+  }
+
+  async channels(user: AuthenticatedUser) {
+    const [ticketsByChannel, conversationsByChannel, aiCreatedMessagesByChannel, publicMessagesByChannel] = await Promise.all([
+      this.prisma.ticket.groupBy({ by: ['channel'], where: { tenantId: user.tenantId }, _count: { _all: true } }),
+      this.prisma.conversation.groupBy({ by: ['channel'], where: { tenantId: user.tenantId }, _count: { _all: true } }),
+      this.prisma.ticketMessage.groupBy({
+        by: ['channel'],
+        where: { tenantId: user.tenantId, senderType: AuditActorType.AI },
+        _count: { _all: true },
+      }),
+      this.prisma.ticketMessage.groupBy({
+        by: ['channel'],
+        where: { tenantId: user.tenantId, visibility: MessageVisibility.PUBLIC },
+        _count: { _all: true },
+      }),
+    ]);
+
+    const channels = new Set([
+      ...ticketsByChannel.map((item) => item.channel),
+      ...conversationsByChannel.map((item) => item.channel),
+      ...aiCreatedMessagesByChannel.map((item) => item.channel).filter(Boolean),
+      ...publicMessagesByChannel.map((item) => item.channel).filter(Boolean),
+    ]);
+
+    return [...channels].sort().map((channel) => {
+      const tickets = ticketsByChannel.find((item) => item.channel === channel)?._count._all ?? 0;
+      const conversations = conversationsByChannel.find((item) => item.channel === channel)?._count._all ?? 0;
+      const aiMessages = aiCreatedMessagesByChannel.find((item) => item.channel === channel)?._count._all ?? 0;
+      const publicMessages = publicMessagesByChannel.find((item) => item.channel === channel)?._count._all ?? 0;
+
+      return {
+        channel,
+        tickets,
+        conversations,
+        publicMessages,
+        aiMessages,
+        automationRate: publicMessages ? Number((aiMessages / publicMessages).toFixed(3)) : 0,
+      };
+    });
   }
 }

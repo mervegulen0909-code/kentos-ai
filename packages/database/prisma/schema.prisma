@@ -62,6 +62,10 @@ model Tenant {
   timezone         String   @default("Europe/Istanbul")
   locale           String   @default("tr-TR")
   status           String   @default("ACTIVE")
+  widgetEnabled    Boolean  @default(true)
+  widgetTitle      String   @default("Belediye asistanı")
+  widgetWelcome    String   @default("Merhaba, belediyeye iletmek istediğiniz konuyu yazın.")
+  widgetAllowedOrigins Json?
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 

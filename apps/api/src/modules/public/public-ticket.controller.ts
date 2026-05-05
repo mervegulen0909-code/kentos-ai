@@ -1,8 +1,10 @@
-import { Body, Controller, Get, Inject, Param, Post } from '@nestjs/common';
+import { Body, Controller, Get, Inject, Param, Post, UseGuards } from '@nestjs/common';
+import { PublicChannelGuard } from '../../common/guards/public-channel.guard.js';
 import { CreatePublicMessageDto } from './dto/create-public-message.dto.js';
 import { CreatePublicTicketDto } from './dto/create-public-ticket.dto.js';
 import { PublicTicketService } from './public-ticket.service.js';
 
+@UseGuards(PublicChannelGuard)
 @Controller('public/:tenantSlug/tickets')
 export class PublicTicketController {
   constructor(@Inject(PublicTicketService) private readonly tickets: PublicTicketService) {}

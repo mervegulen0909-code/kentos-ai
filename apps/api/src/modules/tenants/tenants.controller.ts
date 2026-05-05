@@ -7,6 +7,7 @@ import { CreateCategoryDto, UpdateCategoryDto } from './dto/category.dto.js';
 import { CreateDepartmentDto, UpdateDepartmentDto } from './dto/department.dto.js';
 import { UpdateMessageTemplateDto } from './dto/message-template.dto.js';
 import { CreateSlaPolicyDto, UpdateSlaPolicyDto } from './dto/sla-policy.dto.js';
+import { UpdateWidgetSettingsDto } from './dto/widget-settings.dto.js';
 import { RolesGuard } from '../../common/guards/roles.guard.js';
 import { TenantsService } from './tenants.service.js';
 
@@ -43,6 +44,17 @@ export class TenantsController {
   @Get('message-templates')
   messageTemplates(@CurrentUser() user: AuthenticatedUser) {
     return this.tenants.messageTemplates(user.tenantId);
+  }
+
+  @Get('widget-settings')
+  widgetSettings(@CurrentUser() user: AuthenticatedUser) {
+    return this.tenants.widgetSettings(user.tenantId);
+  }
+
+  @Roles('SUPER_ADMIN', 'TENANT_ADMIN')
+  @Patch('widget-settings')
+  updateWidgetSettings(@CurrentUser() user: AuthenticatedUser, @Body() dto: UpdateWidgetSettingsDto) {
+    return this.tenants.updateWidgetSettings(user, dto);
   }
 
   @Roles('SUPER_ADMIN', 'TENANT_ADMIN')

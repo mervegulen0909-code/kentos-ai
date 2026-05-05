@@ -24,12 +24,14 @@ export default async function ReportPage({
   searchParams,
 }: {
   params: Promise<{ tenantSlug: string }>;
-  searchParams: Promise<{ error?: string; field?: string }>;
+  searchParams: Promise<{ error?: string; field?: string; draft?: string; source?: string }>;
 }) {
   const { tenantSlug } = await params;
-  const { error, field } = await searchParams;
+  const { error, field, draft, source } = await searchParams;
   const errorMessage = error ? (errorCopy[error] ?? errorCopy.api) : null;
   const action = createReportAction.bind(null, tenantSlug);
+  const normalizedDraft = typeof draft === 'string' ? draft.trim() : '';
+  const assistantPreviewSource = source === 'assistant-preview';
 
   return (
     <main className="wrap">
@@ -40,6 +42,12 @@ export default async function ReportPage({
           <p style={{ color: 'var(--muted)', fontSize: '1.2rem' }}>Gönderim başarılı olursa gizli takip kodunuzun olduğu güvenli sayfaya yönlendirileceksiniz.</p>
         </div>
         <form action={action} className="card">
+          {assistantPreviewSource ? (
+            <div className="notice" role="status">
+              <strong>Asistan önizlemesinden geldiniz.</strong>
+              <p>İlk mesajınız forma taşındı. Gerekirse açıklamayı netleştirip resmi başvuruyu oluşturun.</p>
+            </div>
+          ) : null}
           {errorMessage ? (
             <div className="notice error" role="alert">
               <strong>{errorMessage.title}</strong>
@@ -48,7 +56,17 @@ export default async function ReportPage({
           ) : null}
           <div className={`field ${field === 'description' ? 'field-error' : ''}`}>
             <label htmlFor="description">Açıklama</label>
-            <textarea id="description" name="description" rows={6} placeholder="Örn. Kaldırım taşları yerinden çıkmış, bebek arabası geçemiyor." required minLength={10} aria-describedby="description-help" aria-invalid={field === 'description'} />
+            <textarea
+              id="description"
+              name="description"
+              rows={6}
+              placeholder="Örn. Kaldırım taşları yerinden çıkmış, bebek arabası geçemiyor."
+              required
+              minLength={10}
+              aria-describedby="description-help"
+              aria-invalid={field === 'description'}
+              defaultValue={normalizedDraft}
+            />
             <small id="description-help">En az 10 karakter yazın; mahalle, sokak veya ayırt edici bir nokta eklerseniz ekip daha hızlı yönlenir.</small>
           </div>
           <div className="field">

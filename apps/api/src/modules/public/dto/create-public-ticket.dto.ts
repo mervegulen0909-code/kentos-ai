@@ -1,4 +1,6 @@
-import { IsEmail, IsLatitude, IsLongitude, IsOptional, IsPhoneNumber, IsString, MinLength } from 'class-validator';
+import { IsEmail, IsIn, IsLatitude, IsLongitude, IsOptional, IsPhoneNumber, IsString, MinLength } from 'class-validator';
+import { ChannelType } from '@kentos/database';
+import type { IntakeChannel } from '@kentos/shared';
 
 export class CreatePublicTicketDto {
   @IsString()
@@ -32,4 +34,8 @@ export class CreatePublicTicketDto {
   @IsOptional()
   @IsLongitude()
   longitude?: number;
+
+  @IsOptional()
+  @IsIn([ChannelType.CITIZEN_WEB, ChannelType.WEB_CHAT, ChannelType.MOBILE_APP])
+  channel?: Exclude<IntakeChannel, 'WHATSAPP'>;
 }

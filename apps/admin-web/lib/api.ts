@@ -34,6 +34,29 @@ export type AnalyticsOverview = {
   byStatus: Array<{ status: string; count: number }>;
 };
 
+export type AnalyticsChannelSummary = {
+  channel: string;
+  tickets: number;
+  conversations: number;
+  publicMessages: number;
+  aiMessages: number;
+  automationRate: number;
+};
+
+export type WidgetSettings = {
+  tenantSlug: string;
+  widgetEnabled: boolean;
+  widgetTitle: string;
+  widgetWelcome: string;
+  widgetAllowedOrigins: string[];
+};
+
+export type WidgetEmbedConfig = WidgetSettings & {
+  scriptPath: string;
+  previewPath: string;
+  scriptSnippet: string;
+};
+
 export type TicketListItem = {
   id: string;
   ticketNo: string;
@@ -80,6 +103,7 @@ export type AuditLogItem = { id: string; action: string; createdAt: string; befo
 
 export const adminApi = {
   overview: (token: string) => apiFetch<AnalyticsOverview>('/analytics/overview', { token }),
+  channelSummary: (token: string) => apiFetch<AnalyticsChannelSummary[]>('/analytics/channels', { token }),
   tickets: (token: string) => apiFetch<TicketListItem[]>('/tickets', { token }),
   ticket: (token: string, id: string) => apiFetch<TicketDetail>(`/tickets/${id}`, { token }),
   auditLog: (token: string, id: string) => apiFetch<AuditLogItem[]>(`/tickets/${id}/audit-log`, { token }),
@@ -87,4 +111,7 @@ export const adminApi = {
   categories: (token: string) => apiFetch<Category[]>('/categories', { token }),
   slaPolicies: (token: string) => apiFetch<SlaPolicy[]>('/sla-policies', { token }),
   messageTemplates: (token: string) => apiFetch<MessageTemplate[]>('/message-templates', { token }),
+  widgetSettings: (token: string) => apiFetch<WidgetSettings>('/widget-settings', { token }),
+  updateWidgetSettings: (token: string, input: Omit<WidgetSettings, 'tenantSlug'>) =>
+    apiFetch<WidgetSettings>('/widget-settings', { method: 'PATCH', token, body: JSON.stringify(input) }),
 };

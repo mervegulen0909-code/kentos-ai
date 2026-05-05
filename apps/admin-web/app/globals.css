@@ -50,6 +50,12 @@ fieldset[data-pending='true'] { opacity: 0.82; }
 .ticket-list-row { display: grid; grid-template-columns: minmax(124px, .9fr) minmax(0, 1.6fr) minmax(0, 1fr) minmax(0, .95fr) minmax(0, .9fr); gap: 12px; padding: 14px; border: 1px solid var(--line); border-radius: 14px; align-items: start; min-width: 0; }
 .ticket-list-row > * { min-width: 0; overflow-wrap: anywhere; }
 .ticket-list-label { display: none; color: var(--muted); font-size: .78rem; text-transform: uppercase; margin-bottom: 4px; }
+.widget-install-card { margin-bottom: 18px; background: linear-gradient(135deg, color-mix(in oklch, var(--surface) 88%, transparent), color-mix(in oklch, var(--accent) 8%, var(--surface))); }
+.install-code-grid { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(240px, .8fr); gap: 16px; align-items: start; }
+.install-code { overflow-x: auto; white-space: pre-wrap; overflow-wrap: anywhere; border: 1px solid var(--line); border-radius: 16px; padding: 16px; background: oklch(12% 0.014 252); color: var(--accent); line-height: 1.5; }
+.install-checklist { border: 1px solid var(--line); border-radius: 16px; padding: 16px; background: color-mix(in oklch, var(--surface-2) 48%, transparent); }
+.install-checklist ul { margin: 10px 0 0; padding-left: 18px; color: var(--muted); line-height: 1.7; }
+.install-checklist code, .install-code-grid code { color: var(--text); }
 .skeleton { overflow: hidden; position: relative; min-height: 52px; border-radius: 16px; background: color-mix(in oklch, var(--surface-2) 66%, transparent); }
 .skeleton::after { content: ''; position: absolute; inset: 0; transform: translateX(-100%); background: linear-gradient(90deg, transparent, color-mix(in oklch, var(--accent) 16%, transparent), transparent); animation: sweep 1.4s infinite; }
 @keyframes sweep { to { transform: translateX(100%); } }
@@ -63,4 +69,5 @@ fieldset[data-pending='true'] { opacity: 0.82; }
   .queue-row { grid-template-columns: 1fr; gap: 6px; }
   .ticket-list-row { grid-template-columns: 1fr; gap: 10px; }
   .ticket-list-label { display: block; }
+  .install-code-grid { grid-template-columns: 1fr; }
 }

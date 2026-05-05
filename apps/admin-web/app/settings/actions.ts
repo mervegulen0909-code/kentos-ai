@@ -147,3 +147,23 @@ export async function updateTemplateAction(formData: FormData) {
     }),
   }));
 }
+
+export async function updateWidgetSettingsAction(formData: FormData) {
+  const widgetTitle = requireNonEmpty(formData.get('widgetTitle'), 'update-widget');
+  const widgetWelcome = requireNonEmpty(formData.get('widgetWelcome'), 'update-widget');
+  const widgetAllowedOrigins = String(formData.get('widgetAllowedOrigins') ?? '')
+    .split(/\r?\n/)
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+
+  await runSettingsMutation(formData, 'widget-updated', (token) => apiFetch('/widget-settings', {
+    method: 'PATCH',
+    token,
+    body: JSON.stringify({
+      widgetEnabled: formData.get('widgetEnabled') === 'true',
+      widgetTitle,
+      widgetWelcome,
+      widgetAllowedOrigins,
+    }),
+  }));
+}

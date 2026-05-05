@@ -40,12 +40,21 @@ const templates = [
 async function main() {
   const tenant = await prisma.tenant.upsert({
     where: { slug: 'demo-belediye' },
-    update: {},
+    update: {
+      widgetEnabled: true,
+      widgetTitle: 'Demo Belediyesi Asistanı',
+      widgetWelcome: 'Merhaba, Demo Belediyesi asistanına hoş geldiniz. Talebinizi yazın, doğru birime aktaralım.',
+      widgetAllowedOrigins: ['http://127.0.0.1:3002', 'http://127.0.0.1:3112'],
+    },
     create: {
       name: 'Demo Belediyesi',
       slug: 'demo-belediye',
       timezone: 'Europe/Istanbul',
       locale: 'tr-TR',
+      widgetEnabled: true,
+      widgetTitle: 'Demo Belediyesi Asistanı',
+      widgetWelcome: 'Merhaba, Demo Belediyesi asistanına hoş geldiniz. Talebinizi yazın, doğru birime aktaralım.',
+      widgetAllowedOrigins: ['http://127.0.0.1:3002', 'http://127.0.0.1:3112'],
     },
   });
 

@@ -31,4 +31,9 @@ export class AnalyticsController {
   neighborhoods(@CurrentUser() user: AuthenticatedUser) {
     return this.analytics.neighborhoods(user);
   }
+
+  @Get('channels')
+  channels(@CurrentUser() user: AuthenticatedUser) {
+    return this.analytics.channels(user);
+  }
 }

@@ -1,4 +1,4 @@
-import { getTrackRedirectPath, isLowercaseTrackingTokenVariant, isTrackingTokenFormat, normalizeTrackingToken } from './actions';
+import { getTrackRedirectPath, isLowercaseTrackingTokenVariant, isTrackingTokenFormat, normalizeTrackingToken } from './token';
 
 function assertEqual(actual: unknown, expected: unknown, message: string) {
   if (actual !== expected) {
