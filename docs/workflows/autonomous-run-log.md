@@ -757,3 +757,14 @@ Eksik schema ile yazılan checkpoint release kanıtı sayılmaz.
 - **Result:** Passed. `.tools/` no longer appears in `git status`; diff hygiene is clean apart from CRLF warnings. Remaining untracked files are intentional product/test/docs additions: public conversation/internal ingest files, widget routes/actions, PWA files, WhatsApp forwarder, Playwright configs/tests, and workflow docs.
 - **Next action:** If committing, stage only intentional product/docs/test files; do not stage generated Playwright output or local tool caches. Run `pnpm typecheck`, `pnpm build`, and API/browser smoke again if code changes before commit.
 - **Blocker:** None.
+
+## 2026-05-05 — PR #2 merge closure checkpoint
+
+- **Owner:** `1 — Ana Kontrol`
+- **Status:** passed
+- **Action taken:** Merged PR #2 (`wave/assistant-intake-widget-20260505` into `master`) after green `verify` and `ui-e2e`, confirmed local `master` fast-forwarded to `origin/master`, and verified the remote feature branch was deleted by merge cleanup.
+- **Files changed:** `docs/workflows/autonomous-run-log.md`.
+- **Verification run:** `gh pr view 2 --json state,mergedAt,mergeCommit,url,headRefName,baseRefName`; `git status --short --branch`; `git branch -vv`.
+- **Result:** Passed. PR #2 merged at `2026-05-05T15:04:00Z` with merge commit `1244c0833086e07415edbce2c3e93a5f782c7598`; local `master` is aligned with `origin/master`.
+- **Next action:** Commit this final evidence note if desired, or continue the next product hardening slice from current `master`.
+- **Blocker:** None.
