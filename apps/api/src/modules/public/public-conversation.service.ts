@@ -22,6 +22,17 @@ export class PublicConversationService {
     @Inject(PublicTicketService) private readonly tickets: PublicTicketService,
   ) {}
 
+  async widgetSettings(tenantSlug: string) {
+    const tenant = await this.requireTenant(tenantSlug);
+    return {
+      tenantSlug: tenant.slug,
+      widgetEnabled: tenant.widgetEnabled,
+      widgetTitle: tenant.widgetTitle,
+      widgetWelcome: tenant.widgetWelcome,
+      widgetAllowedOrigins: Array.isArray(tenant.widgetAllowedOrigins) ? tenant.widgetAllowedOrigins.map((origin) => String(origin)).filter(Boolean) : [],
+    };
+  }
+
   async start(tenantSlug: string, dto: CreatePublicConversationDto) {
     const tenant = await this.requireTenant(tenantSlug);
     const channel = dto.channel ?? ChannelType.WEB_CHAT;

@@ -43,8 +43,15 @@ export type AnalyticsChannelSummary = {
   automationRate: number;
 };
 
-export type WidgetEmbedConfig = {
+export type WidgetSettings = {
   tenantSlug: string;
+  widgetEnabled: boolean;
+  widgetTitle: string;
+  widgetWelcome: string;
+  widgetAllowedOrigins: string[];
+};
+
+export type WidgetEmbedConfig = WidgetSettings & {
   scriptPath: string;
   previewPath: string;
   scriptSnippet: string;
@@ -104,4 +111,7 @@ export const adminApi = {
   categories: (token: string) => apiFetch<Category[]>('/categories', { token }),
   slaPolicies: (token: string) => apiFetch<SlaPolicy[]>('/sla-policies', { token }),
   messageTemplates: (token: string) => apiFetch<MessageTemplate[]>('/message-templates', { token }),
+  widgetSettings: (token: string) => apiFetch<WidgetSettings>('/widget-settings', { token }),
+  updateWidgetSettings: (token: string, input: Omit<WidgetSettings, 'tenantSlug'>) =>
+    apiFetch<WidgetSettings>('/widget-settings', { method: 'PATCH', token, body: JSON.stringify(input) }),
 };

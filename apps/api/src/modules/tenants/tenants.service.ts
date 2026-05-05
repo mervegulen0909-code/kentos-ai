@@ -6,6 +6,7 @@ import { CreateCategoryDto, UpdateCategoryDto } from './dto/category.dto.js';
 import { CreateDepartmentDto, UpdateDepartmentDto } from './dto/department.dto.js';
 import { UpdateMessageTemplateDto } from './dto/message-template.dto.js';
 import { CreateSlaPolicyDto, UpdateSlaPolicyDto } from './dto/sla-policy.dto.js';
+import { UpdateWidgetSettingsDto } from './dto/widget-settings.dto.js';
 
 @Injectable()
 export class TenantsService {
@@ -53,6 +54,58 @@ export class TenantsService {
 
   messageTemplates(tenantId: string) {
     return this.prisma.messageTemplate.findMany({ where: { tenantId }, orderBy: { key: 'asc' } });
+  }
+
+  async widgetSettings(tenantId: string) {
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: {
+        slug: true,
+        widgetEnabled: true,
+        widgetTitle: true,
+        widgetWelcome: true,
+        widgetAllowedOrigins: true,
+      },
+    });
+    if (!tenant) throw new NotFoundException('Belediye bulunamadi.');
+
+    return {
+      tenantSlug: tenant.slug,
+      widgetEnabled: tenant.widgetEnabled,
+      widgetTitle: tenant.widgetTitle,
+      widgetWelcome: tenant.widgetWelcome,
+      widgetAllowedOrigins: this.readOriginList(tenant.widgetAllowedOrigins),
+    };
+  }
+
+  async updateWidgetSettings(user: AuthenticatedUser, dto: UpdateWidgetSettingsDto) {
+    const before = await this.widgetSettings(user.tenantId);
+    const tenant = await this.prisma.tenant.update({
+      where: { id: user.tenantId },
+      data: {
+        widgetEnabled: dto.widgetEnabled,
+        widgetTitle: dto.widgetTitle?.trim(),
+        widgetWelcome: dto.widgetWelcome?.trim(),
+        widgetAllowedOrigins: dto.widgetAllowedOrigins,
+      },
+      select: {
+        slug: true,
+        widgetEnabled: true,
+        widgetTitle: true,
+        widgetWelcome: true,
+        widgetAllowedOrigins: true,
+      },
+    });
+    const after = {
+      tenantSlug: tenant.slug,
+      widgetEnabled: tenant.widgetEnabled,
+      widgetTitle: tenant.widgetTitle,
+      widgetWelcome: tenant.widgetWelcome,
+      widgetAllowedOrigins: this.readOriginList(tenant.widgetAllowedOrigins),
+    };
+
+    await this.audit(user, 'tenant.widget_settings_updated', before, after);
+    return after;
   }
 
   async createDepartment(user: AuthenticatedUser, dto: CreateDepartmentDto) {
@@ -253,6 +306,10 @@ export class TenantsService {
     );
 
     return template;
+  }
+
+  private readOriginList(value: unknown) {
+    return Array.isArray(value) ? value.map((origin) => String(origin)).filter(Boolean) : [];
   }
 
   private async requireDepartment(tenantId: string, id: string) {

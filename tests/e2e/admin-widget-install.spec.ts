@@ -17,9 +17,10 @@ test('admin settings shows tenant widget install snippet', async ({ page }) => {
   await expect(page.getByLabel('Widget kurulum kodu')).toContainText('/widget.js');
   await expect(page.getByText('Beklenen kanal:')).toBeVisible();
   await expect(page.getByRole('link', { name: `/widget/${tenantSlug}` })).toHaveAttribute('href', `/widget/${tenantSlug}`);
-  await expect(page.getByText('origin allowlist')).toBeVisible();
+  await expect(page.getByLabel('Widget basligi')).toHaveValue('Demo Belediyesi Asistanı');
+  await expect(page.getByLabel(/Origin izin listesi/)).toContainText('http://127.0.0.1:3002');
   await expect(page.getByText(/Dashboard verisi alinamadi\./i)).toHaveCount(0);
 
   await page.goto(`${citizenBaseURL}/widget/${tenantSlug}`);
-  await expect(page.getByRole('heading', { name: `${tenantSlug} için widget kabuğu` })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Demo Belediyesi Asistanı' })).toBeVisible();
 });

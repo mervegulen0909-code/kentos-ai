@@ -8,10 +8,11 @@ import { InternalChannelController } from './internal-channel.controller.js';
 import { PublicConversationController } from './public-conversation.controller.js';
 import { PublicConversationService } from './public-conversation.service.js';
 import { PublicTicketController } from './public-ticket.controller.js';
+import { PublicWidgetController } from './public-widget.controller.js';
 import { PublicTicketAiService, PublicTicketService } from './public-ticket.service.js';
 
 @Module({
-  controllers: [PublicTicketController, PublicConversationController, InternalChannelController],
+  controllers: [PublicTicketController, PublicConversationController, PublicWidgetController, InternalChannelController],
   providers: [PublicTicketAiService, PublicTicketService, PublicConversationService, PublicChannelGuard, NotificationQueueService, NotificationTemplateService, SlaService, TicketNumberService],
 })
 export class PublicTicketModule {}

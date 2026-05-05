@@ -1,3 +1,4 @@
+import { citizenApi } from '../../../lib/api';
 import { WidgetChatForm } from './widget-chat-form';
 
 const suggestedMessages = [
@@ -8,6 +9,13 @@ const suggestedMessages = [
 
 export default async function WidgetPreviewPage({ params }: { params: Promise<{ tenantSlug: string }> }) {
   const { tenantSlug } = await params;
+  const widgetSettings = await citizenApi.getWidgetSettings(tenantSlug).catch(() => ({
+    tenantSlug,
+    widgetEnabled: true,
+    widgetTitle: 'KentOS Belediye Asistanı',
+    widgetWelcome: 'Merhaba. Talebinizi kısa bir cümleyle yazın. Eksik bilgi varsa size bir takip sorusu sorarım, ardından resmi başvuruya geçeriz.',
+    widgetAllowedOrigins: [],
+  }));
   const trackHref = `/${tenantSlug}/track`;
 
   return (
@@ -16,7 +24,7 @@ export default async function WidgetPreviewPage({ params }: { params: Promise<{ 
         <div className="widget-preview-header">
           <div>
             <p className="widget-preview-eyebrow">Gömülebilir belediye asistanı · Önizleme</p>
-            <h1 className="widget-preview-title">{tenantSlug} için widget kabuğu</h1>
+            <h1 className="widget-preview-title">{widgetSettings.widgetTitle}</h1>
           </div>
           <p className="widget-preview-copy">
             Bu ekran, belediye anasayfasına eklenecek sohbet kutusunun ilk kabuğunu temsil eder. Gerçek zamanlı konuşma yerine,
@@ -35,7 +43,7 @@ export default async function WidgetPreviewPage({ params }: { params: Promise<{ 
 
           <div className="widget-message-list">
             <div className="widget-message widget-message-assistant">
-              Merhaba. Talebinizi kısa bir cümleyle yazın. Eksik bilgi varsa size bir takip sorusu sorarım, ardından resmi başvuruya geçeriz.
+              {widgetSettings.widgetWelcome}
             </div>
             {suggestedMessages.map((message) => (
               <div key={message} className="widget-message widget-message-user">

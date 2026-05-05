@@ -228,6 +228,35 @@ const updatedTemplate = await request(`/message-templates/${firstTemplate.id}`, 
   body: JSON.stringify({ body: firstTemplate.body }),
 });
 console.log('message_template_update', updatedTemplate.status, Boolean(updatedTemplate.body.id));
+const widgetSettings = await request('/widget-settings', { token });
+assert(widgetSettings.body.widgetTitle, 'Widget settings missing title.');
+const updatedWidgetSettings = await request('/widget-settings', {
+  method: 'PATCH',
+  token,
+  body: JSON.stringify({
+    widgetEnabled: true,
+    widgetTitle: `Smoke Widget ${unique}`,
+    widgetWelcome: 'Smoke widget karsilama metni.',
+    widgetAllowedOrigins: ['http://localhost:3002', 'http://127.0.0.1:3002', 'http://127.0.0.1:3112'],
+  }),
+});
+assert(updatedWidgetSettings.body.widgetAllowedOrigins.includes('http://127.0.0.1:3002'), 'Widget origin allowlist was not persisted.');
+await request('/widget-settings', {
+  method: 'PATCH',
+  token,
+  body: JSON.stringify({
+    widgetEnabled: true,
+    widgetTitle: widgetSettings.body.widgetTitle,
+    widgetWelcome: widgetSettings.body.widgetWelcome,
+    widgetAllowedOrigins: widgetSettings.body.widgetAllowedOrigins,
+  }),
+});
+await expectStatus('/widget-settings', 403, {
+  method: 'PATCH',
+  token: readOnlyToken,
+  body: JSON.stringify({ widgetTitle: 'Read only widget update' }),
+});
+console.log('widget_settings_update', updatedWidgetSettings.status, updatedWidgetSettings.body.widgetTitle);
 const disabledTemplate = await request(`/message-templates/${firstTemplate.id}`, {
   method: 'PATCH',
   token,
@@ -618,6 +647,7 @@ const settingsAuditActions = [
   'tenant.sla_policy_created',
   'tenant.sla_policy_updated',
   'tenant.message_template_updated',
+  'tenant.widget_settings_updated',
 ];
 const settingsAuditEntries = await prisma.auditLog.findMany({
   where: {

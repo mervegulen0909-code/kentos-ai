@@ -6,7 +6,7 @@ test('citizen widget preview submits through conversation shell without raw erro
 
   await page.goto(`${citizenBaseURL}/widget/${tenantSlug}`);
 
-  await expect(page.getByRole('heading', { name: `${tenantSlug} için widget kabuğu` })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Demo Belediyesi Asistanı' })).toBeVisible();
   await expect(page.getByText('WEB_CHAT')).toBeVisible();
   await page.getByLabel('Vatandaşın ilk mesajı').fill('Atatürk Mahallesi 12. Sokak kaldırım çöktü, bebek arabası geçemiyor. Telefonum +905551112233.');
   await page.getByLabel('Ad soyad').fill('Playwright Widget Vatandas');

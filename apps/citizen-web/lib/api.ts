@@ -44,6 +44,14 @@ export type CreatePublicTicketInput = {
   channel?: 'CITIZEN_WEB' | 'WEB_CHAT' | 'MOBILE_APP';
 };
 
+export type PublicWidgetSettings = {
+  tenantSlug: string;
+  widgetEnabled: boolean;
+  widgetTitle: string;
+  widgetWelcome: string;
+  widgetAllowedOrigins: string[];
+};
+
 export type PublicConversation = {
   conversationId: string;
   channel: 'CITIZEN_WEB' | 'WEB_CHAT' | 'MOBILE_APP';
@@ -72,6 +80,7 @@ export const citizenApi = {
   createTicket: (tenantSlug: string, input: CreatePublicTicketInput) =>
     apiFetch<PublicTicket>(`/public/${tenantSlug}/tickets`, { method: 'POST', body: JSON.stringify(input) }),
   getTicket: (tenantSlug: string, ticketIdentifier: string) => apiFetch<PublicTicket>(`/public/${tenantSlug}/tickets/${ticketIdentifier}`),
+  getWidgetSettings: (tenantSlug: string) => apiFetch<PublicWidgetSettings>(`/public/${tenantSlug}/widget-settings`),
   startConversation: (tenantSlug: string, input: StartPublicConversationInput) =>
     apiFetch<PublicConversation>(`/public/${tenantSlug}/conversations`, { method: 'POST', body: JSON.stringify(input) }),
   sendConversationMessage: (tenantSlug: string, conversationId: string, input: SendPublicConversationMessageInput) =>
