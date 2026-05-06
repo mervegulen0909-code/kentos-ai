@@ -8,12 +8,14 @@ type WidgetSubmitState = {
   status: 'idle' | 'success' | 'error';
   message: string | null;
   trackingToken: string | null;
+  handoffRequested: boolean;
 };
 
 const initialWidgetSubmitState: WidgetSubmitState = {
   status: 'idle',
   message: null,
   trackingToken: null,
+  handoffRequested: false,
 };
 
 export function WidgetChatForm({ tenantSlug, trackHref }: { tenantSlug: string; trackHref: string }) {
@@ -46,6 +48,7 @@ export function WidgetChatForm({ tenantSlug, trackHref }: { tenantSlug: string; 
       {state.message ? (
         <div className={`widget-result widget-result-${state.status}`} role={state.status === 'error' ? 'alert' : 'status'}>
           <p>{state.message}</p>
+          {state.handoffRequested ? <strong>Durum: İnsan desteği talebi belediye ekibine iletildi.</strong> : null}
           {state.trackingToken ? <strong>Takip kodu: {state.trackingToken}</strong> : null}
         </div>
       ) : null}

@@ -6,83 +6,55 @@ const quickPrompts = [
   'Park içindeki sulama hattı patlamış olabilir.',
 ];
 
+const metrics = [
+  ['24/7', 'Vatandaş mesajı web, widget ve WhatsApp kanallarından alınır.'],
+  ['TK', 'Halka açık takip sadece güvenli takip koduyla yapılır.'],
+  ['SLA', 'Departman, kategori ve süre hedefleri operasyon panelinde izlenir.'],
+];
+
 export default function CitizenHome() {
   return (
-    <main className="wrap">
+    <main className="wrap home-shell">
       <section className="hero">
-        <div>
-          <p style={{ color: 'var(--muted)', fontWeight: 700 }}>Demo Belediyesi · KentOS AI</p>
-          <h1 className="display">Belediye asistanı ile yazış, başvuru aç, süreci takip et.</h1>
-          <p style={{ color: 'var(--muted)', fontSize: '1.25rem', maxWidth: 680 }}>
-            Bu yüz, ayrı bir vatandaş uygulaması ile belediye sitesine gömülebilecek asistan deneyimi arasındaki ilk köprüdür.
-            Vatandaş hızlıca talep başlatır, sonra resmi başvuru akışına ya da takip ekranına geçer.
+        <div className="hero-copy">
+          <p className="eyebrow">Demo Belediyesi · KentOS AI</p>
+          <h1 className="display">Belediye asistanı; talebi alır, kayda çevirir, süreci görünür kılar.</h1>
+          <p className="lede">
+            Vatandaş tek cümleyle başlar. Sistem konuyu yapılandırır, eksik bilgi varsa tamamlatır ve resmi başvuru omurgasına güvenli takip koduyla taşır.
           </p>
-          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 24 }}>
-            <Link className="cta" href="/demo-belediye/report" style={{ display: 'inline-flex', alignItems: 'center', textDecoration: 'none' }}>
-              Başvuru oluştur
-            </Link>
-            <Link
-              href="/demo-belediye/track"
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                minHeight: 48,
-                padding: '0 22px',
-                borderRadius: 999,
-                border: '1px solid var(--line)',
-                color: 'var(--ink)',
-                background: 'var(--surface)',
-                textDecoration: 'none',
-              }}
-            >
-              Takip kodu gir
-            </Link>
+          <div className="action-row">
+            <Link className="cta" href="/demo-belediye/report">Başvuru oluştur</Link>
+            <Link className="secondary-cta" href="/demo-belediye/track">Takip kodu gir</Link>
+            <Link className="secondary-cta" href="/widget/demo-belediye">Widget önizle</Link>
+          </div>
+          <div className="home-metrics" aria-label="KentOS yetenekleri">
+            {metrics.map(([value, label]) => (
+              <div className="metric-card" key={value}>
+                <strong>{value}</strong>
+                <span>{label}</span>
+              </div>
+            ))}
           </div>
         </div>
 
-        <section className="card" aria-label="Belediye asistanı önizlemesi">
-          <p style={{ margin: 0, color: 'var(--muted)', fontWeight: 700 }}>Web asistanı önizleme akışı</p>
-          <div
-            style={{
-              marginTop: 18,
-              display: 'grid',
-              gap: 12,
-              border: '1px solid var(--line)',
-              borderRadius: 20,
-              padding: 18,
-              background: 'oklch(98% 0.01 92)',
-            }}
-          >
-            <div
-              style={{
-                maxWidth: '85%',
-                justifySelf: 'start',
-                background: 'white',
-                border: '1px solid var(--line)',
-                borderRadius: 18,
-                padding: '12px 14px',
-              }}
-            >
+        <section className="card assistant-preview-panel" aria-label="Belediye asistanı önizlemesi">
+          <p className="eyebrow">Web asistanı önizleme akışı</p>
+          <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(2.2rem, 5vw, 4.8rem)', lineHeight: .88, letterSpacing: '-.055em', margin: 0 }}>
+            Gömülebilir, takip kodlu, belediye tonunda.
+          </h2>
+          <p className="panel-muted" style={{ lineHeight: 1.55, marginTop: 14 }}>
+            Bu deneyim belediye sitesine tek script ile eklenir; mesajlar WEB_CHAT kanalıyla aynı ticket, SLA ve audit omurgasına bağlanır.
+          </p>
+          <div className="preview-thread">
+            <div className="preview-bubble preview-bubble-assistant">
               Merhaba. Talebinizi tek cümleyle yazın; eksik bilgi varsa size kısa bir takip sorusu sorayım.
             </div>
             {quickPrompts.map((prompt) => (
-              <div
-                key={prompt}
-                style={{
-                  maxWidth: '88%',
-                  justifySelf: 'end',
-                  background: 'var(--ink)',
-                  color: 'white',
-                  borderRadius: 18,
-                  padding: '12px 14px',
-                }}
-              >
-                {prompt}
-              </div>
+              <div className="preview-bubble preview-bubble-user" key={prompt}>{prompt}</div>
             ))}
-            <div className="notice" style={{ marginBottom: 0 }}>
-              Bu ilk dalgada gerçek sohbet motoru yerine yönlendirilmiş bir giriş yüzü sunuyoruz. Sonraki fazda çok adımlı konuşma akışı eklenecek.
+            <div className="notice preview-note">
+              <strong>Operasyon köprüsü hazır.</strong>
+              <p>Widget, vatandaş formu ve WhatsApp aynı kanal analitiğinde birleşir.</p>
             </div>
           </div>
 
@@ -98,28 +70,9 @@ export default function CitizenHome() {
                 defaultValue="Atatürk Mahallesi 12. Sokak'ta kaldırım çöktü, bebek arabası geçemiyor."
               />
             </div>
-            <p style={{ margin: 0, color: 'var(--muted)' }}>
-              Üretim kullanımında bu alan widget konuşmasına dönüşecek. Şimdilik ilk mesajı resmi başvuru formuna taşıyoruz.
-            </p>
-            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+            <div className="action-row" style={{ marginTop: 0 }}>
               <button className="cta" type="submit">Mesajı başvuruya taşı</button>
-              <Link
-                href="/widget/demo-belediye"
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  minHeight: 48,
-                  padding: '0 22px',
-                  borderRadius: 999,
-                  border: '1px solid var(--line)',
-                  color: 'var(--ink)',
-                  background: 'var(--surface)',
-                  textDecoration: 'none',
-                }}
-              >
-                Widget kabuğunu aç
-              </Link>
+              <Link className="secondary-cta" href="/widget/demo-belediye">Widget kabuğunu aç</Link>
             </div>
           </form>
         </section>

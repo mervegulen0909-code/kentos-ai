@@ -53,7 +53,7 @@ export class PublicConversationService {
       },
     });
 
-    return this.toResponse(conversation.id, channel, context, null);
+    return this.toResponse(conversation.id, channel, context, null, false);
   }
 
   async ingestEnvelope(envelope: ChannelIntakeEnvelope) {
@@ -125,8 +125,14 @@ export class PublicConversationService {
       latestClassification: aiResult.classification,
     };
 
+    const handoffRequested = aiResult.classification.intent === 'human_handoff';
     let ticket = null;
     let assistantMessage = aiResult.classification.followUpQuestion;
+
+    if (handoffRequested && !assistantMessage) {
+      assistantMessage = 'Talebiniz belediye ekibine insan desteği isteği olarak iletildi. Kısa süre içinde sizinle paylaştığınız iletişim bilgisinden dönüş yapılacaktır.';
+    }
+
     if (!aiResult.classification.missingFields.length && aiResult.classification.intent === 'new_ticket') {
       ticket = await this.tickets.create(tenantSlug, {
         description: aiResult.classification.description,
@@ -149,12 +155,13 @@ export class PublicConversationService {
       where: { id: conversation.id },
       data: {
         context: nextContext,
+        handoffRequested,
         lastMessageAt: now,
         state: ticket ? 'TICKET_CREATED' : 'OPEN',
       },
     });
 
-    return this.toResponse(conversation.id, channel, nextContext, assistantMessage);
+    return this.toResponse(conversation.id, channel, nextContext, assistantMessage, handoffRequested);
   }
 
   private async requireTenant(tenantSlug: string) {
@@ -206,7 +213,13 @@ export class PublicConversationService {
     });
   }
 
-  private toResponse(conversationId: string, channel: IntakeChannel, context: ConversationContext, assistantMessage: string | null) {
+  private toResponse(
+    conversationId: string,
+    channel: IntakeChannel,
+    context: ConversationContext,
+    assistantMessage: string | null,
+    handoffRequested: boolean,
+  ) {
     return {
       conversationId,
       channel,
@@ -215,6 +228,7 @@ export class PublicConversationService {
       missingFields: context.latestClassification?.missingFields ?? [],
       followUpQuestion: context.latestClassification?.followUpQuestion ?? null,
       trackingToken: context.ticket?.trackingToken ?? null,
+      handoffRequested,
     };
   }
 }

@@ -67,6 +67,10 @@ const successCopy: Record<string, FeedbackCopy> = {
     title: 'Atama tamamlandi.',
     detail: 'Talep secilen birimin operasyon kuyruguna tasindi.',
   },
+  'created-from-handoff': {
+    title: 'Operator devrinden ticket olusturuldu.',
+    detail: 'Konusma kaydi ticket omurgasina alindi; bundan sonraki operasyon akisi standart talep ekranindan ilerler.',
+  },
   'internal-note-added': {
     title: 'Ic not kaydedildi.',
     detail: 'Bu not yalnizca personel ekranlarinda gorunur; vatandas takip ekranina yansimaz.',

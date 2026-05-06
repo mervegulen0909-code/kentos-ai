@@ -39,6 +39,7 @@ export default async function ReportsPage() {
         <nav style={{ display: 'grid', gap: 12, marginTop: 32 }}>
           <a href="/">Dashboard</a>
           <a href="/tickets">Talepler</a>
+          <a href="/handoffs">Operator devri</a>
           <a href="/queues">Birim kuyruklari</a>
           {analyticsVisible ? <a href="/reports">Raporlar</a> : null}
           {settingsVisible ? <a href="/settings">Ayarlar</a> : null}

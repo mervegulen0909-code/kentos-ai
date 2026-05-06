@@ -35,13 +35,20 @@ export default async function ReportPage({
 
   return (
     <main className="wrap">
-      <p style={{ color: 'var(--muted)', fontWeight: 700 }}>{tenantSlug} - Yeni başvuru</p>
       <section className="hero">
-        <div>
-          <h1 className="display">Talebinizi belediyeye iletin.</h1>
-          <p style={{ color: 'var(--muted)', fontSize: '1.2rem' }}>Gönderim başarılı olursa gizli takip kodunuzun olduğu güvenli sayfaya yönlendirileceksiniz.</p>
+        <div className="card report-header-card">
+          <div>
+            <p className="eyebrow">{tenantSlug} · Yeni başvuru</p>
+            <h1 className="display">Talebinizi belediyeye iletin.</h1>
+            <p className="lede">Gönderim başarılı olursa gizli takip kodunuzun olduğu güvenli sayfaya yönlendirileceksiniz.</p>
+          </div>
+          <div className="report-steps" aria-label="Başvuru akışı">
+            <div className="report-step"><strong>1 · Anlatın</strong><span>Ne oldu, nerede oldu, ekip neye baksın?</span></div>
+            <div className="report-step"><strong>2 · Kayda alın</strong><span>Sistem talebi güvenli TK koduyla oluşturur.</span></div>
+            <div className="report-step"><strong>3 · Takip edin</strong><span>Durumu vatandaş ekranından izleyin.</span></div>
+          </div>
         </div>
-        <form action={action} className="card">
+        <form action={action} className="card report-card">
           {assistantPreviewSource ? (
             <div className="notice" role="status">
               <strong>Asistan önizlemesinden geldiniz.</strong>

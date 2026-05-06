@@ -100,6 +100,39 @@ export type Category = { id: string; name: string; code: string; departmentId?: 
 export type MessageTemplate = { id: string; key: string; body: string; locale: string; isActive: boolean };
 export type SlaPolicy = { id: string; priority: string; responseMinutes: number; resolutionMinutes: number; isActive: boolean; department?: Department | null; category?: Category | null };
 export type AuditLogItem = { id: string; action: string; createdAt: string; before?: unknown; after?: unknown };
+export type HandoffSummary = {
+  id: string;
+  channel: string;
+  state: string;
+  handoffRequested: boolean;
+  createdAt: string;
+  updatedAt: string;
+  lastMessageAt: string | null;
+  externalConversationId: string | null;
+  citizen: {
+    displayName: string | null;
+    phone: string | null;
+    email: string | null;
+  };
+  latestIntent: string | null;
+  latestCitizenMessage: string | null;
+  latestAssistantMessage: string | null;
+  trackingToken: string | null;
+  messageCount: number;
+};
+export type HandoffDetail = HandoffSummary & {
+  followUpQuestion: string | null;
+  classificationTitle: string | null;
+  classificationDescription: string | null;
+  missingFields: string[];
+  messages: Array<{ role: 'citizen' | 'assistant'; text: string; at: string | null }>;
+};
+
+export type HandoffCreateTicketResult = {
+  ticketId: string;
+  ticketNo: string;
+  trackingToken: string | null;
+};
 
 export const adminApi = {
   overview: (token: string) => apiFetch<AnalyticsOverview>('/analytics/overview', { token }),
@@ -107,6 +140,9 @@ export const adminApi = {
   tickets: (token: string) => apiFetch<TicketListItem[]>('/tickets', { token }),
   ticket: (token: string, id: string) => apiFetch<TicketDetail>(`/tickets/${id}`, { token }),
   auditLog: (token: string, id: string) => apiFetch<AuditLogItem[]>(`/tickets/${id}/audit-log`, { token }),
+  handoffs: (token: string) => apiFetch<HandoffSummary[]>('/tickets/handoffs', { token }),
+  handoff: (token: string, id: string) => apiFetch<HandoffDetail>(`/tickets/handoffs/${id}`, { token }),
+  createTicketFromHandoff: (token: string, id: string) => apiFetch<HandoffCreateTicketResult>(`/tickets/handoffs/${id}/create-ticket`, { method: 'POST', token }),
   departments: (token: string) => apiFetch<Department[]>('/departments', { token }),
   categories: (token: string) => apiFetch<Category[]>('/categories', { token }),
   slaPolicies: (token: string) => apiFetch<SlaPolicy[]>('/sla-policies', { token }),

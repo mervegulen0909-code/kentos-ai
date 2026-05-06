@@ -6,6 +6,7 @@ type WidgetSubmitState = {
   status: 'idle' | 'success' | 'error';
   message: string | null;
   trackingToken: string | null;
+  handoffRequested: boolean;
 };
 
 export async function submitWidgetMessage(tenantSlug: string, _state: WidgetSubmitState, formData: FormData): Promise<WidgetSubmitState> {
@@ -18,6 +19,7 @@ export async function submitWidgetMessage(tenantSlug: string, _state: WidgetSubm
       status: 'error',
       message: 'Talebinizi anlayabilmemiz için en az 10 karakterlik kısa bir açıklama yazın.',
       trackingToken: null,
+      handoffRequested: false,
     };
   }
 
@@ -35,15 +37,22 @@ export async function submitWidgetMessage(tenantSlug: string, _state: WidgetSubm
     });
 
     return {
-      status: result.trackingToken ? 'success' : 'error',
-      message: result.assistantMessage ?? result.followUpQuestion ?? 'Talebiniz için ek bilgi gerekiyor. Lütfen resmi başvuru formundan devam edin.',
+      status: result.trackingToken || result.handoffRequested ? 'success' : 'error',
+      message:
+        result.assistantMessage ??
+        result.followUpQuestion ??
+        (result.handoffRequested
+          ? 'Talebiniz insan desteği isteği olarak belediye ekibine iletildi.'
+          : 'Talebiniz için ek bilgi gerekiyor. Lütfen resmi başvuru formundan devam edin.'),
       trackingToken: result.trackingToken,
+      handoffRequested: result.handoffRequested,
     };
   } catch {
     return {
       status: 'error',
       message: 'Talep şu anda aktarılamadı. Lütfen biraz sonra tekrar deneyin veya resmi başvuru formuna geçin.',
       trackingToken: null,
+      handoffRequested: false,
     };
   }
 }

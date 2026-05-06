@@ -1,5 +1,5 @@
 import { ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { AuditActorType, MessageVisibility, TicketStatus, UserRole } from '@kentos/database';
+import { AuditActorType, ChannelType, MessageVisibility, TicketStatus, UserRole } from '@kentos/database';
 import type { Prisma } from '@kentos/database';
 import type { IntakeClassification } from '@kentos/shared';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
@@ -288,6 +288,135 @@ export class TicketsService {
     return this.prisma.auditLog.findMany({ where: { tenantId: user.tenantId, ticketId: id }, orderBy: { createdAt: 'desc' } });
   }
 
+  async listHandoffs(user: AuthenticatedUser) {
+    const conversations = await this.prisma.conversation.findMany({
+      where: {
+        tenantId: user.tenantId,
+        handoffRequested: true,
+      },
+      include: {
+        citizen: true,
+      },
+      orderBy: [{ lastMessageAt: 'desc' }, { createdAt: 'desc' }],
+      take: 100,
+    });
+
+    return conversations.map((conversation) => this.toHandoffSummary(conversation));
+  }
+
+  async getHandoff(user: AuthenticatedUser, id: string) {
+    const conversation = await this.prisma.conversation.findFirst({
+      where: {
+        id,
+        tenantId: user.tenantId,
+        handoffRequested: true,
+      },
+      include: {
+        citizen: true,
+      },
+    });
+
+    if (!conversation) throw new NotFoundException('Operator devri bekleyen konusma bulunamadi.');
+    return this.toHandoffDetail(conversation);
+  }
+
+  async createTicketFromHandoff(user: AuthenticatedUser, id: string) {
+    const conversation = await this.prisma.conversation.findFirst({
+      where: {
+        id,
+        tenantId: user.tenantId,
+        handoffRequested: true,
+      },
+      include: {
+        citizen: true,
+      },
+    });
+
+    if (!conversation) throw new NotFoundException('Operator devri bekleyen konusma bulunamadi.');
+
+    const context = this.readConversationContext(conversation.context);
+    const latestClassification = this.asRecord(context.latestClassification);
+    const contact = this.readConversationContact(context.contact);
+    const existingTicket = this.asRecord(context.ticket);
+
+    if (typeof existingTicket?.trackingToken === 'string') {
+      throw new ForbiddenException('Bu konusma icin zaten ticket olusturulmus.');
+    }
+
+    const title = typeof latestClassification?.title === 'string' && latestClassification.title.trim().length >= 3
+      ? latestClassification.title.trim()
+      : 'Operator devri talebi';
+    const description = typeof latestClassification?.description === 'string' && latestClassification.description.trim().length >= 10
+      ? latestClassification.description.trim()
+      : this.readConversationMessages(context.messages)
+          .filter((message) => message.role === 'citizen')
+          .map((message) => message.text.trim())
+          .filter(Boolean)
+          .join('\n\n')
+          .slice(0, 5000);
+
+    if (!description || description.length < 10) {
+      throw new ForbiddenException('Bu konusmadan ticket olusturmak icin yeterli aciklama yok.');
+    }
+
+    const ticket = await this.create(user, {
+      channel: conversation.channel as ChannelType,
+      title,
+      description,
+      addressText: typeof latestClassification?.addressText === 'string' ? latestClassification.addressText : undefined,
+      citizenId: conversation.citizenId ?? undefined,
+    });
+
+    const nextContext: Prisma.InputJsonValue = {
+      ...context,
+      ticket: {
+        trackingToken: ticket.publicTrackingToken,
+        createdAt: new Date().toISOString(),
+        source: 'operator_handoff',
+      },
+      contact: {
+        displayName: conversation.citizen?.displayName ?? contact.displayName,
+        phone: conversation.citizen?.phone ?? contact.phone,
+        email: conversation.citizen?.email ?? contact.email,
+      },
+    };
+
+    await this.prisma.conversation.update({
+      where: { id: conversation.id },
+      data: {
+        context: nextContext,
+        handoffRequested: false,
+        state: 'TICKET_CREATED',
+        lastMessageAt: conversation.lastMessageAt ?? new Date(),
+      },
+    });
+
+    await this.prisma.auditLog.create({
+      data: {
+        tenantId: user.tenantId,
+        ticketId: ticket.id,
+        actorType: AuditActorType.USER,
+        actorUserId: user.id,
+        action: 'ticket.created_from_handoff',
+        after: {
+          conversationId: conversation.id,
+          channel: conversation.channel,
+          citizen: {
+            displayName: conversation.citizen?.displayName ?? contact.displayName,
+            phone: conversation.citizen?.phone ?? contact.phone,
+            email: conversation.citizen?.email ?? contact.email,
+          },
+        },
+      },
+    });
+
+    return {
+      ticketId: ticket.id,
+      ticketNo: ticket.ticketNo,
+      trackingToken: ticket.publicTrackingToken,
+    };
+  }
+
   private async requireTicket(user: AuthenticatedUser, id: string) {
     const departmentScope = await this.departmentScope(user);
     const ticket = await this.prisma.ticket.findFirst({
@@ -354,6 +483,103 @@ export class TicketsService {
 
   private asRecord(value: unknown): Record<string, unknown> | null {
     return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
+  }
+
+  private toHandoffSummary(conversation: {
+    id: string;
+    channel: string;
+    state: string;
+    handoffRequested: boolean;
+    lastMessageAt: Date | null;
+    createdAt: Date;
+    updatedAt: Date;
+    externalConversationId: string | null;
+    citizen: { displayName: string | null; phone: string | null; email: string | null } | null;
+    context: unknown;
+  }) {
+    const context = this.readConversationContext(conversation.context);
+    const messages = this.readConversationMessages(context.messages);
+    const contact = this.readConversationContact(context.contact);
+    const latestClassification = this.asRecord(context.latestClassification);
+    const latestCitizenMessage = [...messages].reverse().find((message) => message.role === 'citizen')?.text ?? null;
+    const latestAssistantMessage = [...messages].reverse().find((message) => message.role === 'assistant')?.text ?? null;
+    const ticket = this.asRecord(context.ticket);
+
+    return {
+      id: conversation.id,
+      channel: conversation.channel,
+      state: conversation.state,
+      handoffRequested: conversation.handoffRequested,
+      createdAt: conversation.createdAt,
+      updatedAt: conversation.updatedAt,
+      lastMessageAt: conversation.lastMessageAt,
+      externalConversationId: conversation.externalConversationId,
+      citizen: {
+        displayName: conversation.citizen?.displayName ?? contact.displayName,
+        phone: conversation.citizen?.phone ?? contact.phone,
+        email: conversation.citizen?.email ?? contact.email,
+      },
+      latestIntent: typeof latestClassification?.intent === 'string' ? latestClassification.intent : null,
+      latestCitizenMessage,
+      latestAssistantMessage,
+      trackingToken: typeof ticket?.trackingToken === 'string' ? ticket.trackingToken : null,
+      messageCount: messages.length,
+    };
+  }
+
+  private toHandoffDetail(conversation: {
+    id: string;
+    channel: string;
+    state: string;
+    handoffRequested: boolean;
+    lastMessageAt: Date | null;
+    createdAt: Date;
+    updatedAt: Date;
+    externalConversationId: string | null;
+    citizen: { displayName: string | null; phone: string | null; email: string | null } | null;
+    context: unknown;
+  }) {
+    const summary = this.toHandoffSummary(conversation);
+    const context = this.readConversationContext(conversation.context);
+    const latestClassification = this.asRecord(context.latestClassification);
+    const missingFields = Array.isArray(latestClassification?.missingFields)
+      ? latestClassification.missingFields.filter((field): field is string => typeof field === 'string')
+      : [];
+
+    return {
+      ...summary,
+      followUpQuestion: typeof latestClassification?.followUpQuestion === 'string' ? latestClassification.followUpQuestion : null,
+      classificationTitle: typeof latestClassification?.title === 'string' ? latestClassification.title : null,
+      classificationDescription: typeof latestClassification?.description === 'string' ? latestClassification.description : null,
+      missingFields,
+      messages: this.readConversationMessages(context.messages),
+    };
+  }
+
+  private readConversationContext(value: unknown) {
+    return this.asRecord(value) ?? {};
+  }
+
+  private readConversationContact(value: unknown) {
+    const contact = this.asRecord(value);
+    return {
+      displayName: typeof contact?.displayName === 'string' ? contact.displayName : null,
+      phone: typeof contact?.phone === 'string' ? contact.phone : null,
+      email: typeof contact?.email === 'string' ? contact.email : null,
+    };
+  }
+
+  private readConversationMessages(value: unknown) {
+    if (!Array.isArray(value)) return [] as Array<{ role: 'citizen' | 'assistant'; text: string; at: string | null }>;
+
+    return value.flatMap((message) => {
+      const item = this.asRecord(message);
+      const role = item?.role;
+      const text = item?.text;
+      const at = item?.at;
+      if ((role !== 'citizen' && role !== 'assistant') || typeof text !== 'string') return [];
+      return [{ role, text, at: typeof at === 'string' ? at : null }];
+    });
   }
 
   private audit(user: AuthenticatedUser, ticketId: string, action: string, before?: Prisma.InputJsonValue, after?: Prisma.InputJsonValue) {

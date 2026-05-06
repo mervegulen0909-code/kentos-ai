@@ -34,6 +34,22 @@ export class TicketsController {
     return this.tickets.create(user, dto);
   }
 
+  @Get('handoffs')
+  listHandoffs(@CurrentUser() user: AuthenticatedUser) {
+    return this.tickets.listHandoffs(user);
+  }
+
+  @Get('handoffs/:id')
+  getHandoff(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+    return this.tickets.getHandoff(user, id);
+  }
+
+  @Roles('SUPER_ADMIN', 'TENANT_ADMIN', 'MANAGER', 'OPERATOR')
+  @Post('handoffs/:id/create-ticket')
+  createTicketFromHandoff(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+    return this.tickets.createTicketFromHandoff(user, id);
+  }
+
   @Get(':id')
   get(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
     return this.tickets.get(user, id);

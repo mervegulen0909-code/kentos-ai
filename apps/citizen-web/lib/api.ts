@@ -60,6 +60,7 @@ export type PublicConversation = {
   missingFields: string[];
   followUpQuestion: string | null;
   trackingToken: string | null;
+  handoffRequested: boolean;
 };
 
 export type StartPublicConversationInput = {
