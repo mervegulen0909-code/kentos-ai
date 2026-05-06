@@ -2,6 +2,7 @@ import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { ChannelType } from '@kentos/database';
 import type { ChannelIntakeEnvelope, IntakeChannel, PublicTicketAiIntakeResult } from '@kentos/shared';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { CitizenIdentityService } from './citizen-identity.service.js';
 import { CreatePublicConversationDto } from './dto/create-public-conversation.dto.js';
 import { CreatePublicTicketDto } from './dto/create-public-ticket.dto.js';
 import { SendPublicConversationMessageDto } from './dto/send-public-conversation-message.dto.js';
@@ -20,6 +21,7 @@ export class PublicConversationService {
     @Inject(PrismaService) private readonly prisma: PrismaService,
     @Inject(PublicTicketAiService) private readonly ai: PublicTicketAiService,
     @Inject(PublicTicketService) private readonly tickets: PublicTicketService,
+    @Inject(CitizenIdentityService) private readonly citizenIdentity: CitizenIdentityService,
   ) {}
 
   async widgetSettings(tenantSlug: string) {
@@ -37,6 +39,11 @@ export class PublicConversationService {
     const tenant = await this.requireTenant(tenantSlug);
     const channel = dto.channel ?? ChannelType.WEB_CHAT;
     const contact = this.normalizeContact(dto.contact, dto.displayName);
+    const citizen = await this.citizenIdentity.resolveCitizen({
+      tenantId: tenant.id,
+      contact,
+      source: this.identitySourceForChannel(channel),
+    });
     const now = new Date();
     const context: ConversationContext = {
       messages: dto.initialMessage ? [{ role: 'citizen', text: dto.initialMessage.trim(), at: now.toISOString() }] : [],
@@ -46,6 +53,7 @@ export class PublicConversationService {
     const conversation = await this.prisma.conversation.create({
       data: {
         tenantId: tenant.id,
+        citizenId: citizen?.id,
         channel,
         externalConversationId: dto.externalConversationId?.trim() || undefined,
         context,
@@ -60,27 +68,43 @@ export class PublicConversationService {
     const tenant = envelope.tenantSlug
       ? await this.requireTenant(envelope.tenantSlug)
       : await this.requireTenantById(envelope.tenantId ?? '');
-    const conversation = await this.prisma.conversation.findFirst({
-      where: {
-        tenantId: tenant.id,
-        channel: envelope.channel,
-        externalConversationId: envelope.externalConversationId,
-      },
-    }) ?? await this.prisma.conversation.create({
+    const inboundEvent = await this.recordInboundEvent(tenant.id, envelope);
+    if (inboundEvent?.processedAt) {
+      const existingConversation = await this.findConversationForEnvelope(tenant.id, envelope);
+      if (existingConversation) {
+        const context = this.readContext(existingConversation.context);
+        return this.toResponse(existingConversation.id, existingConversation.channel as IntakeChannel, context, null, existingConversation.handoffRequested);
+      }
+    }
+
+    const citizen = await this.citizenIdentity.resolveCitizen({
+      tenantId: tenant.id,
+      contact: envelope.citizenContact,
+      source: this.identitySourceForChannel(envelope.channel),
+    });
+    const conversation = await this.findConversationForEnvelope(tenant.id, envelope) ?? await this.prisma.conversation.create({
       data: {
         tenantId: tenant.id,
+        citizenId: citizen?.id,
         channel: envelope.channel,
         externalConversationId: envelope.externalConversationId,
-        context: { messages: [], contact: envelope.citizenContact },
+        context: { messages: [], contact: this.citizenIdentity.normalizeContact(envelope.citizenContact) },
       },
     });
 
-    return this.processMessage(tenant.slug, conversation.id, {
+    const result = await this.processMessage(tenant.slug, conversation.id, {
       text: envelope.text,
       displayName: envelope.citizenContact?.displayName ?? undefined,
       phone: envelope.citizenContact?.phone ?? undefined,
       email: envelope.citizenContact?.email ?? undefined,
     });
+    if (inboundEvent && !inboundEvent.processedAt) {
+      await this.prisma.channelEvent.update({
+        where: { id: inboundEvent.id },
+        data: { processedAt: new Date() },
+      });
+    }
+    return result;
   }
 
   async sendMessage(tenantSlug: string, conversationId: string, dto: SendPublicConversationMessageDto) {
@@ -99,9 +123,35 @@ export class PublicConversationService {
       phone: dto.phone,
       email: dto.email,
     });
+    const citizen = await this.citizenIdentity.resolveCitizen({
+      tenantId: tenant.id,
+      contact,
+      source: this.identitySourceForChannel(channel),
+      preferredCitizenId: conversation.citizenId,
+    });
     const now = new Date();
     const text = dto.text.trim();
     const messages = [...(context.messages ?? []), { role: 'citizen' as const, text, at: now.toISOString() }];
+    const existingTicket = this.readTicketContext(context.ticket);
+    if (existingTicket.trackingToken) {
+      const assistantMessage = `Bu konusmadan basvuru zaten olusturuldu. Takip kodunuz: ${existingTicket.trackingToken}.`;
+      const nextContext: ConversationContext = {
+        ...context,
+        contact,
+        messages: [...messages, { role: 'assistant' as const, text: assistantMessage, at: now.toISOString() }],
+      };
+      await this.prisma.conversation.update({
+        where: { id: conversation.id },
+        data: {
+          citizenId: citizen?.id ?? conversation.citizenId,
+          context: nextContext,
+          handoffRequested: false,
+          lastMessageAt: now,
+          state: 'TICKET_CREATED',
+        },
+      });
+      return this.toResponse(conversation.id, channel, nextContext, assistantMessage, false);
+    }
 
     const aiResult = await this.ai.classify({
       tenantContext: {
@@ -144,6 +194,8 @@ export class PublicConversationService {
         latitude: aiResult.classification.location?.latitude,
         longitude: aiResult.classification.location?.longitude,
         channel: channel as CreatePublicTicketDto['channel'],
+      }, {
+        preferredCitizenId: citizen?.id ?? conversation.citizenId,
       });
       nextContext.ticket = { trackingToken: ticket.trackingToken, createdAt: new Date().toISOString() };
       assistantMessage = `Başvurunuz oluşturuldu. Takip kodunuz: ${ticket.trackingToken}.`;
@@ -154,6 +206,7 @@ export class PublicConversationService {
     await this.prisma.conversation.update({
       where: { id: conversation.id },
       data: {
+        citizenId: citizen?.id ?? conversation.citizenId,
         context: nextContext,
         handoffRequested,
         lastMessageAt: now,
@@ -180,21 +233,74 @@ export class PublicConversationService {
     return value && typeof value === 'object' ? value as ConversationContext : {};
   }
 
+  private async findConversationForEnvelope(tenantId: string, envelope: ChannelIntakeEnvelope) {
+    return this.prisma.conversation.findFirst({
+      where: {
+        tenantId,
+        channel: envelope.channel,
+        externalConversationId: envelope.externalConversationId,
+      },
+    });
+  }
+
+  private async recordInboundEvent(tenantId: string, envelope: ChannelIntakeEnvelope) {
+    if (!envelope.externalMessageId) return null;
+
+    const where = {
+      tenantId,
+      channel: envelope.channel,
+      provider: envelope.provider,
+      externalEventId: envelope.externalMessageId,
+    };
+    const existing = await this.prisma.channelEvent.findFirst({ where, select: { id: true, processedAt: true } });
+    if (existing) return existing;
+
+    try {
+      return await this.prisma.channelEvent.create({
+        data: {
+          ...where,
+          payload: {
+            direction: 'INBOUND',
+            externalConversationId: envelope.externalConversationId,
+            text: envelope.text,
+            citizenContact: envelope.citizenContact,
+            raw: envelope.raw ?? null,
+          },
+        },
+        select: { id: true, processedAt: true },
+      });
+    } catch {
+      return this.prisma.channelEvent.findFirst({ where, select: { id: true, processedAt: true } });
+    }
+  }
+
+  private readTicketContext(value: unknown) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return { trackingToken: null as string | null };
+    const trackingToken = (value as { trackingToken?: unknown }).trackingToken;
+    return { trackingToken: typeof trackingToken === 'string' ? trackingToken : null };
+  }
+
   private normalizeContact(contact?: string | null, displayName?: string | null) {
     const normalizedContact = contact?.trim() || null;
-    return {
-      displayName: displayName?.trim() || null,
-      phone: normalizedContact?.startsWith('05') ? normalizedContact : null,
-      email: normalizedContact?.includes('@') ? normalizedContact.toLocaleLowerCase('tr-TR') : null,
-    };
+    return this.citizenIdentity.normalizeContact({
+      displayName,
+      phone: normalizedContact,
+      email: normalizedContact,
+    });
   }
 
   private mergeContact(previous: ConversationContext['contact'], next: ConversationContext['contact']) {
-    return {
-      displayName: next?.displayName?.trim() || previous?.displayName || null,
-      phone: next?.phone?.trim() || previous?.phone || null,
-      email: next?.email?.trim().toLocaleLowerCase('tr-TR') || previous?.email || null,
-    };
+    return this.citizenIdentity.normalizeContact({
+      displayName: next?.displayName ?? previous?.displayName,
+      phone: next?.phone ?? previous?.phone,
+      email: next?.email ?? previous?.email,
+    });
+  }
+
+  private identitySourceForChannel(channel: string) {
+    if (channel === ChannelType.WHATSAPP) return 'WHATSAPP';
+    if (channel === ChannelType.WEB_CHAT) return 'WEB_CHAT';
+    return 'PUBLIC_WEB';
   }
 
   private async listTenantDepartments(tenantId: string) {

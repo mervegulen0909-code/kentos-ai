@@ -32,7 +32,16 @@ async function runSettingsMutation(formData: FormData, success: string, mutation
     if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
       redirect('/settings?error=forbidden');
     }
-    redirect(`/settings?error=${encodeURIComponent(String(formData.get('intent') ?? 'general'))}`);
+
+    const params = new URLSearchParams({
+      error: String(formData.get('intent') ?? 'general'),
+    });
+
+    if (error instanceof ApiError && error.safeMessage) {
+      params.set('errorMessage', error.safeMessage);
+    }
+
+    redirect(`/settings?${params.toString()}`);
   }
 
   revalidatePath('/settings');

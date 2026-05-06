@@ -50,13 +50,13 @@ const errorCopy: Record<string, FeedbackCopy> = {
   general: { title: 'Ayar kaydedilemedi.', detail: 'Baglanti, yetki veya kayit durumunu kontrol edip islemi tekrar deneyin.' },
 };
 
-export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ success?: string; error?: string }> }) {
+export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ success?: string; error?: string; errorMessage?: string }> }) {
   const session = await getAdminSession();
   const hasSession = Boolean(session);
   const token = session?.accessToken ?? null;
   const canEditSettings = canManageSettings(session?.user.role);
   const controlsDisabled = !hasSession || !canEditSettings;
-  const { success, error } = await searchParams;
+  const { success, error, errorMessage } = await searchParams;
   const fallbackWidgetSettings: WidgetSettings = {
     tenantSlug: session?.user.tenantSlug ?? 'demo-belediye',
     widgetEnabled: true,
@@ -88,7 +88,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
       {error ? (
         <div className="notice error" role="alert">
           <strong>{(errorCopy[error] ?? errorCopy.general).title}</strong>
-          <p>{(errorCopy[error] ?? errorCopy.general).detail}</p>
+          <p>{errorMessage ?? (errorCopy[error] ?? errorCopy.general).detail}</p>
         </div>
       ) : null}
       {!hasSession ? <p className="notice muted">Ayarlari duzenlemek icin giris yapin. Formlar guvenli bicimde pasif tutulur.</p> : null}

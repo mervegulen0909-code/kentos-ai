@@ -1,12 +1,23 @@
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:3100/api/v1';
 
+function safeErrorMessage(status: number) {
+  if (status === 400) return 'Gonderdiginiz bilgiler dogrulanamadi.';
+  if (status === 401 || status === 403) return 'Bu islem icin yetkiniz bulunmuyor.';
+  if (status === 404) return 'Aradiginiz kayit bulunamadi.';
+  if (status === 409) return 'Bu islem mevcut durumla cakisiyor.';
+  if (status === 429) return 'Cok fazla istek gonderdiniz. Lutfen kisa bir sure sonra tekrar deneyin.';
+  return 'Isleminiz su anda tamamlanamadi. Lutfen daha sonra tekrar deneyin.';
+}
+
 export class ApiError extends Error {
   status: number;
+  safeMessage: string;
 
-  constructor(status: number, message: string) {
+  constructor(status: number, message: string, safeMessage = safeErrorMessage(status)) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
+    this.safeMessage = safeMessage;
   }
 }
 
@@ -16,7 +27,10 @@ async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> 
   if (options.body && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
 
   const response = await fetch(`${API_BASE_URL}${path}`, { ...options, headers, cache: 'no-store' });
-  if (!response.ok) throw new ApiError(response.status, `KentOS API ${response.status}: ${await response.text()}`);
+  if (!response.ok) {
+    const rawBody = await response.text();
+    throw new ApiError(response.status, rawBody || `KentOS API ${response.status}`, safeErrorMessage(response.status));
+  }
   return response.json() as Promise<T>;
 }
 

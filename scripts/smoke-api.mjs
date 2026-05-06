@@ -237,10 +237,11 @@ const updatedWidgetSettings = await request('/widget-settings', {
     widgetEnabled: true,
     widgetTitle: `Smoke Widget ${unique}`,
     widgetWelcome: 'Smoke widget karsilama metni.',
-    widgetAllowedOrigins: ['http://localhost:3002', 'http://127.0.0.1:3002', 'http://127.0.0.1:3112'],
+    widgetAllowedOrigins: ['http://localhost:3112', 'http://127.0.0.1:3112'],
   }),
 });
-assert(updatedWidgetSettings.body.widgetAllowedOrigins.includes('http://127.0.0.1:3002'), 'Widget origin allowlist was not persisted.');
+assert(updatedWidgetSettings.body.widgetAllowedOrigins.includes('http://127.0.0.1:3112'), 'Widget origin allowlist was not persisted.');
+assert(updatedWidgetSettings.body.widgetAllowedOrigins.includes('http://localhost:3112'), 'Widget origin allowlist missed localhost QA origin.');
 await request('/widget-settings', {
   method: 'PATCH',
   token,
@@ -704,6 +705,39 @@ const whatsappIngest = await request('/internal/channel-ingest', {
 assert(whatsappIngest.body.channel === 'WHATSAPP', 'WhatsApp ingest did not preserve channel.');
 assert(whatsappIngest.body.trackingToken || whatsappIngest.body.followUpQuestion, 'WhatsApp ingest did not return a ticket or follow-up state.');
 console.log('whatsapp_internal_ingest', whatsappIngest.status, whatsappIngest.body.state);
+const whatsappEventCountBeforeReplay = await prisma.channelEvent.count({
+  where: {
+    tenantId: login.body.user.tenantId,
+    channel: 'WHATSAPP',
+    provider: 'baileys',
+    externalEventId: `wa-msg-${unique}`,
+  },
+});
+const whatsappReplay = await request('/internal/channel-ingest', {
+  method: 'POST',
+  headers: { 'x-kentos-internal-key': internalApiKey },
+  body: JSON.stringify({
+    tenantId: login.body.user.tenantId,
+    channel: 'WHATSAPP',
+    provider: 'baileys',
+    externalConversationId: `wa-smoke-${unique}`,
+    externalMessageId: `wa-msg-${unique}`,
+    text: 'Replay smoke text ' + publicPhone,
+    receivedAt: new Date().toISOString(),
+    citizenContact: { phone: publicPhone },
+  }),
+});
+const whatsappEventCountAfterReplay = await prisma.channelEvent.count({
+  where: {
+    tenantId: login.body.user.tenantId,
+    channel: 'WHATSAPP',
+    provider: 'baileys',
+    externalEventId: `wa-msg-${unique}`,
+  },
+});
+assert(whatsappReplay.body.conversationId === whatsappIngest.body.conversationId, 'WhatsApp replay did not return the existing conversation.');
+assert(whatsappEventCountAfterReplay === whatsappEventCountBeforeReplay, 'WhatsApp replay created a duplicate channel event.');
+console.log('whatsapp_internal_ingest_idempotency', true);
 
 await expectStatus('/public/demo-belediye/tickets', 403, {
   method: 'POST',
@@ -718,7 +752,7 @@ await expectStatus('/public/demo-belediye/tickets', 403, {
 
 const publicTicket = await request('/public/demo-belediye/tickets', {
   method: 'POST',
-  headers: { Origin: 'http://localhost:3002' },
+  headers: { Origin: 'http://localhost:3112' },
   body: JSON.stringify({
     description: 'Atatürk Mahallesi 12. Sokak önünde kaldırım çöktü.',
     displayName: `Public Basvuran ${unique}`,
@@ -756,10 +790,20 @@ const publicTicketDbRecord = await prisma.ticket.findFirst({
   where: { tenantId: login.body.user.tenantId, publicTrackingToken: publicTicket.body.trackingToken },
   select: { citizenId: true },
 });
-const unchangedPublicContactCitizen = await prisma.citizen.findUnique({ where: { id: existingPublicContactCitizen.id } });
-assert(publicTicketDbRecord?.citizenId && publicTicketDbRecord.citizenId !== existingPublicContactCitizen.id, 'Public intake reused an existing citizen contact record.');
-assert(unchangedPublicContactCitizen?.displayName === existingPublicContactCitizen.displayName, 'Public intake changed an existing citizen displayName.');
-assert(unchangedPublicContactCitizen?.email === existingPublicContactCitizen.email, 'Public intake changed an existing citizen email.');
+const updatedPublicContactCitizen = await prisma.citizen.findUnique({ where: { id: existingPublicContactCitizen.id } });
+const normalizedPublicPhone = publicPhone.replace(/\D+/g, '');
+const citizenPhoneIdentifier = await prisma.citizenIdentifier.findFirst({
+  where: {
+    tenantId: login.body.user.tenantId,
+    citizenId: existingPublicContactCitizen.id,
+    kind: 'PHONE',
+    normalizedValue: normalizedPublicPhone,
+  },
+});
+assert(publicTicketDbRecord?.citizenId === existingPublicContactCitizen.id, 'Public intake did not reuse the existing citizen contact record.');
+assert(citizenPhoneIdentifier, 'Public intake did not backfill a citizen phone identifier.');
+assert(updatedPublicContactCitizen?.displayName === existingPublicContactCitizen.displayName, 'Public intake should not overwrite an existing citizen displayName.');
+assert(updatedPublicContactCitizen?.email === existingPublicContactCitizen.email, 'Public intake should not overwrite an existing citizen email.');
 await expectStatus(`/public/demo-belediye/tickets/${publicTicketRecord.ticketNo}`, 404);
 
 const publicAuditLog = await request(`/tickets/${publicTicketRecord.id}/audit-log`, { token });

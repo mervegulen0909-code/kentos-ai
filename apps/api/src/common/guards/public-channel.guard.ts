@@ -31,7 +31,10 @@ export class PublicChannelGuard implements CanActivate {
     if (!origin) return;
 
     const allowlist = await this.resolveAllowedOrigins(String(request.params?.tenantSlug ?? ''));
-    if (!allowlist.length) return;
+    if (!allowlist.length) {
+      if (this.isProduction()) throw new ForbiddenException('Widget origin izin listesi yapilandirilmadi.');
+      return;
+    }
     if (allowlist.includes(origin)) return;
 
     throw new ForbiddenException('Widget origin izin listesinde degil.');
@@ -50,6 +53,10 @@ export class PublicChannelGuard implements CanActivate {
       : [];
 
     return [...new Set([...envOrigins, ...tenantOrigins])];
+  }
+
+  private isProduction() {
+    return this.config.get<string>('NODE_ENV') === 'production';
   }
 
   private requireRateLimit(request: PublicRequest) {

@@ -768,3 +768,25 @@ Eksik schema ile yazılan checkpoint release kanıtı sayılmaz.
 - **Result:** Passed. PR #2 merged at `2026-05-05T15:04:00Z` with merge commit `1244c0833086e07415edbce2c3e93a5f782c7598`; local `master` is aligned with `origin/master`.
 - **Next action:** Commit this final evidence note if desired, or continue the next product hardening slice from current `master`.
 - **Blocker:** None.
+
+## 2026-05-06 — Principal engineer audit hardening checkpoint
+
+- **Owner:** `1 — Ana Kontrol`
+- **Status:** passed
+- **Action taken:** Closed the principal-engineer hardening slice by extracting deterministic intake fallback logic into shared code, correcting smoke-origin and citizen-dedup verification drift, threading safe admin mutation notices through redirect-based server actions, and recording the staged citizen identity reconciliation design as an ADR.
+- **Files changed:** `packages/shared/src/intake-deterministic.ts`, `packages/shared/src/index.ts`, `apps/api/src/modules/public/public-ticket.service.ts`, `apps/ai-service/src/main.ts`, `scripts/smoke-api.mjs`, `apps/admin-web/app/settings/actions.ts`, `apps/admin-web/app/settings/page.tsx`, `apps/admin-web/app/tickets/actions.ts`, `apps/admin-web/app/tickets/[id]/page.tsx`, `docs/decisions/0002-citizen-identity-reconciliation.md`, `docs/releases/RELEASE_NOTES.md`, `docs/workflows/autonomous-run-log.md`.
+- **Verification run:** [`pnpm smoke:api`](package.json); [`pnpm typecheck`](package.json).
+- **Result:** Passed. P1 remediation items are closed. Remaining material risk is now the planned schema-backed citizen identity migration, which is documented but not yet implemented. Workspace-wide [`pnpm build`](package.json) remains a known Windows-specific operational blocker when the active API dev process locks [`apps/api/dist`](apps/api/dist).
+- **Next action:** Implement the ADR from [`0002 — Citizen Identity and Reconciliation Strategy`](docs/decisions/0002-citizen-identity-reconciliation.md:1), then rerun [`pnpm db:generate`](package.json), [`pnpm typecheck`](package.json), and full release verification.
+- **Blocker:** None.
+
+## 2026-05-06 — Principal engineer consolidation checkpoint
+
+- **Owner:** `1 — Ana Kontrol`
+- **Status:** passed
+- **Action taken:** Consolidated the verified identity/security hardening diff for commit readiness: classified intentional product/docs/test changes, aligned release evidence with the schema-backed citizen identity migration, recorded that `CitizenIdentityService` is now wired into public ticket/conversation/WhatsApp intake, and kept backfill CLI, handoff browser smoke, and provider signature verification as explicit next-phase work.
+- **Files changed:** `apps/api/src/modules/public/**`, `apps/api/src/common/guards/public-channel.guard.ts`, `packages/database/prisma/schema.prisma`, `packages/database/prisma/migrations/20260506120000_citizen_identity_reconciliation/migration.sql`, `packages/shared/src/**`, `scripts/smoke-api.mjs`, `docs/releases/RELEASE_NOTES.md`, `docs/workflows/autonomous-run-log.md`.
+- **Verification run:** `git diff --check`; `pnpm db:generate`; `pnpm typecheck`; `pnpm build`; `DATABASE_URL=... pnpm db:migrate`; `DATABASE_URL=... pnpm db:seed`; local API on port `3110`; `KENTOS_API_BASE_URL=http://127.0.0.1:3110/api/v1 INTERNAL_API_KEY=... pnpm smoke:api`.
+- **Result:** Passed. Static verification, local migration/seed, and live API smoke are green, including citizen identifier backfill and WhatsApp internal ingest replay idempotency assertions.
+- **Next action:** If committing, stage only intentional product/docs/test files and leave local logs, caches, build outputs, Playwright outputs, and tool artifacts unstaged.
+- **Blocker:** None.

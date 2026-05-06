@@ -21,7 +21,16 @@ async function runTicketMutation(formData: FormData, success: string, mutation: 
     if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
       redirect(`/tickets/${ticketId}?error=forbidden`);
     }
-    redirect(`/tickets/${ticketId}?error=${encodeURIComponent(String(formData.get('intent') ?? 'general'))}`);
+
+    const params = new URLSearchParams({
+      error: String(formData.get('intent') ?? 'general'),
+    });
+
+    if (error instanceof ApiError && error.safeMessage) {
+      params.set('errorMessage', error.safeMessage);
+    }
+
+    redirect(`/tickets/${ticketId}?${params.toString()}`);
   }
 
   revalidatePath('/tickets');

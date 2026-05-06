@@ -1,6 +1,6 @@
-import { Body, Controller, ForbiddenException, Headers, Inject, Post } from '@nestjs/common';
+import { BadRequestException, Body, Controller, ForbiddenException, Headers, Inject, Post } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import type { ChannelIntakeEnvelope } from '@kentos/shared';
+import { channelIntakeEnvelopeSchema } from '@kentos/shared';
 import { IngestChannelEnvelopeDto } from './dto/ingest-channel-envelope.dto.js';
 import { PublicConversationService } from './public-conversation.service.js';
 
@@ -13,8 +13,25 @@ export class InternalChannelController {
 
   @Post()
   ingest(@Headers('x-kentos-internal-key') internalKey: string | undefined, @Body() dto: IngestChannelEnvelopeDto) {
-    const expected = this.config.get<string>('INTERNAL_API_KEY') ?? 'change-me-internal';
+    const expected = this.resolveInternalApiKey();
     if (!internalKey || internalKey !== expected) throw new ForbiddenException('Internal kanal anahtari gecersiz.');
-    return this.conversations.ingestEnvelope(dto as ChannelIntakeEnvelope);
+    const parsed = channelIntakeEnvelopeSchema.safeParse(dto);
+    if (!parsed.success) throw new BadRequestException('Internal kanal zarfi gecersiz.');
+    return this.conversations.ingestEnvelope(parsed.data);
+  }
+
+  private resolveInternalApiKey() {
+    const configured = this.config.get<string>('INTERNAL_API_KEY');
+    if (configured) {
+      if (this.config.get<string>('NODE_ENV') === 'production' && configured === 'change-me-internal') {
+        throw new ForbiddenException('Internal kanal anahtari production icin yapilandirilmadi.');
+      }
+      return configured;
+    }
+
+    if (this.config.get<string>('NODE_ENV') === 'production') {
+      throw new ForbiddenException('Internal kanal anahtari yapilandirilmadi.');
+    }
+    return 'change-me-internal';
   }
 }

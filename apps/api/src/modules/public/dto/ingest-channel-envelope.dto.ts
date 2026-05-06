@@ -1,4 +1,5 @@
-import { IsEmail, IsIn, IsOptional, IsString, MinLength, ValidateIf } from 'class-validator';
+import { Type } from 'class-transformer';
+import { IsDateString, IsEmail, IsIn, IsOptional, IsString, MinLength, ValidateIf, ValidateNested } from 'class-validator';
 import { ChannelType } from '@kentos/database';
 import type { IntakeChannel } from '@kentos/shared';
 
@@ -45,9 +46,11 @@ export class IngestChannelEnvelopeDto {
   text!: string;
 
   @IsString()
-  @MinLength(1)
+  @IsDateString()
   receivedAt!: string;
 
   @IsOptional()
+  @ValidateNested()
+  @Type(() => IngestChannelEnvelopeContactDto)
   citizenContact?: IngestChannelEnvelopeContactDto;
 }

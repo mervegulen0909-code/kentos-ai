@@ -4,6 +4,7 @@ import { NotificationQueueService } from '../tickets/notification-queue.service.
 import { NotificationTemplateService } from '../tickets/notification-template.service.js';
 import { SlaService } from '../tickets/sla.service.js';
 import { TicketNumberService } from '../tickets/ticket-number.service.js';
+import { CitizenIdentityService } from './citizen-identity.service.js';
 import { InternalChannelController } from './internal-channel.controller.js';
 import { PublicConversationController } from './public-conversation.controller.js';
 import { PublicConversationService } from './public-conversation.service.js';
@@ -13,6 +14,6 @@ import { PublicTicketAiService, PublicTicketService } from './public-ticket.serv
 
 @Module({
   controllers: [PublicTicketController, PublicConversationController, PublicWidgetController, InternalChannelController],
-  providers: [PublicTicketAiService, PublicTicketService, PublicConversationService, PublicChannelGuard, NotificationQueueService, NotificationTemplateService, SlaService, TicketNumberService],
+  providers: [PublicTicketAiService, PublicTicketService, PublicConversationService, CitizenIdentityService, PublicChannelGuard, NotificationQueueService, NotificationTemplateService, SlaService, TicketNumberService],
 })
 export class PublicTicketModule {}

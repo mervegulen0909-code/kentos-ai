@@ -117,10 +117,10 @@ export default async function TicketDetailPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ success?: string; error?: string }>;
+  searchParams: Promise<{ success?: string; error?: string; errorMessage?: string }>;
 }) {
   const { id } = await params;
-  const { success, error } = await searchParams;
+  const { success, error, errorMessage } = await searchParams;
   const session = await getAdminSession();
   const hasSession = Boolean(session);
   const token = session?.accessToken ?? null;
@@ -155,7 +155,7 @@ export default async function TicketDetailPage({
       {error ? (
         <div className="notice error" role="alert">
           <strong>{(errorCopy[error] ?? errorCopy.general).title}</strong>
-          <p>{(errorCopy[error] ?? errorCopy.general).detail}</p>
+          <p>{errorMessage ?? (errorCopy[error] ?? errorCopy.general).detail}</p>
         </div>
       ) : null}
       <div className="grid">

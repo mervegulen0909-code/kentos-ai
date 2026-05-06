@@ -55,33 +55,48 @@ enum AuditActorType {
   WEBHOOK
 }
 
-model Tenant {
-  id               String   @id @default(cuid())
-  name             String
-  slug             String   @unique
-  timezone         String   @default("Europe/Istanbul")
-  locale           String   @default("tr-TR")
-  status           String   @default("ACTIVE")
-  widgetEnabled    Boolean  @default(true)
-  widgetTitle      String   @default("Belediye asistanı")
-  widgetWelcome    String   @default("Merhaba, belediyeye iletmek istediğiniz konuyu yazın.")
-  widgetAllowedOrigins Json?
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+enum CitizenIdentifierKind {
+  PHONE
+  EMAIL
+}
 
-  aiRuns           AiRun[]
-  auditLogs        AuditLog[]
-  categories       Category[]
-  channelEvents    ChannelEvent[]
-  citizens         Citizen[]
-  conversations    Conversation[]
-  departments      Department[]
-  managerReports   ManagerReport[]
-  messageTemplates MessageTemplate[]
-  neighborhoods    Neighborhood[]
-  slaPolicies      SlaPolicy[]
-  tickets          Ticket[]
-  users            User[]
+enum CitizenIdentifierSource {
+  PUBLIC_WEB
+  WEB_CHAT
+  WHATSAPP
+  STAFF
+  IMPORT
+  MERGE
+}
+
+model Tenant {
+  id                   String   @id @default(cuid())
+  name                 String
+  slug                 String   @unique
+  timezone             String   @default("Europe/Istanbul")
+  locale               String   @default("tr-TR")
+  status               String   @default("ACTIVE")
+  widgetEnabled        Boolean  @default(true)
+  widgetTitle          String   @default("Belediye asistanı")
+  widgetWelcome        String   @default("Merhaba, belediyeye iletmek istediğiniz konuyu yazın.")
+  widgetAllowedOrigins Json?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  aiRuns               AiRun[]
+  auditLogs            AuditLog[]
+  categories           Category[]
+  channelEvents        ChannelEvent[]
+  citizenIdentifiers   CitizenIdentifier[]
+  citizens             Citizen[]
+  conversations        Conversation[]
+  departments          Department[]
+  managerReports       ManagerReport[]
+  messageTemplates     MessageTemplate[]
+  neighborhoods        Neighborhood[]
+  slaPolicies          SlaPolicy[]
+  tickets              Ticket[]
+  users                User[]
 }
 
 model Department {
@@ -212,21 +227,47 @@ model UserDepartment {
 }
 
 model Citizen {
-  id            String    @id @default(cuid())
-  tenantId      String
-  displayName   String?
-  phone         String?
-  email         String?
-  kvkkConsentAt DateTime?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id                  String    @id @default(cuid())
+  tenantId            String
+  displayName         String?
+  phone               String?
+  email               String?
+  kvkkConsentAt       DateTime?
+  mergedIntoCitizenId String?
+  mergedAt            DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
 
-  tenant        Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  conversations Conversation[]
-  tickets       Ticket[]
+  tenant              Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  mergedIntoCitizen   Citizen?            @relation("CitizenMerge", fields: [mergedIntoCitizenId], references: [id], onDelete: SetNull)
+  mergedCitizens      Citizen[]           @relation("CitizenMerge")
+  identifiers         CitizenIdentifier[]
+  conversations       Conversation[]
+  tickets             Ticket[]
 
   @@index([tenantId, phone])
   @@index([tenantId, email])
+  @@index([tenantId, mergedIntoCitizenId])
+}
+
+model CitizenIdentifier {
+  id              String                 @id @default(cuid())
+  tenantId        String
+  citizenId       String
+  kind            CitizenIdentifierKind
+  normalizedValue String
+  isPrimary       Boolean                @default(false)
+  isVerified      Boolean                @default(false)
+  source          CitizenIdentifierSource
+  createdAt       DateTime               @default(now())
+  updatedAt       DateTime               @updatedAt
+
+  tenant          Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  citizen         Citizen  @relation(fields: [citizenId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, kind, normalizedValue])
+  @@index([tenantId, citizenId, kind])
+  @@index([tenantId, kind, isPrimary])
 }
 
 model Ticket {
