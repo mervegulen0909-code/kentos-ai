@@ -37,6 +37,13 @@ const templates = [
   ['INFO_REQUESTED', '{{trackingToken}} takip kodlu talebiniz icin ek bilgiye ihtiyac duyuyoruz: {{question}}'],
 ] as const;
 
+const demoWidgetAllowedOrigins = [
+  'http://127.0.0.1:3002',
+  'http://localhost:3002',
+  'http://127.0.0.1:3112',
+  'http://localhost:3112',
+] as const;
+
 async function main() {
   const tenant = await prisma.tenant.upsert({
     where: { slug: 'demo-belediye' },
@@ -44,7 +51,7 @@ async function main() {
       widgetEnabled: true,
       widgetTitle: 'Demo Belediyesi Asistanı',
       widgetWelcome: 'Merhaba, Demo Belediyesi asistanına hoş geldiniz. Talebinizi yazın, doğru birime aktaralım.',
-      widgetAllowedOrigins: ['http://127.0.0.1:3002', 'http://127.0.0.1:3112'],
+      widgetAllowedOrigins: [...demoWidgetAllowedOrigins],
     },
     create: {
       name: 'Demo Belediyesi',
@@ -54,7 +61,7 @@ async function main() {
       widgetEnabled: true,
       widgetTitle: 'Demo Belediyesi Asistanı',
       widgetWelcome: 'Merhaba, Demo Belediyesi asistanına hoş geldiniz. Talebinizi yazın, doğru birime aktaralım.',
-      widgetAllowedOrigins: ['http://127.0.0.1:3002', 'http://127.0.0.1:3112'],
+      widgetAllowedOrigins: [...demoWidgetAllowedOrigins],
     },
   });
 
