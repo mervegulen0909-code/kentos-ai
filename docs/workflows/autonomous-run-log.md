@@ -823,3 +823,14 @@ Eksik schema ile yazılan checkpoint release kanıtı sayılmaz.
 - **Result:** Passed. Static checks, DB prepare, API smoke, gateway smoke, Playwright smoke `5/5`, and Scenario L mobile probe are green. Build still emits the known non-fatal Next `outputFileTracing` warning. Local evidence artifacts are ignored by `.gitignore`; final local `master` is expected to be `origin/master...master = 0 3` after the repo-ready evidence commit.
 - **Next action:** Wait for explicit user direction before push/PR/deploy; if no publish action is requested, keep local `master` as the release-ready handoff state.
 - **Blocker:** None.
+
+## 2026-05-08 — PR merge and final evidence sync checkpoint
+
+- **Owner:** `1 — Ana Kontrol`
+- **Status:** passed
+- **Action taken:** Merged PR #3 (`codex/repo-ready-finalization`) after green `verify` and `ui-e2e`, then closed the remaining repo-internal Next warning follow-up in PR #4 by removing the obsolete `outputFileTracing` config from both Next apps. No production deploy, production config change, Anthropic real run, or live outbound provider send was performed.
+- **Files changed:** `docs/releases/RELEASE_NOTES.md`, `docs/checklists/release-checklist.md`, `docs/workflows/autonomous-run-log.md` for this evidence sync; PR #4 changed only `apps/admin-web/next.config.ts` and `apps/citizen-web/next.config.ts`.
+- **Verification run:** PR #3 CI `verify=passed`, `ui-e2e=passed`; local `pnpm typecheck`; local `pnpm build`; `git diff --check`; PR #4 CI `verify=passed`, `ui-e2e=passed`; `git rev-list --left-right --count origin/master...master`.
+- **Result:** Passed. PR #3 merge commit is `4699c4e`; PR #4 merge commit is `8409c65`; local `master` is synced with `origin/master` (`0 0`). The previous non-fatal Next `outputFileTracing` warning is resolved.
+- **Next action:** External gates only: production deploy, Anthropic real run, live outbound channel sends, and branch-protection platform enforcement require separate approval/platform support.
+- **Blocker:** None for repo-ready code; external provider and governance gates remain outside this repo-only finalization.
