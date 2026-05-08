@@ -12,12 +12,12 @@
 
 ### Evidence snapshot
 
-- Branch/sync: local working tree with intentional hardening diff in progress
-- Static checks: `db:generate=passed`, `typecheck=passed`, `build=passed`
+- Branch/sync: local `master`, `origin/master...master = 0 3` after repo-ready evidence commit; no push/PR performed in this local cycle.
+- Static checks: `db:generate=passed`, `db:migrate=passed`, `db:seed=passed`, `typecheck=passed`, `build=passed`
 - Database migration: `20260506120000_citizen_identity_reconciliation=applied locally`; `20260507133000_citizen_identity_phase3_enforcement_marker=added as no-op phase marker`
-- API smoke: `passed` with citizen identifier backfill and WhatsApp internal ingest replay idempotency checks
-- Gateway verification: `typecheck=passed`, `test=passed` for [`@kentos/whatsapp-gateway`](apps/whatsapp-gateway/package.json)
-- Browser/dev runtime: Windows Next.js `readlink` build blocker was cleared by disabling output file tracing in [`apps/admin-web/next.config.ts`](apps/admin-web/next.config.ts:3) and [`apps/citizen-web/next.config.ts`](apps/citizen-web/next.config.ts:3)
+- API smoke: `passed` on `http://127.0.0.1:3110/api/v1`, including citizen identity backfill, WhatsApp ingest idempotency, widget status, conversation segments, and seeded channel analytics rows.
+- Gateway verification: `typecheck=passed`, `test=passed`, and `smoke:gateway=passed` on `http://127.0.0.1:3120` for health, internal outbound auth rejection, and Meta/Twilio signature rejection.
+- Browser/dev runtime: Playwright smoke `5/5 passed` on QA ports `3110/3111/3112`; Scenario L 390px mobile probe passed for admin login/settings/ticket detail and citizen report/track/ticket.
 - Data-model decision: [`0002 — Citizen Identity and Reconciliation Strategy`](docs/decisions/0002-citizen-identity-reconciliation.md:1) added
 - Citizen reconciliation dry-run: `passed` via [`pnpm citizen-identity:backfill`](package.json:22) with evidence saved at [`output/citizen-identity/all-tenants-dry-run.json`](output/citizen-identity/all-tenants-dry-run.json); `tenantCount=1`, `readyForPhase3=true`, `unresolvedExceptionCount=0`, `mergeCandidateCount=14`
 - Citizen reconciliation controlled apply: `passed` for tenant `cmophayio0000kovgkksj6f25` with evidence at [`apps/api/output/citizen-identity/cmophayio0000kovgkksj6f25-apply.json`](apps/api/output/citizen-identity/cmophayio0000kovgkksj6f25-apply.json) and post-apply verification at [`apps/api/output/citizen-identity/cmophayio0000kovgkksj6f25-post-apply-dry-run.json`](apps/api/output/citizen-identity/cmophayio0000kovgkksj6f25-post-apply-dry-run.json); `mergeCandidateCount=0`, `manualReviewCount=0`, `readyForPhase3=true`
@@ -36,7 +36,7 @@
 
 ### Risk and rollback
 
-- Risk level: `low-medium` because citizen reconciliation apply/post-apply verification, gateway regression checks, and workspace build are green; remaining risk is standard final smoke/release hygiene.
+- Risk level: `low` because static checks, API smoke, gateway smoke, browser smoke, and mobile Scenario L evidence are green; remaining work is push/PR decision only.
 - Rollback policy: revert the Windows Next.js tracing workaround in [`apps/admin-web/next.config.ts`](apps/admin-web/next.config.ts:3) and [`apps/citizen-web/next.config.ts`](apps/citizen-web/next.config.ts:3) if tracing is later required in another environment; for citizen reconciliation, keep [`docs/workflows/citizen-identity-apply-rollback-note.md`](docs/workflows/citizen-identity-apply-rollback-note.md) together with the archived dry-run/apply/post-apply artifacts as the operational rollback reference.
 
 ## Next — PDF-style assistant product wave — 2026-05-05
@@ -51,7 +51,7 @@
 
 ### Evidence snapshot
 
-- Branch/sync: local `master`, broad intentional working-tree diff in progress
+- Branch/sync: local `master`; product wave is committed in `971061a` and line-ending hygiene in `1f0661b`.
 - Static checks: `typecheck=passed`, `build=passed`
 - API smoke: `passed` with WhatsApp internal ingest, analytics channel RBAC, blocked-origin, and allowed-origin public ticket coverage
 - Browser smoke: `passed` via Playwright smoke on QA ports (`admin login`, `admin widget install`, `citizen report`, `citizen track`, `citizen widget preview`)

@@ -55,3 +55,9 @@ HANDOFF_PROMPT.md
 # Playwright outputs
 playwright-report/
 test-results/
+
+# Local release evidence artifacts
+/output/
+/apps/api/output/
+/admin-home-*.png
+/citizen-home-*.png

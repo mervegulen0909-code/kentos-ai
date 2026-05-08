@@ -812,3 +812,14 @@ Eksik schema ile yazılan checkpoint release kanıtı sayılmaz.
 - **Result:** Passed. [`pnpm typecheck`](package.json:7) passed workspace-wide. [`pnpm build`](package.json:8) completed successfully after clearing both `.next` directories and disabling `outputFileTracing` in the two Next.js apps. Gateway regression checks also passed 6/6 tests, including signature helper coverage and internal-key outbound guard behavior.
 - **Next action:** Close Phase 4 release evidence and final production gate tracking in the release docs/checklists.
 - **Blocker:** None.
+
+## 2026-05-08 — Repo-ready finalization checkpoint
+
+- **Owner:** `1 — Ana Kontrol`
+- **Status:** passed
+- **Action taken:** Closed the repo-ready local gate by ignoring local evidence artifacts, expanding API smoke coverage for widget status and conversation/channel analytics, adding gateway HTTP smoke coverage, running full static/runtime/browser verification on QA ports, and recording final release evidence. No push, PR, production deploy, external message send, Anthropic real run, or destructive artifact cleanup was performed.
+- **Files changed:** `.gitignore`, `package.json`, `scripts/smoke-api.mjs`, `scripts/smoke-gateway.mjs`, `docs/releases/RELEASE_NOTES.md`, `docs/checklists/release-checklist.md`, `docs/workflows/autonomous-run-log.md`.
+- **Verification run:** `docker compose -f infra/docker-compose.yml up -d`; `pnpm db:generate`; `DATABASE_URL=... pnpm db:migrate`; `DATABASE_URL=... pnpm db:seed`; `pnpm typecheck`; `pnpm build`; `pnpm --filter @kentos/whatsapp-gateway test`; `pnpm --filter @kentos/shared test`; `pnpm --filter @kentos/worker typecheck`; local API/admin/citizen/gateway on ports `3110/3111/3112/3120`; `KENTOS_API_BASE_URL=http://127.0.0.1:3110/api/v1 INTERNAL_API_KEY=... pnpm smoke:api`; `KENTOS_GATEWAY_BASE_URL=http://127.0.0.1:3120 pnpm smoke:gateway`; `E2E_ADMIN_BASE_URL=http://127.0.0.1:3111 E2E_CITIZEN_BASE_URL=http://127.0.0.1:3112 E2E_API_BASE_URL=http://127.0.0.1:3110/api/v1 pnpm exec playwright test --config=playwright.smoke.config.ts --workers=1`; 390px mobile Scenario L probe; `git diff --check`.
+- **Result:** Passed. Static checks, DB prepare, API smoke, gateway smoke, Playwright smoke `5/5`, and Scenario L mobile probe are green. Build still emits the known non-fatal Next `outputFileTracing` warning. Local evidence artifacts are ignored by `.gitignore`; final local `master` is expected to be `origin/master...master = 0 3` after the repo-ready evidence commit.
+- **Next action:** Wait for explicit user direction before push/PR/deploy; if no publish action is requested, keep local `master` as the release-ready handoff state.
+- **Blocker:** None.

@@ -165,6 +165,19 @@ Before the milestone push decision:
 - [x] Confirm no secrets, production env files, credentials, or real tokens are staged. Latest local evidence: no staging performed; `.env*` remains ignored by policy.
 - [x] Confirm local tool cache directories such as `.codex/` and `.playwright-mcp/` are ignored or otherwise not staged. Latest local evidence: `.gitignore` now includes `.roo/` and `.roomodes`, and `git status --short` no longer shows those Roo local files as untracked (2026-05-04).
 
+### 2026-05-08 repo-ready local gate
+
+- [x] Local `master` ahead count is recorded: expected `origin/master...master = 0 3` after the repo-ready evidence commit.
+- [x] Product wave commits are recorded: `971061a` (`feat: harden multi-channel municipal operations`) and `1f0661b` (`chore: normalize text line endings`).
+- [x] Static verification passed: `pnpm db:generate`, `pnpm db:migrate`, `pnpm db:seed`, `pnpm typecheck`, and `pnpm build` on local infra.
+- [x] Focused checks passed: `pnpm --filter @kentos/whatsapp-gateway test`, `pnpm --filter @kentos/shared test`, `pnpm --filter @kentos/worker typecheck`, and `git diff --check`.
+- [x] API smoke passed on `http://127.0.0.1:3110/api/v1`, including widget status, conversation segment analytics, seeded channel analytics rows, WhatsApp ingest idempotency, role matrix, audit, and public-safe response checks.
+- [x] Gateway smoke passed on `http://127.0.0.1:3120`, including health, internal outbound auth rejection, Meta signature rejection, and Twilio signature rejection.
+- [x] Browser smoke passed: Playwright smoke `5/5` on QA ports `3110/3111/3112`.
+- [x] Strict mobile Scenario L passed at 390px for admin login/settings/ticket detail and citizen report/track/ticket with no horizontal overflow and visible keyboard focus targets.
+- [x] Local release evidence artifacts are excluded by `.gitignore`: `/output/`, `/apps/api/output/`, `/admin-home-*.png`, and `/citizen-home-*.png`.
+- [x] Push/PR/deploy remain out of scope until the user explicitly requests them.
+
 Before push:
 
 - [x] Confirm branch name and target remote. Latest local evidence: current branch is `wave/tk-ai-smoke-hardening-20260504`, target remote is `origin`, and PR base/head is `master <- wave/tk-ai-smoke-hardening-20260504` (`gh pr view 1 --json headRefName,baseRefName,state,url`, 2026-05-04).
