@@ -95,6 +95,9 @@ importers:
       helmet:
         specifier: ^8.0.0
         version: 8.1.0
+      ioredis:
+        specifier: ^5.4.2
+        version: 5.10.1
       passport:
         specifier: ^0.7.0
         version: 0.7.0
@@ -147,6 +150,13 @@ importers:
       '@kentos/shared':
         specifier: workspace:*
         version: link:../../packages/shared
+    devDependencies:
+      tsx:
+        specifier: ^4.21.0
+        version: 4.21.0
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
 
   apps/worker:
     dependencies:

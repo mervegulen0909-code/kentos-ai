@@ -1,6 +1,7 @@
 import { CanActivate, ExecutionContext, ForbiddenException, HttpException, Inject, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../modules/prisma/prisma.service.js';
+import { RateLimitService } from '../services/rate-limit.service.js';
 type PublicRequest = {
   header(name: string): string | undefined;
   ip?: string;
@@ -8,21 +9,18 @@ type PublicRequest = {
   params?: Record<string, string>;
 };
 
-type RateLimitBucket = { count: number; resetAt: number };
-
-const buckets = new Map<string, RateLimitBucket>();
-
 @Injectable()
 export class PublicChannelGuard implements CanActivate {
   constructor(
     @Inject(ConfigService) private readonly config: ConfigService,
     @Inject(PrismaService) private readonly prisma: PrismaService,
+    @Inject(RateLimitService) private readonly rateLimit: RateLimitService,
   ) {}
 
   async canActivate(context: ExecutionContext) {
     const request = context.switchToHttp().getRequest<PublicRequest>();
     await this.requireAllowedOrigin(request);
-    this.requireRateLimit(request);
+    await this.requireRateLimit(request);
     return true;
   }
 
@@ -59,24 +57,16 @@ export class PublicChannelGuard implements CanActivate {
     return this.config.get<string>('NODE_ENV') === 'production';
   }
 
-  private requireRateLimit(request: PublicRequest) {
+  private async requireRateLimit(request: PublicRequest) {
     const limit = Number(this.config.get<string>('PUBLIC_RATE_LIMIT_MAX') ?? 120);
     const windowMs = Number(this.config.get<string>('PUBLIC_RATE_LIMIT_WINDOW_MS') ?? 60_000);
     if (!Number.isFinite(limit) || limit <= 0) return;
 
-    const now = Date.now();
     const tenantSlug = String(request.params?.tenantSlug ?? 'unknown');
     const forwardedFor = request.header('x-forwarded-for')?.split(',')[0]?.trim();
     const ip = forwardedFor || request.ip || request.socket.remoteAddress || 'unknown';
-    const key = `${tenantSlug}:${ip}`;
-    const bucket = buckets.get(key);
 
-    if (!bucket || bucket.resetAt <= now) {
-      buckets.set(key, { count: 1, resetAt: now + windowMs });
-      return;
-    }
-
-    bucket.count += 1;
-    if (bucket.count > limit) throw new HttpException('Public kanal istek limiti asildi.', 429);
+    const result = await this.rateLimit.hit('public-channel', `${tenantSlug}:${ip}`, limit, windowMs);
+    if (!result.allowed) throw new HttpException('Public kanal istek limiti asildi.', 429);
   }
 }

@@ -1,6 +1,7 @@
 import { adminApi, type WidgetEmbedConfig, type WidgetSettings } from '../../lib/api';
 import { canManageSettings, getAdminSession } from '../../lib/session';
 import { PendingFieldset, PendingSubmitButton } from '../components/form-controls';
+import { WidgetStatusProbe } from './widget-status-probe';
 import {
   createCategoryAction,
   createDepartmentAction,
@@ -149,6 +150,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
           <strong>Guvenlik notu</strong>
           <p>Origin izin listesi tenant ayari olarak saklanir; env allowlist sadece operasyonel ek izin katmani olarak kalir.</p>
         </div>
+        <WidgetStatusProbe tenantSlug={widgetEmbed.tenantSlug} />
       </section>
       <div className="grid">
         <section className="card">
@@ -267,6 +269,16 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
                 <input type="hidden" name="id" value={template.id} />
                 <strong>{template.key}</strong>
                 <textarea name="body" defaultValue={template.body} rows={3} disabled={controlsDisabled} />
+                <select name="channel" defaultValue={template.channel ?? ''} disabled={controlsDisabled}>
+                  <option value="">Tum kanallar</option>
+                  <option value="WHATSAPP">WhatsApp</option>
+                  <option value="WEB_CHAT">Web sohbet</option>
+                  <option value="CITIZEN_WEB">Vatandas portali</option>
+                  <option value="MOBILE_APP">Mobil uygulama</option>
+                  <option value="INSTAGRAM">Instagram DM</option>
+                  <option value="FACEBOOK">Facebook DM</option>
+                  <option value="SMS">SMS</option>
+                </select>
                 <select name="isActive" defaultValue={String(template.isActive)} disabled={controlsDisabled}>
                   <option value="true">Aktif</option>
                   <option value="false">Pasif</option>

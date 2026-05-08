@@ -47,7 +47,15 @@ export const intakeTenantConfigSchema = z.object({
   categories: z.array(intakeTenantOptionSchema),
 });
 
-export const intakeChannelSchema = z.enum(['WHATSAPP', 'CITIZEN_WEB', 'WEB_CHAT', 'MOBILE_APP']);
+export const intakeChannelSchema = z.enum([
+  'WHATSAPP',
+  'CITIZEN_WEB',
+  'WEB_CHAT',
+  'MOBILE_APP',
+  'INSTAGRAM',
+  'FACEBOOK',
+  'SMS',
+]);
 
 export const intakeCitizenContactSchema = z.object({
   phone: z.string().nullable().optional(),
@@ -76,6 +84,21 @@ export const channelIntakeEnvelopeSchema = z.object({
 }).refine((value) => Boolean(value.tenantId || value.tenantSlug), {
   message: 'tenantId veya tenantSlug zorunludur',
   path: ['tenantSlug'],
+});
+
+export const channelOutboundEnvelopeSchema = z.object({
+  tenantId: z.string().min(1),
+  tenantSlug: z.string().min(1),
+  channel: intakeChannelSchema,
+  conversationId: z.string().min(1),
+  externalConversationId: z.string().min(1).optional(),
+  recipient: z.object({
+    phone: z.string().min(1).optional(),
+    email: z.string().email().optional(),
+  }),
+  text: z.string().min(1),
+  templateKey: z.string().optional(),
+  scheduledAt: z.string().datetime().optional(),
 });
 
 export const intakePromptEnvelopeSchema = z.object({

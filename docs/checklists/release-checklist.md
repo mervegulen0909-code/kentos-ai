@@ -48,6 +48,11 @@ Run local API smoke when API, database, auth, RBAC, tenant settings, ticket work
 - [ ] Smoke verifies legacy/internal `KNT-*` ticket numbers do not work on public lookup endpoints.
 - [ ] Smoke verifies WhatsApp/internal channel ingest rejects missing internal key and accepts authorized text-only envelope handoff.
 - [ ] Smoke verifies public widget/ticket endpoint rejects disallowed `Origin` and accepts allowlisted widget origin.
+- [ ] Smoke verifies `/public/:tenantSlug/widget-status` returns `widgetReady`, `originAllowed`, and `allowedOriginCount` for the seeded tenant.
+- [ ] Smoke verifies `/analytics/conversation-segments` returns `aiCompleted / operatorHandoff / awaitingInfo / automationRate`.
+- [ ] Smoke verifies `/analytics/channels` returns rows for at least the seeded channels (WEB_CHAT, WHATSAPP, INSTAGRAM, FACEBOOK, SMS).
+- [ ] Smoke verifies internal outbound endpoints (`/internal/<channel>/outbound`) on the gateway reject missing `x-kentos-internal-key`.
+- [ ] Smoke verifies multi-channel webhook intake (`/webhooks/instagram`, `/webhooks/facebook`, `/webhooks/sms`) rejects missing `META_APP_SECRET` / `TWILIO_AUTH_TOKEN` signatures when those env vars are configured.
 
 ## 5. Role and RBAC regression
 
@@ -117,6 +122,19 @@ Run this scope when queue processors, notification delivery guardrails, or worke
 - [ ] Notification processor returns explicit skip reasons for non-deliverable public-message jobs.
 - [ ] SLA processor returns actionable `breached` and `dueSoon` counts with a timestamped summary.
 - [ ] Reports processor returns a timestamped acceptance summary suitable for QA/release evidence.
+- [ ] Outbound processor (`kentos.outbound`) honors retry/backoff and writes terminal `OutboundDelivery.state` (`DISPATCHED`, `FAILED`, `SKIPPED`).
+- [ ] Retention processor (`kentos.retention`) accepts `tenantId / retentionDays / scope` and emits `totals` per scope.
+
+## 7.5 Channel gateway HTTP regression
+
+Run this scope when the gateway HTTP server (`apps/whatsapp-gateway/src/server.ts`), provider parsers, or webhook signature helpers change.
+
+- [ ] `pnpm --filter @kentos/whatsapp-gateway typecheck`
+- [ ] `pnpm --filter @kentos/whatsapp-gateway test`
+- [ ] `GET /health` on the gateway returns 200 with timestamp.
+- [ ] Webhook endpoints `/webhooks/{whatsapp|instagram|facebook|sms}` reject when the corresponding signature env (`META_APP_SECRET` / `TWILIO_AUTH_TOKEN`) is set and the header is missing or wrong.
+- [ ] Internal outbound endpoints `/internal/{channel}/outbound` reject when `x-kentos-internal-key` does not match `INTERNAL_API_KEY`.
+- [ ] Internal outbound endpoints honor `*_OUTBOUND_LIVE` env flag (default dry-run + structured log; `true` invokes provider.sendText).
 
 ## 8. QA Smoke Runner window behavior
 
@@ -146,6 +164,19 @@ Before the milestone push decision:
 - [x] Confirm `git status --short` contains only intentional state. Latest local evidence: broad intended product/docs diff plus untracked Roo mode files that must be explicitly included or ignored before commit.
 - [x] Confirm no secrets, production env files, credentials, or real tokens are staged. Latest local evidence: no staging performed; `.env*` remains ignored by policy.
 - [x] Confirm local tool cache directories such as `.codex/` and `.playwright-mcp/` are ignored or otherwise not staged. Latest local evidence: `.gitignore` now includes `.roo/` and `.roomodes`, and `git status --short` no longer shows those Roo local files as untracked (2026-05-04).
+
+### 2026-05-08 repo-ready local gate
+
+- [x] Local `master` ahead count is recorded: expected `origin/master...master = 0 3` after the repo-ready evidence commit.
+- [x] Product wave commits are recorded: `971061a` (`feat: harden multi-channel municipal operations`) and `1f0661b` (`chore: normalize text line endings`).
+- [x] Static verification passed: `pnpm db:generate`, `pnpm db:migrate`, `pnpm db:seed`, `pnpm typecheck`, and `pnpm build` on local infra.
+- [x] Focused checks passed: `pnpm --filter @kentos/whatsapp-gateway test`, `pnpm --filter @kentos/shared test`, `pnpm --filter @kentos/worker typecheck`, and `git diff --check`.
+- [x] API smoke passed on `http://127.0.0.1:3110/api/v1`, including widget status, conversation segment analytics, seeded channel analytics rows, WhatsApp ingest idempotency, role matrix, audit, and public-safe response checks.
+- [x] Gateway smoke passed on `http://127.0.0.1:3120`, including health, internal outbound auth rejection, Meta signature rejection, and Twilio signature rejection.
+- [x] Browser smoke passed: Playwright smoke `5/5` on QA ports `3110/3111/3112`.
+- [x] Strict mobile Scenario L passed at 390px for admin login/settings/ticket detail and citizen report/track/ticket with no horizontal overflow and visible keyboard focus targets.
+- [x] Local release evidence artifacts are excluded by `.gitignore`: `/output/`, `/apps/api/output/`, `/admin-home-*.png`, and `/citizen-home-*.png`.
+- [x] Push/PR/deploy remain out of scope until the user explicitly requests them.
 
 Before push:
 

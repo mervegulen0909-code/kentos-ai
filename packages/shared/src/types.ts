@@ -1,4 +1,12 @@
-export type ChannelType = 'WHATSAPP' | 'WEB_CHAT' | 'CITIZEN_WEB' | 'MOBILE_APP' | 'OPERATOR';
+export type ChannelType =
+  | 'WHATSAPP'
+  | 'WEB_CHAT'
+  | 'CITIZEN_WEB'
+  | 'MOBILE_APP'
+  | 'OPERATOR'
+  | 'INSTAGRAM'
+  | 'FACEBOOK'
+  | 'SMS';
 
 export type TicketStatus =
   | 'NEW'
@@ -29,7 +37,29 @@ export type NotificationJobData = {
   messageId: string;
 };
 
-export type IntakeChannel = 'WHATSAPP' | 'CITIZEN_WEB' | 'WEB_CHAT' | 'MOBILE_APP';
+export type IntakeChannel =
+  | 'WHATSAPP'
+  | 'CITIZEN_WEB'
+  | 'WEB_CHAT'
+  | 'MOBILE_APP'
+  | 'INSTAGRAM'
+  | 'FACEBOOK'
+  | 'SMS';
+
+export type ChannelOutboundEnvelope = {
+  tenantId: string;
+  tenantSlug: string;
+  channel: IntakeChannel;
+  conversationId: string;
+  externalConversationId?: string;
+  recipient: {
+    phone?: string;
+    email?: string;
+  };
+  text: string;
+  templateKey?: string;
+  scheduledAt?: string;
+};
 
 export type ChannelIntakeEnvelope = {
   tenantId?: string;

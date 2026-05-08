@@ -146,6 +146,9 @@ export async function updateSlaPolicyAction(formData: FormData) {
 export async function updateTemplateAction(formData: FormData) {
   const id = requireNonEmpty(formData.get('id'), 'update-template');
   const body = requireNonEmpty(formData.get('body'), 'update-template');
+  const channelRaw = String(formData.get('channel') ?? '').trim();
+  const allowedChannels = new Set(['', 'WHATSAPP', 'WEB_CHAT', 'CITIZEN_WEB', 'MOBILE_APP', 'INSTAGRAM', 'FACEBOOK', 'SMS']);
+  const channel = allowedChannels.has(channelRaw) ? channelRaw : '';
 
   await runSettingsMutation(formData, 'template-updated', (token) => apiFetch(`/message-templates/${id}`, {
     method: 'PATCH',
@@ -153,6 +156,7 @@ export async function updateTemplateAction(formData: FormData) {
     body: JSON.stringify({
       body,
       isActive: formData.get('isActive') === 'true',
+      channel: channel || null,
     }),
   }));
 }

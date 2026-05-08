@@ -97,6 +97,39 @@ export class AnalyticsService {
     }));
   }
 
+  async conversationSegments(user: AuthenticatedUser) {
+    const [byState, handoffOpen, totalConversations, ticketsFromConversations] = await Promise.all([
+      this.prisma.conversation.groupBy({
+        by: ['state'],
+        where: { tenantId: user.tenantId },
+        _count: { _all: true },
+      }),
+      this.prisma.conversation.count({
+        where: { tenantId: user.tenantId, handoffRequested: true, state: { not: 'TICKET_CREATED' } },
+      }),
+      this.prisma.conversation.count({ where: { tenantId: user.tenantId } }),
+      this.prisma.conversation.count({
+        where: { tenantId: user.tenantId, state: 'TICKET_CREATED', handoffRequested: false },
+      }),
+    ]);
+
+    const stateMap = new Map(byState.map((row) => [row.state, row._count._all]));
+    const aiCompleted = ticketsFromConversations;
+    const operatorHandoff = handoffOpen;
+    const awaitingInfo = (stateMap.get('OPEN') ?? 0) - operatorHandoff;
+    const automationRate = totalConversations
+      ? Number((aiCompleted / totalConversations).toFixed(3))
+      : 0;
+
+    return {
+      totalConversations,
+      aiCompleted,
+      operatorHandoff,
+      awaitingInfo: awaitingInfo < 0 ? 0 : awaitingInfo,
+      automationRate,
+    };
+  }
+
   async channels(user: AuthenticatedUser) {
     const [ticketsByChannel, conversationsByChannel, aiCreatedMessagesByChannel, publicMessagesByChannel] = await Promise.all([
       this.prisma.ticket.groupBy({ by: ['channel'], where: { tenantId: user.tenantId }, _count: { _all: true } }),

@@ -58,6 +58,14 @@ export type AnalyticsChannelSummary = {
   automationRate: number;
 };
 
+export type AnalyticsConversationSegments = {
+  totalConversations: number;
+  aiCompleted: number;
+  operatorHandoff: number;
+  awaitingInfo: number;
+  automationRate: number;
+};
+
 export type WidgetSettings = {
   tenantSlug: string;
   widgetEnabled: boolean;
@@ -112,7 +120,7 @@ export function formatMissingFieldLabel(field: IntakeMissingField) {
 
 export type Department = { id: string; name: string; code: string; description?: string | null; isActive: boolean };
 export type Category = { id: string; name: string; code: string; departmentId?: string | null; defaultPriority: string; isActive: boolean; department?: Department | null };
-export type MessageTemplate = { id: string; key: string; body: string; locale: string; isActive: boolean };
+export type MessageTemplate = { id: string; key: string; body: string; locale: string; isActive: boolean; channel?: string | null };
 export type SlaPolicy = { id: string; priority: string; responseMinutes: number; resolutionMinutes: number; isActive: boolean; department?: Department | null; category?: Category | null };
 export type AuditLogItem = { id: string; action: string; createdAt: string; before?: unknown; after?: unknown };
 export type HandoffSummary = {
@@ -152,6 +160,8 @@ export type HandoffCreateTicketResult = {
 export const adminApi = {
   overview: (token: string) => apiFetch<AnalyticsOverview>('/analytics/overview', { token }),
   channelSummary: (token: string) => apiFetch<AnalyticsChannelSummary[]>('/analytics/channels', { token }),
+  conversationSegments: (token: string) =>
+    apiFetch<AnalyticsConversationSegments>('/analytics/conversation-segments', { token }),
   tickets: (token: string) => apiFetch<TicketListItem[]>('/tickets', { token }),
   ticket: (token: string, id: string) => apiFetch<TicketDetail>(`/tickets/${id}`, { token }),
   auditLog: (token: string, id: string) => apiFetch<AuditLogItem[]>(`/tickets/${id}/audit-log`, { token }),

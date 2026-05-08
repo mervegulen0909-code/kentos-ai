@@ -13,6 +13,9 @@ enum ChannelType {
   CITIZEN_WEB
   MOBILE_APP
   OPERATOR
+  INSTAGRAM
+  FACEBOOK
+  SMS
 }
 
 enum TicketStatus {
@@ -64,9 +67,20 @@ enum CitizenIdentifierSource {
   PUBLIC_WEB
   WEB_CHAT
   WHATSAPP
+  INSTAGRAM
+  FACEBOOK
+  SMS
   STAFF
   IMPORT
   MERGE
+}
+
+enum OutboundDeliveryState {
+  PENDING
+  DISPATCHED
+  DELIVERED
+  FAILED
+  SKIPPED
 }
 
 model Tenant {
@@ -93,6 +107,7 @@ model Tenant {
   departments          Department[]
   managerReports       ManagerReport[]
   messageTemplates     MessageTemplate[]
+  outboundDeliveries   OutboundDelivery[]
   neighborhoods        Neighborhood[]
   slaPolicies          SlaPolicy[]
   tickets              Ticket[]
@@ -394,6 +409,31 @@ model ChannelEvent {
 
   @@index([tenantId, channel, createdAt])
   @@index([tenantId, processedAt])
+}
+
+model OutboundDelivery {
+  id                     String                @id @default(cuid())
+  tenantId               String
+  conversationId         String?
+  channel                ChannelType
+  state                  OutboundDeliveryState @default(PENDING)
+  recipientPhone         String?
+  recipientEmail         String?
+  externalConversationId String?
+  externalMessageId      String?
+  templateKey            String?
+  body                   String
+  attempts               Int                   @default(0)
+  lastError              String?
+  dispatchedAt           DateTime?
+  deliveredAt            DateTime?
+  createdAt              DateTime              @default(now())
+  updatedAt              DateTime              @updatedAt
+
+  tenant                 Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, channel, state])
+  @@index([tenantId, conversationId])
 }
 
 model AuditLog {

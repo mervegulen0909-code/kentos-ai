@@ -1,4 +1,4 @@
-import { PrismaClient, TicketPriority, UserRole } from '@prisma/client';
+import { ChannelType, PrismaClient, TicketPriority, UserRole } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
@@ -221,6 +221,54 @@ async function main() {
     update: {},
     create: { userId: departmentStaff.id, departmentId: fenDepartmentId },
   });
+
+  await seedDemoChannelData(tenant.id);
+}
+
+async function seedDemoChannelData(tenantId: string) {
+  const channelDemos: Array<{ channel: ChannelType; externalId: string; state: string; handoff: boolean }> = [
+    { channel: ChannelType.WEB_CHAT, externalId: 'web-demo-1', state: 'TICKET_CREATED', handoff: false },
+    { channel: ChannelType.WEB_CHAT, externalId: 'web-demo-2', state: 'OPEN', handoff: false },
+    { channel: ChannelType.WHATSAPP, externalId: 'wa-demo-90555111', state: 'TICKET_CREATED', handoff: false },
+    { channel: ChannelType.WHATSAPP, externalId: 'wa-demo-90555222', state: 'OPEN', handoff: true },
+    { channel: ChannelType.INSTAGRAM, externalId: 'ig-demo-001', state: 'OPEN', handoff: false },
+    { channel: ChannelType.FACEBOOK, externalId: 'fb-demo-001', state: 'OPEN', handoff: true },
+    { channel: ChannelType.SMS, externalId: 'sms-demo-001', state: 'TICKET_CREATED', handoff: false },
+  ];
+
+  for (const demo of channelDemos) {
+    const existing = await prisma.conversation.findFirst({
+      where: { tenantId, channel: demo.channel, externalConversationId: demo.externalId },
+    });
+    if (existing) continue;
+    await prisma.conversation.create({
+      data: {
+        tenantId,
+        channel: demo.channel,
+        externalConversationId: demo.externalId,
+        state: demo.state,
+        handoffRequested: demo.handoff,
+        context: {
+          messages: [
+            { role: 'citizen', text: `${demo.channel} demo mesaji`, at: new Date().toISOString() },
+            { role: 'assistant', text: 'Demo asistan cevabi.', at: new Date().toISOString() },
+          ],
+        },
+        lastMessageAt: new Date(),
+      },
+    });
+
+    await prisma.channelEvent.create({
+      data: {
+        tenantId,
+        channel: demo.channel,
+        provider: demo.channel.toLowerCase(),
+        externalEventId: `${demo.externalId}-evt-1`,
+        payload: { direction: 'INBOUND', text: 'Demo seed event', externalConversationId: demo.externalId },
+        processedAt: new Date(),
+      },
+    });
+  }
 }
 
 main()

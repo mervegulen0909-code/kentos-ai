@@ -1,6 +1,8 @@
 import { processMediaJob } from './processors/media.processor.js';
 import { processNotificationJob } from './processors/notifications.processor.js';
+import { processOutboundJob } from './processors/outbound.processor.js';
 import { processReportJob } from './processors/reports.processor.js';
+import { processRetentionJob } from './processors/retention.processor.js';
 import { processSlaJob } from './processors/sla.processor.js';
 import { createWorker } from './queues/create-worker.js';
 import { queueNames } from './queues/queue-names.js';
@@ -10,6 +12,8 @@ const workers = [
   createWorker(queueNames.notifications, processNotificationJob),
   createWorker(queueNames.reports, processReportJob),
   createWorker(queueNames.media, processMediaJob),
+  createWorker(queueNames.retention, processRetentionJob),
+  createWorker(queueNames.outbound, processOutboundJob),
 ];
 
 console.log('KentOS worker ready for SLA, notification, reporting and media queues.');

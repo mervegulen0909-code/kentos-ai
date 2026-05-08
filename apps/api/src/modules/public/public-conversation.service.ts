@@ -6,6 +6,7 @@ import { CitizenIdentityService } from './citizen-identity.service.js';
 import { CreatePublicConversationDto } from './dto/create-public-conversation.dto.js';
 import { CreatePublicTicketDto } from './dto/create-public-ticket.dto.js';
 import { SendPublicConversationMessageDto } from './dto/send-public-conversation-message.dto.js';
+import { OutboundDispatchService } from './outbound-dispatch.service.js';
 import { PublicTicketAiService, PublicTicketService } from './public-ticket.service.js';
 
 type ConversationContext = {
@@ -22,6 +23,7 @@ export class PublicConversationService {
     @Inject(PublicTicketAiService) private readonly ai: PublicTicketAiService,
     @Inject(PublicTicketService) private readonly tickets: PublicTicketService,
     @Inject(CitizenIdentityService) private readonly citizenIdentity: CitizenIdentityService,
+    @Inject(OutboundDispatchService) private readonly outbound: OutboundDispatchService,
   ) {}
 
   async widgetSettings(tenantSlug: string) {
@@ -214,6 +216,18 @@ export class PublicConversationService {
       },
     });
 
+    if (assistantMessage) {
+      await this.outbound.dispatch({
+        tenantId: tenant.id,
+        tenantSlug: tenant.slug,
+        channel,
+        conversationId: conversation.id,
+        externalConversationId: conversation.externalConversationId,
+        recipient: { phone: contact.phone, email: contact.email },
+        text: assistantMessage,
+      });
+    }
+
     return this.toResponse(conversation.id, channel, nextContext, assistantMessage, handoffRequested);
   }
 
@@ -300,6 +314,9 @@ export class PublicConversationService {
   private identitySourceForChannel(channel: string) {
     if (channel === ChannelType.WHATSAPP) return 'WHATSAPP';
     if (channel === ChannelType.WEB_CHAT) return 'WEB_CHAT';
+    if (channel === ChannelType.INSTAGRAM) return 'INSTAGRAM';
+    if (channel === ChannelType.FACEBOOK) return 'FACEBOOK';
+    if (channel === ChannelType.SMS) return 'SMS';
     return 'PUBLIC_WEB';
   }
 

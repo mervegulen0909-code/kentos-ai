@@ -790,3 +790,36 @@ Eksik schema ile yazılan checkpoint release kanıtı sayılmaz.
 - **Result:** Passed. Static verification, local migration/seed, and live API smoke are green, including citizen identifier backfill and WhatsApp internal ingest replay idempotency assertions.
 - **Next action:** If committing, stage only intentional product/docs/test files and leave local logs, caches, build outputs, Playwright outputs, and tool artifacts unstaged.
 - **Blocker:** None.
+
+## 2026-05-07 — Citizen identity dry-run evidence and apply gate checkpoint
+
+- **Owner:** `1 — Ana Kontrol`
+- **Status:** passed
+- **Action taken:** Standardized the citizen identity dry-run operating procedure in [`docs/workflows/citizen-identity-backfill-runbook.md`](docs/workflows/citizen-identity-backfill-runbook.md), ran all-tenant reconciliation dry-run with the provided local [`DATABASE_URL`](packages/database/prisma/schema.prisma:7), and recorded the resulting Phase 3 readiness / controlled-apply gate status.
+- **Files changed:** `apps/api/src/common/services/rate-limit.service.ts`, `apps/api/src/modules/public/citizen-identity.service.ts`, `docs/workflows/citizen-identity-backfill-runbook.md`, `docs/releases/RELEASE_NOTES.md`, `docs/workflows/autonomous-run-log.md`.
+- **Verification run:** [`pnpm db:generate`](package.json:13); [`pnpm --filter @kentos/api typecheck`](apps/api/package.json:11); `set DATABASE_URL=postgresql://kentos:kentos@localhost:5432/kentos_ai?schema=public && pnpm citizen-identity:backfill --all-tenants --dry-run --output output/citizen-identity/all-tenants-dry-run.json`.
+- **Result:** Passed. Dry-run output was written to [`output/citizen-identity/all-tenants-dry-run.json`](output/citizen-identity/all-tenants-dry-run.json) with `tenantCount=1`, `readyForPhase3=true`, `unresolvedExceptionCount=0`, and `mergeCandidateCount=14`. Tenant summary: `scannedCitizenCount=42`, `processedClusterCount=28`, `noopCount=3`, `syncIdentifierCount=11`, `mergeCount=14`, `manualReviewCount=0`, `ticketRepointCount=14`, `conversationRepointCount=0`, `identifierTransferCount=0`.
+- **Next action:** Controlled apply may proceed only under the gates in [`docs/workflows/citizen-identity-backfill-runbook.md`](docs/workflows/citizen-identity-backfill-runbook.md): archive dry-run evidence, confirm manual-review count remains zero, prepare rollback note, then run tenant-scoped [`pnpm citizen-identity:backfill`](package.json:22) with `--apply`.
+- **Blocker:** None.
+
+## 2026-05-07 — Citizen identity Phase 3 enforcement marker checkpoint
+
+- **Owner:** `1 — Ana Kontrol`
+- **Status:** passed
+- **Action taken:** Validated that Phase 3 unique enforcement is already live in [`packages/database/prisma/schema.prisma`](packages/database/prisma/schema.prisma) and [`20260506120000_citizen_identity_reconciliation`](packages/database/prisma/migrations/20260506120000_citizen_identity_reconciliation/migration.sql:1), confirmed the tenant-scoped controlled apply/post-apply evidence is green, added a no-op Prisma migration marker at [`packages/database/prisma/migrations/20260507133000_citizen_identity_phase3_enforcement_marker/migration.sql`](packages/database/prisma/migrations/20260507133000_citizen_identity_phase3_enforcement_marker/migration.sql), and cleared the Windows Next.js build blocker by disabling output file tracing in the two web apps.
+- **Files changed:** `packages/database/prisma/migrations/20260507133000_citizen_identity_phase3_enforcement_marker/migration.sql`, [`apps/admin-web/next.config.ts`](apps/admin-web/next.config.ts:1), [`apps/citizen-web/next.config.ts`](apps/citizen-web/next.config.ts:1), `docs/releases/RELEASE_NOTES.md`, `docs/workflows/autonomous-run-log.md`.
+- **Verification run:** [`pnpm typecheck`](package.json:7); [`pnpm build`](package.json:8); [`pnpm --filter @kentos/whatsapp-gateway typecheck`](apps/whatsapp-gateway/package.json:8); [`pnpm --filter @kentos/whatsapp-gateway test`](apps/whatsapp-gateway/package.json:9).
+- **Result:** Passed. [`pnpm typecheck`](package.json:7) passed workspace-wide. [`pnpm build`](package.json:8) completed successfully after clearing both `.next` directories and disabling `outputFileTracing` in the two Next.js apps. Gateway regression checks also passed 6/6 tests, including signature helper coverage and internal-key outbound guard behavior.
+- **Next action:** Close Phase 4 release evidence and final production gate tracking in the release docs/checklists.
+- **Blocker:** None.
+
+## 2026-05-08 — Repo-ready finalization checkpoint
+
+- **Owner:** `1 — Ana Kontrol`
+- **Status:** passed
+- **Action taken:** Closed the repo-ready local gate by ignoring local evidence artifacts, expanding API smoke coverage for widget status and conversation/channel analytics, adding gateway HTTP smoke coverage, running full static/runtime/browser verification on QA ports, and recording final release evidence. No push, PR, production deploy, external message send, Anthropic real run, or destructive artifact cleanup was performed.
+- **Files changed:** `.gitignore`, `package.json`, `scripts/smoke-api.mjs`, `scripts/smoke-gateway.mjs`, `docs/releases/RELEASE_NOTES.md`, `docs/checklists/release-checklist.md`, `docs/workflows/autonomous-run-log.md`.
+- **Verification run:** `docker compose -f infra/docker-compose.yml up -d`; `pnpm db:generate`; `DATABASE_URL=... pnpm db:migrate`; `DATABASE_URL=... pnpm db:seed`; `pnpm typecheck`; `pnpm build`; `pnpm --filter @kentos/whatsapp-gateway test`; `pnpm --filter @kentos/shared test`; `pnpm --filter @kentos/worker typecheck`; local API/admin/citizen/gateway on ports `3110/3111/3112/3120`; `KENTOS_API_BASE_URL=http://127.0.0.1:3110/api/v1 INTERNAL_API_KEY=... pnpm smoke:api`; `KENTOS_GATEWAY_BASE_URL=http://127.0.0.1:3120 pnpm smoke:gateway`; `E2E_ADMIN_BASE_URL=http://127.0.0.1:3111 E2E_CITIZEN_BASE_URL=http://127.0.0.1:3112 E2E_API_BASE_URL=http://127.0.0.1:3110/api/v1 pnpm exec playwright test --config=playwright.smoke.config.ts --workers=1`; 390px mobile Scenario L probe; `git diff --check`.
+- **Result:** Passed. Static checks, DB prepare, API smoke, gateway smoke, Playwright smoke `5/5`, and Scenario L mobile probe are green. Build still emits the known non-fatal Next `outputFileTracing` warning. Local evidence artifacts are ignored by `.gitignore`; final local `master` is expected to be `origin/master...master = 0 3` after the repo-ready evidence commit.
+- **Next action:** Wait for explicit user direction before push/PR/deploy; if no publish action is requested, keep local `master` as the release-ready handoff state.
+- **Blocker:** None.

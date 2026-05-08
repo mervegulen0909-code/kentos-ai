@@ -1,4 +1,5 @@
 import { createReportAction } from './actions';
+import { ReportLocationPicker } from './report-location-picker';
 
 const errorCopy: Record<string, { title: string; detail: string }> = {
   description: {
@@ -80,6 +81,7 @@ export default async function ReportPage({
             <label htmlFor="addressText">Adres veya konum tarifi</label>
             <input id="addressText" name="addressText" placeholder="Mahalle, sokak, bina önü veya yakınındaki bilinen nokta" autoComplete="street-address" />
           </div>
+          <ReportLocationPicker />
           <div className="field">
             <label htmlFor="displayName">Ad soyad</label>
             <input id="displayName" name="displayName" placeholder="İsteğinize bağlı" autoComplete="name" />

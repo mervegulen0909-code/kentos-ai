@@ -36,4 +36,9 @@ export class AnalyticsController {
   channels(@CurrentUser() user: AuthenticatedUser) {
     return this.analytics.channels(user);
   }
+
+  @Get('conversation-segments')
+  conversationSegments(@CurrentUser() user: AuthenticatedUser) {
+    return this.analytics.conversationSegments(user);
+  }
 }

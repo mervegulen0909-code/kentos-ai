@@ -265,6 +265,9 @@ export class PublicTicketService {
   private identitySourceForChannel(channel: ChannelType) {
     if (channel === ChannelType.WEB_CHAT) return 'WEB_CHAT';
     if (channel === ChannelType.WHATSAPP) return 'WHATSAPP';
+    if (channel === ChannelType.INSTAGRAM) return 'INSTAGRAM';
+    if (channel === ChannelType.FACEBOOK) return 'FACEBOOK';
+    if (channel === ChannelType.SMS) return 'SMS';
     return 'PUBLIC_WEB';
   }
 

@@ -34,7 +34,7 @@ export type SendMediaInput = SendTextInput & {
 };
 
 export type SendMessageResult = {
-  provider: 'baileys' | 'meta-cloud';
+  provider: string;
   externalMessageId: string;
   sentAt: string;
 };
@@ -45,4 +45,30 @@ export interface WhatsAppProvider {
   sendMedia(input: SendMediaInput): Promise<SendMessageResult>;
   markRead(input: { tenantId: string; externalMessageId: string }): Promise<void>;
   parseWebhook(raw: unknown): Promise<NormalizedInboundMessage[]>;
+}
+
+export type GenericChannelKind = 'INSTAGRAM' | 'FACEBOOK' | 'SMS';
+
+export type GenericInboundMessage = {
+  tenantId: string;
+  channel: GenericChannelKind;
+  provider: string;
+  externalConversationId: string;
+  externalMessageId: string;
+  from: string;
+  text?: string;
+  receivedAt: string;
+};
+
+export type GenericSendInput = {
+  tenantId: string;
+  to: string;
+  text: string;
+};
+
+export interface ChannelProvider {
+  channel: GenericChannelKind;
+  providerName: string;
+  parseWebhook(raw: unknown): Promise<GenericInboundMessage[]>;
+  sendText(input: GenericSendInput): Promise<SendMessageResult>;
 }

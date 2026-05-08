@@ -39,7 +39,7 @@ export default function CitizenHome() {
 
         <section className="card assistant-preview-panel" aria-label="Belediye asistanı önizlemesi">
           <p className="eyebrow">Web asistanı önizleme akışı</p>
-          <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(2.2rem, 5vw, 4.8rem)', lineHeight: .88, letterSpacing: '-.055em', margin: 0 }}>
+          <h2 style={{ fontFamily: 'var(--font-display)', margin: 0 }}>
             Gömülebilir, takip kodlu, belediye tonunda.
           </h2>
           <p className="panel-muted" style={{ lineHeight: 1.55, marginTop: 14 }}>

@@ -285,6 +285,7 @@ export class TenantsService {
       data: {
         body: dto.body,
         isActive: dto.isActive,
+        ...(dto.channel === undefined ? {} : { channel: dto.channel ?? null }),
       },
     });
 
@@ -296,12 +297,14 @@ export class TenantsService {
         key: existing.key,
         body: existing.body,
         isActive: existing.isActive,
+        channel: existing.channel,
       },
       {
         messageTemplateId: template.id,
         key: template.key,
         body: template.body,
         isActive: template.isActive,
+        channel: template.channel,
       },
     );
 

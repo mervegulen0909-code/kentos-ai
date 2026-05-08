@@ -70,7 +70,7 @@ export default async function AdminHome() {
         <p className="badge">
           {session?.user.role ? `${session.user.role} oturumu` : 'Oturum dogrulamasi bekleniyor'} - Rol ve SLA odakli operasyon ozeti
         </p>
-        <h2 style={{ fontSize: 'clamp(2.8rem, 8vw, 7rem)', lineHeight: 0.9, letterSpacing: '-.06em', maxWidth: 900 }}>
+        <h2>
           Yetkili ekiplerin talep yuku, SLA alarmi ve RBAC kapsami tek ekranda.
         </h2>
         {!hasSession ? (

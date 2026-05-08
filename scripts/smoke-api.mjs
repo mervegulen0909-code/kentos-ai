@@ -242,6 +242,13 @@ const updatedWidgetSettings = await request('/widget-settings', {
 });
 assert(updatedWidgetSettings.body.widgetAllowedOrigins.includes('http://127.0.0.1:3112'), 'Widget origin allowlist was not persisted.');
 assert(updatedWidgetSettings.body.widgetAllowedOrigins.includes('http://localhost:3112'), 'Widget origin allowlist missed localhost QA origin.');
+const widgetStatus = await request('/public/demo-belediye/widget-status', {
+  headers: { 'x-probe-origin': 'http://127.0.0.1:3112' },
+});
+assert(widgetStatus.body.widgetReady === true, 'Widget status did not report widgetReady=true for seeded tenant.');
+assert(widgetStatus.body.originAllowed === true, 'Widget status did not mark QA origin as allowed.');
+assert(typeof widgetStatus.body.allowedOriginCount === 'number', 'Widget status missing allowedOriginCount.');
+console.log('widget_status', widgetStatus.status, widgetStatus.body.widgetReady, widgetStatus.body.originAllowed);
 await request('/widget-settings', {
   method: 'PATCH',
   token,
@@ -346,6 +353,19 @@ const analyticsNeighborhoods = await request('/analytics/neighborhoods', { token
 assert(Array.isArray(analyticsNeighborhoods.body), 'Admin analytics neighborhoods response is not an array.');
 const analyticsChannels = await request('/analytics/channels', { token });
 assert(Array.isArray(analyticsChannels.body), 'Admin analytics channels response is not an array.');
+const analyticsConversationSegments = await request('/analytics/conversation-segments', { token });
+for (const key of ['aiCompleted', 'operatorHandoff', 'awaitingInfo', 'automationRate']) {
+  assert(
+    typeof analyticsConversationSegments.body[key] === 'number',
+    `Analytics conversation segments missing numeric ${key}.`,
+  );
+}
+for (const channel of ['WEB_CHAT', 'WHATSAPP', 'INSTAGRAM', 'FACEBOOK', 'SMS']) {
+  assert(
+    analyticsChannels.body.some((row) => row.channel === channel),
+    `Analytics channels missing seeded ${channel} row.`,
+  );
+}
 const managerAnalyticsOverview = await request('/analytics/overview', { token: managerToken });
 assert(typeof managerAnalyticsOverview.body.totalOpen === 'number', 'Manager analytics overview missing totalOpen.');
 const managerAnalyticsDepartments = await request('/analytics/departments', { token: managerToken });
@@ -355,11 +375,13 @@ assert(Array.isArray(managerAnalyticsChannels.body), 'Manager analytics channels
 await expectStatus('/analytics/overview', 403, { token: operatorToken });
 await expectStatus('/analytics/departments', 403, { token: operatorToken });
 await expectStatus('/analytics/channels', 403, { token: operatorToken });
+await expectStatus('/analytics/conversation-segments', 403, { token: operatorToken });
 await expectStatus('/analytics/overview', 403, { token: departmentStaffToken });
 await expectStatus('/analytics/channels', 403, { token: departmentStaffToken });
 await expectStatus('/analytics/overview', 403, { token: readOnlyToken });
+await expectStatus('/analytics/conversation-segments', 403, { token: readOnlyToken });
 const forbiddenAnalyticsKeys = ['citizen', 'citizens', 'citizenId', 'phone', 'email', 'auditLogs', 'messages', 'internalNotes', 'aiRuns', 'aiClassification'];
-const analyticsPayload = JSON.stringify([analyticsOverview.body, analyticsDepartments.body, analyticsCategories.body, analyticsNeighborhoods.body, analyticsChannels.body, managerAnalyticsOverview.body, managerAnalyticsDepartments.body, managerAnalyticsChannels.body]);
+const analyticsPayload = JSON.stringify([analyticsOverview.body, analyticsDepartments.body, analyticsCategories.body, analyticsNeighborhoods.body, analyticsChannels.body, analyticsConversationSegments.body, managerAnalyticsOverview.body, managerAnalyticsDepartments.body, managerAnalyticsChannels.body]);
 for (const key of forbiddenAnalyticsKeys) {
   assert(!analyticsPayload.includes(`"${key}"`), `Analytics response leaked ${key}.`);
 }
