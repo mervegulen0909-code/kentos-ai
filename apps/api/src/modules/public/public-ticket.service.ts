@@ -22,7 +22,7 @@ import { CreatePublicTicketDto } from './dto/create-public-ticket.dto.js';
 @Injectable()
 export class PublicTicketAiService {
   async classify(input: PublicTicketAiIntakeRequest): Promise<PublicTicketAiIntakeResult> {
-    const request = publicTicketAiIntakeRequestSchema.parse(input);
+    const request = publicTicketAiIntakeRequestSchema.parse(this.normalizeRequestContact(input));
     const requestedAt = new Date().toISOString();
     const netivaConfig = this.readNetivaConfig();
 
@@ -35,6 +35,23 @@ export class PublicTicketAiService {
     }
 
     return this.classifyWithDeterministicFallback(request, requestedAt);
+  }
+
+  private normalizeRequestContact(input: PublicTicketAiIntakeRequest): PublicTicketAiIntakeRequest {
+    const contact = input.message.citizenContact;
+    if (!contact) return input;
+
+    const phone = this.cleanOptionalText(contact.phone);
+    const email = this.cleanEmail(contact.email);
+    const displayName = this.cleanOptionalText(contact.displayName);
+
+    return {
+      ...input,
+      message: {
+        ...input.message,
+        citizenContact: { phone, email, displayName },
+      },
+    };
   }
 
   private classifyWithDeterministicFallback(
@@ -163,6 +180,17 @@ export class PublicTicketAiService {
   private readPositiveInt(value: string | undefined, fallback: number) {
     const parsed = Number.parseInt(value ?? '', 10);
     return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+  }
+
+  private cleanOptionalText(value: string | null | undefined) {
+    const trimmed = value?.trim();
+    return trimmed ? trimmed : null;
+  }
+
+  private cleanEmail(value: string | null | undefined) {
+    const trimmed = this.cleanOptionalText(value);
+    if (!trimmed) return null;
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed) ? trimmed : null;
   }
 }
 
