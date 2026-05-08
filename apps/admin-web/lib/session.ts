@@ -6,6 +6,7 @@ const sessionStateCookieName = 'kentos_admin_session';
 
 type JwtPayload = {
   exp?: number;
+  role?: string;
 };
 
 export type AdminSessionUser = {
@@ -99,13 +100,17 @@ async function refreshAdminAccessToken(refreshToken: string) {
     throw new Error('Refresh response missing accessToken');
   }
 
-  await setSessionAccessToken(result.accessToken);
   return result.accessToken;
 }
 
 export async function getSessionToken() {
   const store = await cookies();
   return store.get(sessionCookieName)?.value ?? null;
+}
+
+export function getRoleFromToken(token: string | null) {
+  if (!token) return null;
+  return decodeJwtPayload(token)?.role ?? null;
 }
 
 export async function setSessionAccessToken(accessToken: string) {
@@ -123,7 +128,6 @@ export async function resolveAdminAccessToken() {
   try {
     return await refreshAdminAccessToken(refreshToken);
   } catch {
-    await clearSessionToken();
     return null;
   }
 }

@@ -635,7 +635,7 @@ export class TicketsService {
       TRIAGED: [TicketStatus.ASSIGNED, TicketStatus.WAITING_INFO, TicketStatus.REJECTED],
       ASSIGNED: [TicketStatus.IN_PROGRESS, TicketStatus.WAITING_INFO, TicketStatus.REJECTED],
       IN_PROGRESS: [TicketStatus.WAITING_INFO, TicketStatus.RESOLVED, TicketStatus.REJECTED],
-      WAITING_INFO: [TicketStatus.TRIAGED, TicketStatus.ASSIGNED, TicketStatus.IN_PROGRESS, TicketStatus.REJECTED],
+      WAITING_INFO: [TicketStatus.TRIAGED, TicketStatus.ASSIGNED, TicketStatus.IN_PROGRESS, TicketStatus.RESOLVED, TicketStatus.REJECTED],
       RESOLVED: [TicketStatus.CLOSED, TicketStatus.IN_PROGRESS],
       CLOSED: [],
       REJECTED: [],

@@ -1,5 +1,5 @@
 import { adminApi, formatMissingFieldLabel } from '../../../lib/api';
-import { canAssignTickets, canMutateTickets, getAdminSession, isReadOnlyRole } from '../../../lib/session';
+import { canAssignTickets, canMutateTickets, getAdminSession, getRoleFromToken, isReadOnlyRole, resolveAdminAccessToken } from '../../../lib/session';
 import { PendingFieldset, PendingSubmitButton } from '../../components/form-controls';
 import { addInternalNoteAction, addPublicMessageAction, assignTicketAction, updateStatusAction } from '../actions';
 
@@ -8,7 +8,7 @@ const transitions: Record<string, string[]> = {
   TRIAGED: ['ASSIGNED', 'WAITING_INFO', 'REJECTED'],
   ASSIGNED: ['IN_PROGRESS', 'WAITING_INFO', 'REJECTED'],
   IN_PROGRESS: ['WAITING_INFO', 'RESOLVED', 'REJECTED'],
-  WAITING_INFO: ['TRIAGED', 'ASSIGNED', 'IN_PROGRESS', 'REJECTED'],
+  WAITING_INFO: ['TRIAGED', 'ASSIGNED', 'IN_PROGRESS', 'RESOLVED', 'REJECTED'],
   RESOLVED: ['CLOSED', 'IN_PROGRESS'],
   CLOSED: [],
   REJECTED: [],
@@ -122,9 +122,9 @@ export default async function TicketDetailPage({
   const { id } = await params;
   const { success, error, errorMessage } = await searchParams;
   const session = await getAdminSession();
-  const hasSession = Boolean(session);
-  const token = session?.accessToken ?? null;
-  const role = session?.user.role ?? null;
+  const token = await resolveAdminAccessToken();
+  const hasSession = Boolean(token);
+  const role = session?.user.role ?? getRoleFromToken(token);
   const ticket = token ? await adminApi.ticket(token, id).catch(() => null) : null;
   const auditLog = token ? await adminApi.auditLog(token, id).catch(() => []) : [];
   const departments = token ? await adminApi.departments(token).catch(() => []) : [];

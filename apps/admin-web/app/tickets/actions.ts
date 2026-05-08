@@ -38,14 +38,15 @@ async function runTicketMutation(formData: FormData, success: string, mutation: 
   redirect(`/tickets/${ticketId}?success=${success}`);
 }
 
-function requireNonEmpty(value: FormDataEntryValue | null, fallback: string) {
-  const normalized = String(value ?? '').trim();
-  if (!normalized) throw new Error(fallback);
+function requireNonEmpty(formData: FormData, field: string, fallback: string) {
+  const normalized = String(formData.get(field) ?? '').trim();
+  const ticketId = String(formData.get('ticketId') ?? '');
+  if (!normalized) redirect(`/tickets/${ticketId}?error=${fallback}`);
   return normalized;
 }
 
 export async function updateStatusAction(formData: FormData) {
-  const status = requireNonEmpty(formData.get('status'), 'status');
+  const status = requireNonEmpty(formData, 'status', 'status');
   const publicMessage = String(formData.get('publicMessage') ?? '').trim();
 
   await runTicketMutation(formData, 'status-updated', (token, ticketId) => apiFetch(`/tickets/${ticketId}/status`, {
@@ -56,7 +57,7 @@ export async function updateStatusAction(formData: FormData) {
 }
 
 export async function assignTicketAction(formData: FormData) {
-  const departmentId = requireNonEmpty(formData.get('departmentId'), 'assignment');
+  const departmentId = requireNonEmpty(formData, 'departmentId', 'assignment');
 
   await runTicketMutation(formData, 'assigned', (token, ticketId) => apiFetch(`/tickets/${ticketId}/assign`, {
     method: 'POST',
@@ -66,7 +67,7 @@ export async function assignTicketAction(formData: FormData) {
 }
 
 export async function addInternalNoteAction(formData: FormData) {
-  const body = requireNonEmpty(formData.get('body'), 'internal-note');
+  const body = requireNonEmpty(formData, 'body', 'internal-note');
 
   await runTicketMutation(formData, 'internal-note-added', (token, ticketId) => apiFetch(`/tickets/${ticketId}/notes`, {
     method: 'POST',
@@ -76,7 +77,7 @@ export async function addInternalNoteAction(formData: FormData) {
 }
 
 export async function addPublicMessageAction(formData: FormData) {
-  const body = requireNonEmpty(formData.get('body'), 'public-message');
+  const body = requireNonEmpty(formData, 'body', 'public-message');
 
   await runTicketMutation(formData, 'public-message-sent', (token, ticketId) => apiFetch(`/tickets/${ticketId}/public-messages`, {
     method: 'POST',
