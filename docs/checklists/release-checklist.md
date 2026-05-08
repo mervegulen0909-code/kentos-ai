@@ -167,8 +167,8 @@ Before the milestone push decision:
 
 ### 2026-05-08 repo-ready local gate
 
-- [x] Local `master` ahead count is recorded: expected `origin/master...master = 0 3` after the repo-ready evidence commit.
-- [x] Product wave commits are recorded: `971061a` (`feat: harden multi-channel municipal operations`) and `1f0661b` (`chore: normalize text line endings`).
+- [x] Local `master` ahead count is recorded: `origin/master...master = 0 0` after PR #3 and PR #4 merge sync.
+- [x] Product wave commits are recorded: `971061a` (`feat: harden multi-channel municipal operations`), `1f0661b` (`chore: normalize text line endings`), `c185a58` (`test: close repo-ready smoke evidence`), and `07521c9` (`chore: sync lockfile for api dependency`).
 - [x] Static verification passed: `pnpm db:generate`, `pnpm db:migrate`, `pnpm db:seed`, `pnpm typecheck`, and `pnpm build` on local infra.
 - [x] Focused checks passed: `pnpm --filter @kentos/whatsapp-gateway test`, `pnpm --filter @kentos/shared test`, `pnpm --filter @kentos/worker typecheck`, and `git diff --check`.
 - [x] API smoke passed on `http://127.0.0.1:3110/api/v1`, including widget status, conversation segment analytics, seeded channel analytics rows, WhatsApp ingest idempotency, role matrix, audit, and public-safe response checks.
@@ -176,7 +176,7 @@ Before the milestone push decision:
 - [x] Browser smoke passed: Playwright smoke `5/5` on QA ports `3110/3111/3112`.
 - [x] Strict mobile Scenario L passed at 390px for admin login/settings/ticket detail and citizen report/track/ticket with no horizontal overflow and visible keyboard focus targets.
 - [x] Local release evidence artifacts are excluded by `.gitignore`: `/output/`, `/apps/api/output/`, `/admin-home-*.png`, and `/citizen-home-*.png`.
-- [x] Push/PR/deploy remain out of scope until the user explicitly requests them.
+- [x] PR #3 merged in `4699c4e`; PR #4 merged in `8409c65`; production deploy remains out of scope until separately approved.
 
 Before push:
 

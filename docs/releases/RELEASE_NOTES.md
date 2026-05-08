@@ -12,7 +12,7 @@
 
 ### Evidence snapshot
 
-- Branch/sync: local `master`, `origin/master...master = 0 3` after repo-ready evidence commit; no push/PR performed in this local cycle.
+- Branch/sync: PR #3 merged to `master` in `4699c4e`; PR #4 merged the Next config cleanup in `8409c65`; local `master` is synced with `origin/master` (`origin/master...master = 0 0`).
 - Static checks: `db:generate=passed`, `db:migrate=passed`, `db:seed=passed`, `typecheck=passed`, `build=passed`
 - Database migration: `20260506120000_citizen_identity_reconciliation=applied locally`; `20260507133000_citizen_identity_phase3_enforcement_marker=added as no-op phase marker`
 - API smoke: `passed` on `http://127.0.0.1:3110/api/v1`, including citizen identity backfill, WhatsApp ingest idempotency, widget status, conversation segments, and seeded channel analytics rows.
@@ -32,12 +32,12 @@
 - P1 closed: historical citizen backfill dry-run and exception-report evidence is now produced through [`pnpm citizen-identity:backfill`](package.json:22) and archived at [`output/citizen-identity/all-tenants-dry-run.json`](output/citizen-identity/all-tenants-dry-run.json).
 - P1 closed: controlled citizen merge `--apply` execution and post-apply verification are complete for tenant `cmophayio0000kovgkksj6f25`; Phase 3 is represented by the no-op enforcement marker migration because the unique index already exists in [`20260506120000_citizen_identity_reconciliation`](packages/database/prisma/migrations/20260506120000_citizen_identity_reconciliation/migration.sql:1).
 - P1 closed: external WhatsApp provider signature verification helper and gateway regression checks are passing in [`apps/whatsapp-gateway/src/webhook-signatures.ts`](apps/whatsapp-gateway/src/webhook-signatures.ts:1) and [`apps/whatsapp-gateway/src/server.ts`](apps/whatsapp-gateway/src/server.ts:18).
-- P1 closed: workspace-wide [`pnpm build`](package.json:8) passes again after the Windows Next.js tracing workaround in [`apps/admin-web/next.config.ts`](apps/admin-web/next.config.ts:3) and [`apps/citizen-web/next.config.ts`](apps/citizen-web/next.config.ts:3).
+- P1 closed: workspace-wide [`pnpm build`](package.json:8) passes, and PR #4 removed the obsolete Next `outputFileTracing` config that caused the non-fatal Next 15 warning.
 
 ### Risk and rollback
 
-- Risk level: `low` because static checks, API smoke, gateway smoke, browser smoke, and mobile Scenario L evidence are green; remaining work is push/PR decision only.
-- Rollback policy: revert the Windows Next.js tracing workaround in [`apps/admin-web/next.config.ts`](apps/admin-web/next.config.ts:3) and [`apps/citizen-web/next.config.ts`](apps/citizen-web/next.config.ts:3) if tracing is later required in another environment; for citizen reconciliation, keep [`docs/workflows/citizen-identity-apply-rollback-note.md`](docs/workflows/citizen-identity-apply-rollback-note.md) together with the archived dry-run/apply/post-apply artifacts as the operational rollback reference.
+- Risk level: `low` because static checks, API smoke, gateway smoke, browser smoke, and mobile Scenario L evidence are green; remaining gates are external production/provider approvals only.
+- Rollback policy: revert PR #4 (`499d59e`) if a future deployment needs an explicit Next output-tracing setting; for citizen reconciliation, keep [`docs/workflows/citizen-identity-apply-rollback-note.md`](docs/workflows/citizen-identity-apply-rollback-note.md) together with the archived dry-run/apply/post-apply artifacts as the operational rollback reference.
 
 ## Next — PDF-style assistant product wave — 2026-05-05
 
