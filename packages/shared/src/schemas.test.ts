@@ -94,6 +94,18 @@ function testValidResultSchema() {
   assert(parsed.data.classification.confidence === 0.92, 'confidence should survive parsing');
 }
 
+function testValidNetivaResultSchema() {
+  const netivaResult: PublicTicketAiIntakeResult = {
+    ...buildValidResult(),
+    provider: 'netiva',
+    model: 'claude-sonnet-4-6',
+  };
+
+  const parsed = publicTicketAiIntakeResultSchema.safeParse(netivaResult);
+  assert(parsed.success, 'valid Netiva intake result should parse');
+  assert(parsed.data.provider === 'netiva', 'Netiva provider should survive parsing');
+}
+
 function testRejectInvalidMissingField() {
   const invalid = buildValidResult() as PublicTicketAiIntakeResult & {
     classification: Omit<PublicTicketAiIntakeResult['classification'], 'missingFields'> & { missingFields: string[] };
@@ -136,6 +148,7 @@ function testRejectLegacyStatusTicketNo() {
 testValidRequestSchema();
 testRejectInvalidRequestEmail();
 testValidResultSchema();
+testValidNetivaResultSchema();
 testRejectInvalidMissingField();
 testRejectInvalidConfidence();
 testRejectLegacyStatusTicketNo();

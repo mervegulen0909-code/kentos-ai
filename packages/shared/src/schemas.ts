@@ -114,8 +114,8 @@ export const publicTicketAiIntakeRequestSchema = z.object({
 });
 
 export const publicTicketAiIntakeResultSchema = z.object({
-  provider: z.literal('stub'),
-  model: z.literal('deterministic-fallback'),
+  provider: z.enum(['stub', 'netiva']),
+  model: z.string().min(1),
   promptVersion: z.string().min(1),
   classification: intakeClassificationSchema,
   requestedAt: z.string().datetime(),
