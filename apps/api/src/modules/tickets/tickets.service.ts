@@ -44,6 +44,7 @@ export class TicketsService {
         OR: filters.q
           ? [
               { ticketNo: { contains: filters.q, mode: 'insensitive' } },
+              { publicTrackingToken: { contains: filters.q, mode: 'insensitive' } },
               { title: { contains: filters.q, mode: 'insensitive' } },
               { description: { contains: filters.q, mode: 'insensitive' } },
               { addressText: { contains: filters.q, mode: 'insensitive' } },
@@ -51,7 +52,7 @@ export class TicketsService {
           : undefined,
       },
       include: { department: true, category: true, assignedTo: true, citizen: true },
-      orderBy: [{ resolutionDueAt: 'asc' }, { createdAt: 'desc' }],
+      orderBy: [{ createdAt: 'desc' }, { resolutionDueAt: 'asc' }],
       take: 100,
     });
 

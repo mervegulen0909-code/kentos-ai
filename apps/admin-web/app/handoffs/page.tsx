@@ -6,11 +6,14 @@ const fallbackRows: HandoffSummary[] = [];
 const channelCopy: Record<string, string> = {
   WEB_CHAT: 'Web chat',
   WHATSAPP: 'WhatsApp',
+  CITIZEN_WEB: 'Vatandas portali',
+  MOBILE_APP: 'Mobil uygulama',
   EMAIL: 'E-posta',
   PHONE: 'Telefon',
   SMS: 'SMS',
-  INSTAGRAM: 'Instagram',
-  FACEBOOK: 'Facebook',
+  INSTAGRAM: 'Instagram DM',
+  FACEBOOK: 'Facebook DM',
+  OPERATOR: 'Operator',
 };
 
 const intentCopy: Record<string, string> = {

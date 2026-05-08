@@ -48,6 +48,11 @@ Run local API smoke when API, database, auth, RBAC, tenant settings, ticket work
 - [ ] Smoke verifies legacy/internal `KNT-*` ticket numbers do not work on public lookup endpoints.
 - [ ] Smoke verifies WhatsApp/internal channel ingest rejects missing internal key and accepts authorized text-only envelope handoff.
 - [ ] Smoke verifies public widget/ticket endpoint rejects disallowed `Origin` and accepts allowlisted widget origin.
+- [ ] Smoke verifies `/public/:tenantSlug/widget-status` returns `widgetReady`, `originAllowed`, and `allowedOriginCount` for the seeded tenant.
+- [ ] Smoke verifies `/analytics/conversation-segments` returns `aiCompleted / operatorHandoff / awaitingInfo / automationRate`.
+- [ ] Smoke verifies `/analytics/channels` returns rows for at least the seeded channels (WEB_CHAT, WHATSAPP, INSTAGRAM, FACEBOOK, SMS).
+- [ ] Smoke verifies internal outbound endpoints (`/internal/<channel>/outbound`) on the gateway reject missing `x-kentos-internal-key`.
+- [ ] Smoke verifies multi-channel webhook intake (`/webhooks/instagram`, `/webhooks/facebook`, `/webhooks/sms`) rejects missing `META_APP_SECRET` / `TWILIO_AUTH_TOKEN` signatures when those env vars are configured.
 
 ## 5. Role and RBAC regression
 
@@ -117,6 +122,19 @@ Run this scope when queue processors, notification delivery guardrails, or worke
 - [ ] Notification processor returns explicit skip reasons for non-deliverable public-message jobs.
 - [ ] SLA processor returns actionable `breached` and `dueSoon` counts with a timestamped summary.
 - [ ] Reports processor returns a timestamped acceptance summary suitable for QA/release evidence.
+- [ ] Outbound processor (`kentos.outbound`) honors retry/backoff and writes terminal `OutboundDelivery.state` (`DISPATCHED`, `FAILED`, `SKIPPED`).
+- [ ] Retention processor (`kentos.retention`) accepts `tenantId / retentionDays / scope` and emits `totals` per scope.
+
+## 7.5 Channel gateway HTTP regression
+
+Run this scope when the gateway HTTP server (`apps/whatsapp-gateway/src/server.ts`), provider parsers, or webhook signature helpers change.
+
+- [ ] `pnpm --filter @kentos/whatsapp-gateway typecheck`
+- [ ] `pnpm --filter @kentos/whatsapp-gateway test`
+- [ ] `GET /health` on the gateway returns 200 with timestamp.
+- [ ] Webhook endpoints `/webhooks/{whatsapp|instagram|facebook|sms}` reject when the corresponding signature env (`META_APP_SECRET` / `TWILIO_AUTH_TOKEN`) is set and the header is missing or wrong.
+- [ ] Internal outbound endpoints `/internal/{channel}/outbound` reject when `x-kentos-internal-key` does not match `INTERNAL_API_KEY`.
+- [ ] Internal outbound endpoints honor `*_OUTBOUND_LIVE` env flag (default dry-run + structured log; `true` invokes provider.sendText).
 
 ## 8. QA Smoke Runner window behavior
 

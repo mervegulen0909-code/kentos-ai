@@ -36,6 +36,14 @@ export class CreatePublicTicketDto {
   longitude?: number;
 
   @IsOptional()
-  @IsIn([ChannelType.CITIZEN_WEB, ChannelType.WEB_CHAT, ChannelType.MOBILE_APP])
-  channel?: Exclude<IntakeChannel, 'WHATSAPP'>;
+  @IsIn([
+    ChannelType.CITIZEN_WEB,
+    ChannelType.WEB_CHAT,
+    ChannelType.MOBILE_APP,
+    ChannelType.WHATSAPP,
+    ChannelType.INSTAGRAM,
+    ChannelType.FACEBOOK,
+    ChannelType.SMS,
+  ])
+  channel?: IntakeChannel;
 }

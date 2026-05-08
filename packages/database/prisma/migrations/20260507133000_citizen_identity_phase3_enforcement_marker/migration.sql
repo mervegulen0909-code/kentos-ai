@@ -1,0 +1,16 @@
+-- Phase 3 enforcement marker migration
+--
+-- Purpose:
+-- The tenant-scoped unique enforcement for citizen identifiers is already live via
+-- [`20260506120000_citizen_identity_reconciliation`](packages/database/prisma/migrations/20260506120000_citizen_identity_reconciliation/migration.sql:1),
+-- which created:
+--   CREATE UNIQUE INDEX "CitizenIdentifier_tenantId_kind_normalizedValue_key"
+--   ON "CitizenIdentifier"("tenantId", "kind", "normalizedValue");
+--
+-- This marker migration records the operational Phase 3 milestone after:
+-- - reconciliation dry-run evidence was archived,
+-- - controlled tenant apply was completed,
+-- - post-apply dry-run returned readyForPhase3=true with no manual_review clusters.
+--
+-- No additional DDL is required here because repeating the same unique index creation
+-- would be unsafe/noisy and would not change the effective database contract.

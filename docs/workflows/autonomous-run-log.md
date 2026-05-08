@@ -790,3 +790,25 @@ Eksik schema ile yazılan checkpoint release kanıtı sayılmaz.
 - **Result:** Passed. Static verification, local migration/seed, and live API smoke are green, including citizen identifier backfill and WhatsApp internal ingest replay idempotency assertions.
 - **Next action:** If committing, stage only intentional product/docs/test files and leave local logs, caches, build outputs, Playwright outputs, and tool artifacts unstaged.
 - **Blocker:** None.
+
+## 2026-05-07 — Citizen identity dry-run evidence and apply gate checkpoint
+
+- **Owner:** `1 — Ana Kontrol`
+- **Status:** passed
+- **Action taken:** Standardized the citizen identity dry-run operating procedure in [`docs/workflows/citizen-identity-backfill-runbook.md`](docs/workflows/citizen-identity-backfill-runbook.md), ran all-tenant reconciliation dry-run with the provided local [`DATABASE_URL`](packages/database/prisma/schema.prisma:7), and recorded the resulting Phase 3 readiness / controlled-apply gate status.
+- **Files changed:** `apps/api/src/common/services/rate-limit.service.ts`, `apps/api/src/modules/public/citizen-identity.service.ts`, `docs/workflows/citizen-identity-backfill-runbook.md`, `docs/releases/RELEASE_NOTES.md`, `docs/workflows/autonomous-run-log.md`.
+- **Verification run:** [`pnpm db:generate`](package.json:13); [`pnpm --filter @kentos/api typecheck`](apps/api/package.json:11); `set DATABASE_URL=postgresql://kentos:kentos@localhost:5432/kentos_ai?schema=public && pnpm citizen-identity:backfill --all-tenants --dry-run --output output/citizen-identity/all-tenants-dry-run.json`.
+- **Result:** Passed. Dry-run output was written to [`output/citizen-identity/all-tenants-dry-run.json`](output/citizen-identity/all-tenants-dry-run.json) with `tenantCount=1`, `readyForPhase3=true`, `unresolvedExceptionCount=0`, and `mergeCandidateCount=14`. Tenant summary: `scannedCitizenCount=42`, `processedClusterCount=28`, `noopCount=3`, `syncIdentifierCount=11`, `mergeCount=14`, `manualReviewCount=0`, `ticketRepointCount=14`, `conversationRepointCount=0`, `identifierTransferCount=0`.
+- **Next action:** Controlled apply may proceed only under the gates in [`docs/workflows/citizen-identity-backfill-runbook.md`](docs/workflows/citizen-identity-backfill-runbook.md): archive dry-run evidence, confirm manual-review count remains zero, prepare rollback note, then run tenant-scoped [`pnpm citizen-identity:backfill`](package.json:22) with `--apply`.
+- **Blocker:** None.
+
+## 2026-05-07 — Citizen identity Phase 3 enforcement marker checkpoint
+
+- **Owner:** `1 — Ana Kontrol`
+- **Status:** passed
+- **Action taken:** Validated that Phase 3 unique enforcement is already live in [`packages/database/prisma/schema.prisma`](packages/database/prisma/schema.prisma) and [`20260506120000_citizen_identity_reconciliation`](packages/database/prisma/migrations/20260506120000_citizen_identity_reconciliation/migration.sql:1), confirmed the tenant-scoped controlled apply/post-apply evidence is green, added a no-op Prisma migration marker at [`packages/database/prisma/migrations/20260507133000_citizen_identity_phase3_enforcement_marker/migration.sql`](packages/database/prisma/migrations/20260507133000_citizen_identity_phase3_enforcement_marker/migration.sql), and cleared the Windows Next.js build blocker by disabling output file tracing in the two web apps.
+- **Files changed:** `packages/database/prisma/migrations/20260507133000_citizen_identity_phase3_enforcement_marker/migration.sql`, [`apps/admin-web/next.config.ts`](apps/admin-web/next.config.ts:1), [`apps/citizen-web/next.config.ts`](apps/citizen-web/next.config.ts:1), `docs/releases/RELEASE_NOTES.md`, `docs/workflows/autonomous-run-log.md`.
+- **Verification run:** [`pnpm typecheck`](package.json:7); [`pnpm build`](package.json:8); [`pnpm --filter @kentos/whatsapp-gateway typecheck`](apps/whatsapp-gateway/package.json:8); [`pnpm --filter @kentos/whatsapp-gateway test`](apps/whatsapp-gateway/package.json:9).
+- **Result:** Passed. [`pnpm typecheck`](package.json:7) passed workspace-wide. [`pnpm build`](package.json:8) completed successfully after clearing both `.next` directories and disabling `outputFileTracing` in the two Next.js apps. Gateway regression checks also passed 6/6 tests, including signature helper coverage and internal-key outbound guard behavior.
+- **Next action:** Close Phase 4 release evidence and final production gate tracking in the release docs/checklists.
+- **Blocker:** None.

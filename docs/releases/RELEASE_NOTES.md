@@ -14,10 +14,13 @@
 
 - Branch/sync: local working tree with intentional hardening diff in progress
 - Static checks: `db:generate=passed`, `typecheck=passed`, `build=passed`
-- Database migration: `20260506120000_citizen_identity_reconciliation=applied locally`
+- Database migration: `20260506120000_citizen_identity_reconciliation=applied locally`; `20260507133000_citizen_identity_phase3_enforcement_marker=added as no-op phase marker`
 - API smoke: `passed` with citizen identifier backfill and WhatsApp internal ingest replay idempotency checks
-- Browser/dev runtime: admin web recompiled cleanly on QA port `3111`; no new runtime error surfaced during the safe-message threading change
+- Gateway verification: `typecheck=passed`, `test=passed` for [`@kentos/whatsapp-gateway`](apps/whatsapp-gateway/package.json)
+- Browser/dev runtime: Windows Next.js `readlink` build blocker was cleared by disabling output file tracing in [`apps/admin-web/next.config.ts`](apps/admin-web/next.config.ts:3) and [`apps/citizen-web/next.config.ts`](apps/citizen-web/next.config.ts:3)
 - Data-model decision: [`0002 — Citizen Identity and Reconciliation Strategy`](docs/decisions/0002-citizen-identity-reconciliation.md:1) added
+- Citizen reconciliation dry-run: `passed` via [`pnpm citizen-identity:backfill`](package.json:22) with evidence saved at [`output/citizen-identity/all-tenants-dry-run.json`](output/citizen-identity/all-tenants-dry-run.json); `tenantCount=1`, `readyForPhase3=true`, `unresolvedExceptionCount=0`, `mergeCandidateCount=14`
+- Citizen reconciliation controlled apply: `passed` for tenant `cmophayio0000kovgkksj6f25` with evidence at [`apps/api/output/citizen-identity/cmophayio0000kovgkksj6f25-apply.json`](apps/api/output/citizen-identity/cmophayio0000kovgkksj6f25-apply.json) and post-apply verification at [`apps/api/output/citizen-identity/cmophayio0000kovgkksj6f25-post-apply-dry-run.json`](apps/api/output/citizen-identity/cmophayio0000kovgkksj6f25-post-apply-dry-run.json); `mergeCandidateCount=0`, `manualReviewCount=0`, `readyForPhase3=true`
 
 ### Principal-engineer risk register
 
@@ -26,14 +29,15 @@
 - P1 closed: admin operators receiving generic mutation failures instead of safe actionable notices in [`runSettingsMutation()`](apps/admin-web/app/settings/actions.ts:26) and [`runTicketMutation()`](apps/admin-web/app/tickets/actions.ts:14)
 - P1 closed: citizen identity uniqueness is now schema-backed through `CitizenIdentifier`, and public/conversation intake uses the shared reconciliation service.
 - P1 closed: WhatsApp/internal replay risk is reduced by `ChannelEvent` idempotency on inbound `externalMessageId`.
-- P2 open: historical citizen backfill/exception-report command is still needed before production rollout with existing tenant data.
-- P2 open: external WhatsApp provider signature verification remains a production gate.
-- P2 open: workspace-wide [`pnpm build`](package.json) can still be blocked on Windows when the active API dev process locks [`apps/api/dist`](apps/api/dist)
+- P1 closed: historical citizen backfill dry-run and exception-report evidence is now produced through [`pnpm citizen-identity:backfill`](package.json:22) and archived at [`output/citizen-identity/all-tenants-dry-run.json`](output/citizen-identity/all-tenants-dry-run.json).
+- P1 closed: controlled citizen merge `--apply` execution and post-apply verification are complete for tenant `cmophayio0000kovgkksj6f25`; Phase 3 is represented by the no-op enforcement marker migration because the unique index already exists in [`20260506120000_citizen_identity_reconciliation`](packages/database/prisma/migrations/20260506120000_citizen_identity_reconciliation/migration.sql:1).
+- P1 closed: external WhatsApp provider signature verification helper and gateway regression checks are passing in [`apps/whatsapp-gateway/src/webhook-signatures.ts`](apps/whatsapp-gateway/src/webhook-signatures.ts:1) and [`apps/whatsapp-gateway/src/server.ts`](apps/whatsapp-gateway/src/server.ts:18).
+- P1 closed: workspace-wide [`pnpm build`](package.json:8) passes again after the Windows Next.js tracing workaround in [`apps/admin-web/next.config.ts`](apps/admin-web/next.config.ts:3) and [`apps/citizen-web/next.config.ts`](apps/citizen-web/next.config.ts:3).
 
 ### Risk and rollback
 
-- Risk level: `medium-low` because P1 correctness and UX gaps are closed, but historical citizen backfill and external provider signature verification still require follow-through.
-- Rollback policy: revert the shared intake extraction, admin error threading, and smoke assertions as isolated patches if regressions surface; keep ADR documentation even if implementation timing changes.
+- Risk level: `low-medium` because citizen reconciliation apply/post-apply verification, gateway regression checks, and workspace build are green; remaining risk is standard final smoke/release hygiene.
+- Rollback policy: revert the Windows Next.js tracing workaround in [`apps/admin-web/next.config.ts`](apps/admin-web/next.config.ts:3) and [`apps/citizen-web/next.config.ts`](apps/citizen-web/next.config.ts:3) if tracing is later required in another environment; for citizen reconciliation, keep [`docs/workflows/citizen-identity-apply-rollback-note.md`](docs/workflows/citizen-identity-apply-rollback-note.md) together with the archived dry-run/apply/post-apply artifacts as the operational rollback reference.
 
 ## Next — PDF-style assistant product wave — 2026-05-05
 

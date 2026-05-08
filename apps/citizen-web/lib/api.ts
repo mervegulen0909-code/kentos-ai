@@ -55,6 +55,8 @@ export type CreatePublicTicketInput = {
   phone?: string;
   email?: string;
   addressText?: string;
+  latitude?: number;
+  longitude?: number;
   channel?: 'CITIZEN_WEB' | 'WEB_CHAT' | 'MOBILE_APP';
 };
 
