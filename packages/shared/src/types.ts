@@ -164,8 +164,8 @@ export type PublicTicketAiIntakeRequest = {
 };
 
 export type PublicTicketAiIntakeResult = {
-  provider: 'stub';
-  model: 'deterministic-fallback';
+  provider: 'stub' | 'netiva';
+  model: string;
   promptVersion: string;
   classification: IntakeClassification;
   requestedAt: string;

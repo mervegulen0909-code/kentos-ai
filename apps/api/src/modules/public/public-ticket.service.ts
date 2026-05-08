@@ -1,7 +1,15 @@
 import { randomBytes } from 'node:crypto';
 import { ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { AuditActorType, ChannelType, MessageVisibility, TicketStatus } from '@kentos/database';
-import { buildDeterministicIntakeClassification, type PublicTicketAiIntakeRequest, type PublicTicketAiIntakeResult } from '@kentos/shared';
+import {
+  buildDeterministicIntakeClassification,
+  intakeClassificationSchema,
+  publicTicketAiIntakeRequestSchema,
+  publicTicketAiIntakeResultSchema,
+  type IntakeClassification,
+  type PublicTicketAiIntakeRequest,
+  type PublicTicketAiIntakeResult,
+} from '@kentos/shared';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { NotificationQueueService } from '../tickets/notification-queue.service.js';
 import { NotificationTemplateService } from '../tickets/notification-template.service.js';
@@ -14,17 +22,147 @@ import { CreatePublicTicketDto } from './dto/create-public-ticket.dto.js';
 @Injectable()
 export class PublicTicketAiService {
   async classify(input: PublicTicketAiIntakeRequest): Promise<PublicTicketAiIntakeResult> {
+    const request = publicTicketAiIntakeRequestSchema.parse(input);
     const requestedAt = new Date().toISOString();
-    const completedAt = new Date().toISOString();
+    const netivaConfig = this.readNetivaConfig();
 
-    return {
+    if (netivaConfig.enabled) {
+      try {
+        return await this.classifyWithNetiva(request, requestedAt, netivaConfig);
+      } catch {
+        // AI intake must not block public ticket creation; keep the deterministic path as a safe fallback.
+      }
+    }
+
+    return this.classifyWithDeterministicFallback(request, requestedAt);
+  }
+
+  private classifyWithDeterministicFallback(
+    input: PublicTicketAiIntakeRequest,
+    requestedAt: string,
+  ): PublicTicketAiIntakeResult {
+    return publicTicketAiIntakeResultSchema.parse({
       provider: 'stub',
       model: 'deterministic-fallback',
       promptVersion: 'intake-classifier.v1',
       requestedAt,
-      completedAt,
+      completedAt: new Date().toISOString(),
       classification: buildDeterministicIntakeClassification(input),
+    });
+  }
+
+  private readNetivaConfig() {
+    const provider = process.env.AI_PROVIDER?.trim().toLowerCase();
+    const apiKey = process.env.NETIVA_API_KEY?.trim() || process.env.AI_API_KEY?.trim() || '';
+
+    return {
+      enabled: provider === 'netiva' && Boolean(apiKey),
+      apiKey,
+      baseUrl: this.normalizeBaseUrl(process.env.NETIVA_BASE_URL || process.env.AI_BASE_URL || 'https://api.netiva.com.tr/v1'),
+      model: process.env.NETIVA_MODEL?.trim() || process.env.AI_MODEL?.trim() || 'claude-sonnet-4-6',
+      timeoutMs: this.readPositiveInt(process.env.NETIVA_TIMEOUT_MS || process.env.AI_TIMEOUT_MS, 15_000),
+      maxTokens: this.readPositiveInt(process.env.NETIVA_MAX_TOKENS || process.env.AI_MAX_TOKENS, 1_200),
     };
+  }
+
+  private async classifyWithNetiva(
+    input: PublicTicketAiIntakeRequest,
+    requestedAt: string,
+    config: ReturnType<PublicTicketAiService['readNetivaConfig']>,
+  ): Promise<PublicTicketAiIntakeResult> {
+    const response = await fetch(`${config.baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${config.apiKey}`,
+        'x-api-key': config.apiKey,
+      },
+      body: JSON.stringify({
+        model: config.model,
+        messages: [
+          { role: 'system', content: this.buildSystemPrompt() },
+          { role: 'user', content: this.buildUserPrompt(input) },
+        ],
+        temperature: 0,
+        max_tokens: config.maxTokens,
+        stream: false,
+      }),
+      signal: AbortSignal.timeout(config.timeoutMs),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Netiva AI request failed with ${response.status}`);
+    }
+
+    const payload = await response.json() as {
+      choices?: Array<{ message?: { content?: string | null }; text?: string | null }>;
+    };
+    const content = payload.choices?.[0]?.message?.content ?? payload.choices?.[0]?.text;
+    if (!content) throw new Error('Netiva AI response did not include content');
+
+    return publicTicketAiIntakeResultSchema.parse({
+      provider: 'netiva',
+      model: config.model,
+      promptVersion: 'intake-classifier.v1',
+      requestedAt,
+      completedAt: new Date().toISOString(),
+      classification: this.parseClassification(content),
+    });
+  }
+
+  private parseClassification(content: string): IntakeClassification {
+    const trimmed = content.trim();
+    const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i)?.[1]?.trim();
+    const jsonText = fenced ?? trimmed;
+    return intakeClassificationSchema.parse(JSON.parse(jsonText));
+  }
+
+  private buildSystemPrompt() {
+    return [
+      'Sen KentOS belediye operasyonlari icin guvenli bir AI intake siniflandiricisisin.',
+      'Sadece gecerli JSON dondur. Markdown, aciklama, kod blogu veya ek metin dondurme.',
+      'Vatandasa gizli alan, ic not, personel yorumu veya model akil yurutmesi ifsa etme.',
+      'categoryCode ve departmentCode alanlarini yalniz verilen tenant seceneklerinden sec; emin degilsen null kullan.',
+      'statusTicketNo yalniz TK-[A-F0-9]{16} formatinda takip kodu varsa dolu olsun; belediye ic ticket numarasi uretme.',
+    ].join(' ');
+  }
+
+  private buildUserPrompt(input: PublicTicketAiIntakeRequest) {
+    return JSON.stringify({
+      task: 'Classify this citizen intake message for municipal ticket routing.',
+      outputSchema: {
+        language: 'tr | en | unknown',
+        intent: 'new_ticket | status_query | add_info | human_handoff | general_question | unsupported',
+        title: 'short public-safe title',
+        description: 'normalized public-safe description',
+        requestType: 'complaint | request | question | emergency_flag | other',
+        categoryCode: 'one of tenant categories or null',
+        departmentCode: 'one of tenant departments or null',
+        priority: 'LOW | NORMAL | HIGH | URGENT',
+        urgencyReason: 'string or null',
+        addressText: 'string or null',
+        neighborhoodName: 'string or null',
+        location: '{ latitude, longitude, accuracyMeters } or null',
+        citizenContact: '{ phone, email, displayName } with nulls for missing values',
+        missingFields: 'array of description | location | contact | category | photo',
+        followUpQuestion: 'Turkish citizen-facing question or null',
+        statusTicketNo: 'TK-[A-F0-9]{16} or null',
+        safetyFlags: 'array of threat | injury | fire | violence | animal_danger | none',
+        confidence: 'number between 0 and 1',
+        reasoningSummary: 'short operational summary, no hidden chain-of-thought',
+      },
+      tenantContext: input.tenantContext,
+      message: input.message,
+    });
+  }
+
+  private normalizeBaseUrl(value: string) {
+    return value.trim().replace(/\/+$/, '');
+  }
+
+  private readPositiveInt(value: string | undefined, fallback: number) {
+    const parsed = Number.parseInt(value ?? '', 10);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
   }
 }
 
