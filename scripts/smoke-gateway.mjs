@@ -107,4 +107,20 @@ const smsWrongSignature = await expectStatus('/webhooks/sms', 401, {
 assert(smsWrongSignature.body?.error === 'twilio-signature-invalid', 'SMS wrong signature reason mismatch.');
 console.log('twilio_signature_reject', smsMissingSignature.status, smsWrongSignature.status);
 
+section('email inbound auth');
+const emailMissingAuth = await request('/webhooks/email', {
+  method: 'POST',
+  body: JSON.stringify({ MessageID: 'msg', From: 'citizen@example.test', Subject: 's', TextBody: 't' }),
+});
+// 401 when basic auth is configured but missing; 503 when env not set. Either is a safe rejection.
+assert([401, 503].includes(emailMissingAuth.status), `Email inbound missing auth expected 401/503, got ${emailMissingAuth.status}.`);
+
+const emailWrongAuth = await request('/webhooks/email', {
+  method: 'POST',
+  headers: { Authorization: 'Basic ' + Buffer.from('wrong:credentials').toString('base64') },
+  body: JSON.stringify({ MessageID: 'msg', From: 'citizen@example.test', Subject: 's', TextBody: 't' }),
+});
+assert([401, 503].includes(emailWrongAuth.status), `Email inbound wrong auth expected 401/503, got ${emailWrongAuth.status}.`);
+console.log('email_inbound_reject', emailMissingAuth.status, emailWrongAuth.status);
+
 console.log('\ngateway smoke passed');

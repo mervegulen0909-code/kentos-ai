@@ -265,6 +265,49 @@ await expectStatus('/widget-settings', 403, {
   body: JSON.stringify({ widgetTitle: 'Read only widget update' }),
 });
 console.log('widget_settings_update', updatedWidgetSettings.status, updatedWidgetSettings.body.widgetTitle);
+
+const retentionSettings = await request('/retention-settings', { token });
+assert(retentionSettings.body.defaults && retentionSettings.body.overrides, 'Retention settings GET missing defaults or overrides.');
+const retentionUpdate = await request('/retention-settings', {
+  method: 'PATCH',
+  token,
+  body: JSON.stringify({ 'attachments': 30, 'audit-logs': 720 }),
+});
+assert(retentionUpdate.body.overrides.attachments === 30, 'Retention attachments override not persisted.');
+assert(retentionUpdate.body.overrides['audit-logs'] === 720, 'Retention audit-logs override not persisted.');
+await expectStatus('/retention-settings', 403, {
+  method: 'PATCH',
+  token: readOnlyToken,
+  body: JSON.stringify({ 'attachments': 999 }),
+});
+// Reset overrides to keep smoke output stable across reruns.
+await request('/retention-settings', {
+  method: 'PATCH',
+  token,
+  body: JSON.stringify({}),
+});
+console.log('retention_settings_rw', retentionUpdate.status);
+
+const aiBudget = await request('/ai-budget-settings', { token });
+assert(aiBudget.body.overrides !== undefined, 'AI budget settings GET missing overrides.');
+const aiBudgetUpdate = await request('/ai-budget-settings', {
+  method: 'PATCH',
+  token,
+  body: JSON.stringify({ dailyTokenBudget: 50000, perRequestTokenLimit: 800 }),
+});
+assert(aiBudgetUpdate.body.overrides.dailyTokenBudget === 50000, 'AI budget dailyTokenBudget not persisted.');
+assert(aiBudgetUpdate.body.overrides.perRequestTokenLimit === 800, 'AI budget perRequestTokenLimit not persisted.');
+await expectStatus('/ai-budget-settings', 403, {
+  method: 'PATCH',
+  token: readOnlyToken,
+  body: JSON.stringify({ dailyTokenBudget: 9999 }),
+});
+await request('/ai-budget-settings', {
+  method: 'PATCH',
+  token,
+  body: JSON.stringify({}),
+});
+console.log('ai_budget_settings_rw', aiBudgetUpdate.status);
 const disabledTemplate = await request(`/message-templates/${firstTemplate.id}`, {
   method: 'PATCH',
   token,
@@ -380,6 +423,18 @@ await expectStatus('/analytics/overview', 403, { token: departmentStaffToken });
 await expectStatus('/analytics/channels', 403, { token: departmentStaffToken });
 await expectStatus('/analytics/overview', 403, { token: readOnlyToken });
 await expectStatus('/analytics/conversation-segments', 403, { token: readOnlyToken });
+
+const aiUsage = await request('/analytics/ai-usage', { token });
+for (const window of ['last24h', 'last7d', 'last30d']) {
+  assert(aiUsage.body.windows[window], `Analytics ai-usage missing ${window} window.`);
+  assert(typeof aiUsage.body.windows[window].runs === 'number', `Analytics ai-usage ${window}.runs not numeric.`);
+  assert(typeof aiUsage.body.windows[window].costMicros === 'number', `Analytics ai-usage ${window}.costMicros not numeric.`);
+}
+assert(Array.isArray(aiUsage.body.byProvider), 'Analytics ai-usage byProvider not an array.');
+await expectStatus('/analytics/ai-usage', 403, { token: operatorToken });
+await expectStatus('/analytics/ai-usage', 403, { token: readOnlyToken });
+console.log('ai_usage_read', true);
+
 const forbiddenAnalyticsKeys = ['citizen', 'citizens', 'citizenId', 'phone', 'email', 'auditLogs', 'messages', 'internalNotes', 'aiRuns', 'aiClassification'];
 const analyticsPayload = JSON.stringify([analyticsOverview.body, analyticsDepartments.body, analyticsCategories.body, analyticsNeighborhoods.body, analyticsChannels.body, analyticsConversationSegments.body, managerAnalyticsOverview.body, managerAnalyticsDepartments.body, managerAnalyticsChannels.body]);
 for (const key of forbiddenAnalyticsKeys) {
@@ -436,6 +491,25 @@ await request(`/attachments/${adminAttachmentUpload.body.attachmentId}/confirm`,
 });
 const adminAttachmentDownload = await request(`/attachments/${adminAttachmentUpload.body.attachmentId}/download`, { token });
 assert(adminAttachmentDownload.body.downloadUrl, 'Admin attachment download did not return a signed URL.');
+
+const quarantinedList = await request('/attachments/quarantined', { token });
+assert(Array.isArray(quarantinedList.body), 'Attachments quarantined list is not an array.');
+await expectStatus('/attachments/quarantined', 403, { token: operatorToken });
+await expectStatus('/attachments/quarantined', 403, { token: readOnlyToken });
+const rescanResponse = await request(`/attachments/${adminAttachmentUpload.body.attachmentId}/rescan`, {
+  method: 'POST',
+  token,
+});
+assert(rescanResponse.body.scanStatus === 'PENDING', 'Rescan did not reset scanStatus to PENDING.');
+await expectStatus(`/attachments/${adminAttachmentUpload.body.attachmentId}/rescan`, 403, {
+  method: 'POST',
+  token: operatorToken,
+});
+await expectStatus(`/attachments/${adminAttachmentUpload.body.attachmentId}/rescan`, 403, {
+  method: 'POST',
+  token: readOnlyToken,
+});
+console.log('attachment_scan_endpoints', true);
 const publicMessageWithAttachment = await request(`/tickets/${operatorTicket.body.id}/public-messages`, {
   method: 'POST',
   token,
