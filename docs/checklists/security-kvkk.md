@@ -1,5 +1,13 @@
 # Security and KVKK Checklist
 
+## Production env generation
+
+- [x] `scripts/bootstrap-prod-env.mjs` writes only to `.env.production.local`, which `.gitignore` excludes from the repository.
+- [x] All production secrets are generated locally with `crypto.randomBytes` (postgres, redis, S3 access/secret, JWT access/refresh, internal API key) — values are not printed to stdout and are not embedded in any committed file.
+- [x] `.dockerignore` excludes `.env` and `.env.*` while allowing `.env.example`, so `.env.production.local` cannot leak into the production image build context.
+- [ ] Operator rotates production secrets via re-running `pnpm infra:prod:bootstrap -- --force` and stores the prior file securely outside git before overwriting.
+- [ ] DNS records for `API_DOMAIN`, `ADMIN_DOMAIN`, `CITIZEN_DOMAIN`, `GATEWAY_DOMAIN` are pointed at the production host before Caddy auto-TLS is allowed to issue certificates.
+
 ## Data minimization
 
 - [ ] Store only necessary citizen contact data.

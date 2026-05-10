@@ -1,0 +1,19 @@
+{
+	email {$ACME_EMAIL}
+}
+
+{$API_DOMAIN} {
+	reverse_proxy api:3100
+}
+
+{$ADMIN_DOMAIN} {
+	reverse_proxy admin-web:3101
+}
+
+{$CITIZEN_DOMAIN} {
+	reverse_proxy citizen-web:3102
+}
+
+{$GATEWAY_DOMAIN} {
+	reverse_proxy whatsapp-gateway:3120
+}

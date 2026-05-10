@@ -1,5 +1,40 @@
 # Release Notes
 
+## Next — Self-hosted production infra scaffold — 2026-05-10
+
+### Summary
+
+- Added a self-hosted single-VPS production scaffold: `infra/Dockerfile.prod`, `infra/docker-compose.prod.yml`, `infra/Caddyfile.prod`, `.dockerignore`.
+- Added the env generator `scripts/bootstrap-prod-env.mjs` exposed as `pnpm infra:prod:bootstrap`. Secrets are produced with `crypto.randomBytes` and written only to `.env.production.local`, which is git-ignored; values are never echoed to stdout.
+- Added the operator runbook `docs/workflows/production-infra-runbook.md` covering env generation, server bootstrap, first deploy, verification, safety rules, and backups.
+- Added `start` scripts for admin-web, citizen-web, and worker; added `prisma:deploy` and root `db:deploy` and `infra:prod:bootstrap` scripts.
+
+### Services in the scaffold
+
+- PostgreSQL 16, Redis 7 (append-only with password auth), MinIO + bucket bootstrap (`minio-init`), KentOS API, KentOS worker, admin web, citizen web, WhatsApp/channel gateway, Caddy reverse proxy with automatic TLS.
+- Compose uses healthchecks and `condition: service_healthy` waits to gate API on Postgres/Redis/MinIO and gate worker/web/gateway on the API.
+
+### Safety posture (kept off by default)
+
+- `*_OUTBOUND_LIVE=false` for WhatsApp, Instagram, Facebook, SMS, EMAIL.
+- `RETENTION_DRY_RUN=true` and `RETENTION_DELETE_ATTACHMENT_OBJECTS=false`.
+- `ATTACHMENT_SCAN_PROVIDER=placeholder` until a real provider is approved.
+- No deploy is performed automatically. No image was built or pushed in this slice. DNS, ACME issuance, and any actual server provisioning remain manual operator actions.
+
+### Evidence snapshot
+
+- `node --check scripts/bootstrap-prod-env.mjs=passed`.
+- `git diff --check=passed` (CRLF normalization warnings only).
+- `PRISMA_GENERATE_NO_ENGINE=true pnpm db:generate=passed` (Windows DLL workaround documented in prior checkpoints).
+- `pnpm typecheck=passed` across all 8 workspace projects.
+- `pnpm build=passed` across all workspace projects.
+- `pnpm ops:preflight` returned `blocked` only on `git-clean` while the in-flight slice was uncommitted, plus expected `prod-env-present` and `attachment-scan-provider` warnings. No new failures introduced by this slice.
+
+### Risk and rollback
+
+- Risk level: `low` — change is additive (new infra files, new docs, additive `start`/`deploy` scripts) and contains no runtime code paths reachable in local dev. No production target was touched.
+- Rollback policy: revert the production-infra commit; admin/citizen/api/worker dev and existing local Docker compose are unaffected because `infra/docker-compose.yml` and existing `dev` scripts were not modified.
+
 ## Next — W2.0-W2.5 attachment milestone — 2026-05-10
 
 ### Summary

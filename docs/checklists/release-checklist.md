@@ -32,6 +32,7 @@ Use this checklist before merging wave branches into `master` and before publish
 - [ ] API `/health` responds locally.
 - [ ] API `/health/ready` responds locally after database seed.
 - [ ] No hardcoded secrets, production credentials, or real tokens are staged.
+- [ ] If the production VPS scaffold (`infra/docker-compose.prod.yml`) is part of the release: DNS for the four production domains is in place; `.env.production.local` was generated via `pnpm infra:prod:bootstrap` and reviewed; safety defaults (`*_OUTBOUND_LIVE=false`, `RETENTION_DRY_RUN=true`, `ATTACHMENT_SCAN_PROVIDER=placeholder`) are confirmed before any production deploy. See `docs/workflows/production-infra-runbook.md`.
 
 ## 4. API smoke
 
