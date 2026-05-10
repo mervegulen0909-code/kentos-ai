@@ -28,6 +28,7 @@ Use this checklist before merging wave branches into `master` and before publish
 - [ ] `pnpm db:generate`
 - [ ] `pnpm typecheck`
 - [ ] `pnpm build`
+- [ ] `pnpm ops:preflight` reports no blocked gates before any production approval meeting.
 - [ ] API `/health` responds locally.
 - [ ] API `/health/ready` responds locally after database seed.
 - [ ] No hardcoded secrets, production credentials, or real tokens are staged.

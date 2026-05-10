@@ -15,6 +15,7 @@
     "db:seed": "pnpm --filter @kentos/database prisma:seed",
     "smoke:api": "node scripts/smoke-api.mjs",
     "smoke:gateway": "node scripts/smoke-gateway.mjs",
+    "ops:preflight": "node scripts/ops-preflight.mjs",
     "verify": "node scripts/verify-env.mjs",
     "e2e": "playwright test",
     "e2e:headed": "playwright test --headed",

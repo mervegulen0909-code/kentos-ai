@@ -868,3 +868,14 @@ Eksik schema ile yazılan checkpoint release kanıtı sayılmaz.
 - **Result:** Passed. Migration drift was resolved without reset by keeping the already-applied `ChannelType.EMAIL` migration forward-only and adding a second migration for `CitizenIdentifierSource.EMAIL`; the local `_prisma_migrations` checksum was reconciled to the repo file before applying the new migration. API smoke passed, and Playwright smoke passed 7/7 with real attachment upload coverage. `playwright.smoke.config.ts` now disables trace/video capture to avoid Windows teardown hangs during local smoke.
 - **Next action:** Stage only intentional product/test/docs files, commit, push `master`, and confirm `origin/master...master = 0 0`.
 - **Blocker:** None.
+
+## 2026-05-10 - Ops preflight automation checkpoint
+
+- **Owner:** `1 - Ana Kontrol`
+- **Status:** passed
+- **Action taken:** Added a safe production-readiness preflight automation that checks clean/synced git state, live outbound flags, retention delete flags, deploy flags, required production env presence, attachment scan provider status, and optional verification gates without deploying, sending live messages, calling paid models, or deleting DB/S3 data.
+- **Files changed:** `scripts/ops-preflight.mjs`, `package.json`, `docs/workflows/ops-preflight-runbook.md`, `docs/checklists/release-checklist.md`, `docs/workflows/autonomous-run-log.md`.
+- **Verification run:** `node --check scripts/ops-preflight.mjs`; `pnpm ops:preflight`; `git diff --check`.
+- **Result:** Passed for script syntax and diff hygiene. The initial preflight intentionally returned `blocked` while the working tree was dirty, proving the gate fails closed. Production env and scan-provider warnings are expected in a local shell without production secrets.
+- **Next action:** Commit and push the automation, then rerun `pnpm ops:preflight` on clean `master` to confirm only environment/scan placeholder warnings remain.
+- **Blocker:** None.
