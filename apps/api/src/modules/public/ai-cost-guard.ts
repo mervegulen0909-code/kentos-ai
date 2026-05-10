@@ -4,6 +4,8 @@ export type AiBudgetConfig = {
   perRequestTokenLimit: number | null;
   inputMicrosPerToken: number;
   outputMicrosPerToken: number;
+  cacheReadRateMultiplier: number;
+  cacheWriteRateMultiplier: number;
   blockMode: 'fallback' | 'error';
 };
 
@@ -30,6 +32,8 @@ export type AiUsageInput = {
   tokensInput?: number | null;
   tokensOutput?: number | null;
   tokensTotal?: number | null;
+  cacheReadInputTokens?: number | null;
+  cacheCreationInputTokens?: number | null;
 };
 
 export function readAiBudgetConfig(env: NodeJS.ProcessEnv = process.env): AiBudgetConfig {
@@ -39,6 +43,8 @@ export function readAiBudgetConfig(env: NodeJS.ProcessEnv = process.env): AiBudg
     perRequestTokenLimit: parseOptionalInt(env.AI_PER_REQUEST_TOKEN_LIMIT),
     inputMicrosPerToken: parseFloatWithDefault(env.AI_COST_INPUT_MICROS_PER_TOKEN, 3),
     outputMicrosPerToken: parseFloatWithDefault(env.AI_COST_OUTPUT_MICROS_PER_TOKEN, 15),
+    cacheReadRateMultiplier: parseFloatWithDefault(env.AI_COST_CACHE_READ_RATE_MULTIPLIER, 0.1),
+    cacheWriteRateMultiplier: parseFloatWithDefault(env.AI_COST_CACHE_WRITE_RATE_MULTIPLIER, 1.25),
     blockMode: env.AI_DAILY_BUDGET_BLOCK_MODE === 'error' ? 'error' : 'fallback',
   };
 }
@@ -54,9 +60,17 @@ export function decideAiBudget(usage: AiBudgetUsage, config: AiBudgetConfig): Ai
 }
 
 export function estimateCostMicros(usage: AiUsageInput, config: AiBudgetConfig): number {
-  const input = Math.max(0, usage.tokensInput ?? 0);
+  // Anthropic prompt-cache pricing: cache reads are 0.1x input rate, cache writes are 1.25x.
+  // tokensInput from Anthropic excludes cache_read_input_tokens and cache_creation_input_tokens, so we add separately.
+  const baseInput = Math.max(0, usage.tokensInput ?? 0);
+  const cacheRead = Math.max(0, usage.cacheReadInputTokens ?? 0);
+  const cacheWrite = Math.max(0, usage.cacheCreationInputTokens ?? 0);
   const output = Math.max(0, usage.tokensOutput ?? 0);
-  const cost = input * config.inputMicrosPerToken + output * config.outputMicrosPerToken;
+  const cost =
+    baseInput * config.inputMicrosPerToken +
+    cacheRead * config.inputMicrosPerToken * config.cacheReadRateMultiplier +
+    cacheWrite * config.inputMicrosPerToken * config.cacheWriteRateMultiplier +
+    output * config.outputMicrosPerToken;
   return Math.max(0, Math.round(cost));
 }
 
@@ -64,13 +78,18 @@ export function extractAnthropicUsage(payload: unknown): AiUsageInput {
   if (!payload || typeof payload !== 'object') return {};
   const usage = (payload as { usage?: unknown }).usage;
   if (!usage || typeof usage !== 'object') return {};
-  const input = (usage as { input_tokens?: unknown }).input_tokens;
-  const output = (usage as { output_tokens?: unknown }).output_tokens;
-  const total = (usage as { total_tokens?: unknown }).total_tokens;
+  const usageRec = usage as Record<string, unknown>;
+  const input = usageRec.input_tokens;
+  const output = usageRec.output_tokens;
+  const total = usageRec.total_tokens;
+  const cacheRead = usageRec.cache_read_input_tokens;
+  const cacheWrite = usageRec.cache_creation_input_tokens;
   return {
     tokensInput: typeof input === 'number' ? input : null,
     tokensOutput: typeof output === 'number' ? output : null,
     tokensTotal: typeof total === 'number' ? total : null,
+    cacheReadInputTokens: typeof cacheRead === 'number' ? cacheRead : null,
+    cacheCreationInputTokens: typeof cacheWrite === 'number' ? cacheWrite : null,
   };
 }
 
@@ -92,7 +111,12 @@ export function extractOpenAiUsage(payload: unknown): AiUsageInput {
 
 export function totalTokens(usage: AiUsageInput): number {
   if (typeof usage.tokensTotal === 'number') return usage.tokensTotal;
-  return (usage.tokensInput ?? 0) + (usage.tokensOutput ?? 0);
+  return (
+    (usage.tokensInput ?? 0) +
+    (usage.tokensOutput ?? 0) +
+    (usage.cacheReadInputTokens ?? 0) +
+    (usage.cacheCreationInputTokens ?? 0)
+  );
 }
 
 function parseOptionalInt(value: string | undefined): number | null {

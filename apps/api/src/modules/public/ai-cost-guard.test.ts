@@ -80,6 +80,43 @@ await run('extractAnthropicUsage reads input/output token counts', () => {
   assert.equal(totalTokens(usage), 360);
 });
 
+await run('extractAnthropicUsage captures cache_read_input_tokens and cache_creation_input_tokens', () => {
+  const usage = extractAnthropicUsage({
+    usage: {
+      input_tokens: 100,
+      output_tokens: 50,
+      cache_read_input_tokens: 800,
+      cache_creation_input_tokens: 200,
+    },
+  });
+  assert.equal(usage.tokensInput, 100);
+  assert.equal(usage.tokensOutput, 50);
+  assert.equal(usage.cacheReadInputTokens, 800);
+  assert.equal(usage.cacheCreationInputTokens, 200);
+  assert.equal(totalTokens(usage), 1150);
+});
+
+await run('estimateCostMicros applies cache read and write multipliers', () => {
+  const cfg = readAiBudgetConfig({
+    AI_COST_INPUT_MICROS_PER_TOKEN: '3',
+    AI_COST_OUTPUT_MICROS_PER_TOKEN: '15',
+    AI_COST_CACHE_READ_RATE_MULTIPLIER: '0.1',
+    AI_COST_CACHE_WRITE_RATE_MULTIPLIER: '1.25',
+  } as NodeJS.ProcessEnv);
+  const cost = estimateCostMicros(
+    {
+      tokensInput: 100,
+      tokensOutput: 50,
+      cacheReadInputTokens: 1000,
+      cacheCreationInputTokens: 200,
+    },
+    cfg,
+  );
+  // baseInput 100*3 + cacheRead 1000*3*0.1 + cacheWrite 200*3*1.25 + output 50*15
+  // = 300 + 300 + 750 + 750 = 2100
+  assert.equal(cost, 2100);
+});
+
 await run('extractOpenAiUsage handles prompt/completion variant', () => {
   const usage = extractOpenAiUsage({ usage: { prompt_tokens: 100, completion_tokens: 50, total_tokens: 150 } });
   assert.equal(usage.tokensInput, 100);

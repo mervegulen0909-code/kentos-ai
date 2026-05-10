@@ -58,7 +58,7 @@ export class PublicTicketAiService {
     if (!budget.allowed) {
       result = this.markStubFallback(this.runDeterministic(request, requestedAt), `budget:${budget.reason}`);
     } else {
-      result = await this.runProviderWithFallback(request, requestedAt);
+      result = await this.runProviderWithFallback(request, requestedAt, budgetConfig);
     }
 
     const latencyMs = Math.max(0, Date.now() - startedAtMs);
@@ -107,11 +107,12 @@ export class PublicTicketAiService {
   private async runProviderWithFallback(
     request: PublicTicketAiIntakeRequest,
     requestedAt: string,
+    budgetConfig: AiBudgetConfig,
   ): Promise<AiProviderResult> {
     const anthropicConfig = this.readAnthropicConfig();
     if (anthropicConfig.enabled) {
       try {
-        return this.markSuccess(await this.classifyWithAnthropic(request, requestedAt, anthropicConfig));
+        return this.markSuccess(await this.classifyWithAnthropic(request, requestedAt, anthropicConfig, budgetConfig));
       } catch (error) {
         return this.markStubFallback(
           this.runDeterministic(request, requestedAt),
@@ -123,7 +124,7 @@ export class PublicTicketAiService {
     const netivaConfig = this.readNetivaConfig();
     if (netivaConfig.enabled) {
       try {
-        return this.markSuccess(await this.classifyWithNetiva(request, requestedAt, netivaConfig));
+        return this.markSuccess(await this.classifyWithNetiva(request, requestedAt, netivaConfig, budgetConfig));
       } catch (error) {
         return this.markStubFallback(
           this.runDeterministic(request, requestedAt),
@@ -219,7 +220,11 @@ export class PublicTicketAiService {
     input: PublicTicketAiIntakeRequest,
     requestedAt: string,
     config: ReturnType<PublicTicketAiService['readAnthropicConfig']>,
+    budgetConfig: AiBudgetConfig,
   ): Promise<PublicTicketAiIntakeResult & { __usage?: AiUsageInput }> {
+    const maxTokens = budgetConfig.perRequestTokenLimit
+      ? Math.min(config.maxTokens, budgetConfig.perRequestTokenLimit)
+      : config.maxTokens;
     const response = await fetch(`${config.baseUrl}/v1/messages`, {
       method: 'POST',
       headers: {
@@ -229,9 +234,11 @@ export class PublicTicketAiService {
       },
       body: JSON.stringify({
         model: config.model,
-        max_tokens: config.maxTokens,
+        max_tokens: maxTokens,
         temperature: 0,
-        system: this.buildSystemPrompt(),
+        system: [
+          { type: 'text', text: this.buildSystemPrompt(), cache_control: { type: 'ephemeral' } },
+        ],
         messages: [{ role: 'user', content: this.buildUserPrompt(input) }],
       }),
       signal: AbortSignal.timeout(config.timeoutMs),
@@ -243,7 +250,7 @@ export class PublicTicketAiService {
 
     const payload = await response.json() as {
       content?: Array<{ type?: string; text?: string }>;
-      usage?: { input_tokens?: number; output_tokens?: number };
+      usage?: { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number; cache_creation_input_tokens?: number };
     };
     const content = payload.content?.find((part) => part.type === 'text')?.text;
     if (!content) throw new Error('Anthropic AI response did not include text content');
@@ -308,7 +315,11 @@ export class PublicTicketAiService {
     input: PublicTicketAiIntakeRequest,
     requestedAt: string,
     config: ReturnType<PublicTicketAiService['readNetivaConfig']>,
+    budgetConfig: AiBudgetConfig,
   ): Promise<PublicTicketAiIntakeResult & { __usage?: AiUsageInput }> {
+    const maxTokens = budgetConfig.perRequestTokenLimit
+      ? Math.min(config.maxTokens, budgetConfig.perRequestTokenLimit)
+      : config.maxTokens;
     const response = await fetch(`${config.baseUrl}/chat/completions`, {
       method: 'POST',
       headers: {
@@ -323,7 +334,7 @@ export class PublicTicketAiService {
           { role: 'user', content: this.buildUserPrompt(input) },
         ],
         temperature: 0,
-        max_tokens: config.maxTokens,
+        max_tokens: maxTokens,
         stream: false,
       }),
       signal: AbortSignal.timeout(config.timeoutMs),
