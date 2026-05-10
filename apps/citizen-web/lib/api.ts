@@ -45,12 +45,12 @@ export type PublicTicket = {
   categoryName: string | null;
   resolutionDueAt: string | null;
   createdAt: string;
-  attachments?: Array<{ id: string; fileName: string; mimeType: string; sizeBytes: number; createdAt: string }>;
+  attachments?: Array<{ id: string; fileName: string; mimeType: string; sizeBytes: number; createdAt: string; scanStatus?: 'PENDING' | 'CLEAN' | 'INFECTED' | 'ERROR' | 'SKIPPED' | null }>;
   publicMessages: Array<{
     body: string;
     createdAt: string;
     author: 'municipality' | 'citizen';
-    attachments?: Array<{ id: string; fileName: string; mimeType: string; sizeBytes: number; createdAt: string }>;
+    attachments?: Array<{ id: string; fileName: string; mimeType: string; sizeBytes: number; createdAt: string; scanStatus?: 'PENDING' | 'CLEAN' | 'INFECTED' | 'ERROR' | 'SKIPPED' | null }>;
   }>;
 };
 

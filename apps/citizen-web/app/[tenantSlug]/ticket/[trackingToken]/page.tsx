@@ -1,6 +1,19 @@
 import Link from 'next/link';
 import { ApiError, citizenApi } from '../../../../lib/api';
 
+const citizenScanLabels: Record<string, string> = {
+  PENDING: '(Tarama bekleniyor)',
+  CLEAN: '(Tarama: temiz)',
+  INFECTED: '(Engellendi - guvenli olmayan icerik)',
+  ERROR: '(Tarama hatasi)',
+  SKIPPED: '(Tarama atlandi)',
+};
+
+function citizenScanLabel(scanStatus: string | null | undefined) {
+  if (!scanStatus) return '';
+  return citizenScanLabels[scanStatus] ?? `(${scanStatus})`;
+}
+
 const citizenStatusCopy: Record<string, { title: string; detail: string; tone: 'progress' | 'warning' | 'success' | 'neutral' | 'danger' }> = {
   NEW: {
     title: 'Başvurunuz alındı.',
@@ -185,7 +198,13 @@ export default async function PublicTicketPage({ params }: { params: Promise<{ t
               {ticket.attachments?.length ? (
                 <div className="notice ticket-location-note" role="status">
                   <strong>Ekler alindi.</strong>
-                  <p>{ticket.attachments.map((attachment) => attachment.fileName).join(', ')}</p>
+                  <ul style={{ marginTop: 6, paddingLeft: 18 }}>
+                    {ticket.attachments.map((attachment) => (
+                      <li key={attachment.id}>
+                        {attachment.fileName} <small>{citizenScanLabel(attachment.scanStatus)}</small>
+                      </li>
+                    ))}
+                  </ul>
                 </div>
               ) : null}
             </>
@@ -218,7 +237,13 @@ export default async function PublicTicketPage({ params }: { params: Promise<{ t
                     </div>
                     <p>{message.body}</p>
                     {message.attachments?.length ? (
-                      <p>Ekler: {message.attachments.map((attachment) => attachment.fileName).join(', ')}</p>
+                      <ul style={{ marginTop: 6, paddingLeft: 18 }}>
+                        {message.attachments.map((attachment) => (
+                          <li key={attachment.id}>
+                            {attachment.fileName} <small>{citizenScanLabel(attachment.scanStatus)}</small>
+                          </li>
+                        ))}
+                      </ul>
                     ) : null}
                   </div>
                 </article>

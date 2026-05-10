@@ -545,7 +545,7 @@ export class PublicTicketService {
             attachments: {
               where: { checksumSha256: { not: null } },
               orderBy: { createdAt: 'asc' },
-              select: { id: true, fileName: true, mimeType: true, sizeBytes: true, createdAt: true },
+              select: { id: true, fileName: true, mimeType: true, sizeBytes: true, createdAt: true, scanStatus: true },
             },
           },
         },
@@ -680,9 +680,9 @@ export class PublicTicketService {
       body: string;
       createdAt: Date;
       senderType: string;
-      attachments?: Array<{ id: string; fileName: string; mimeType: string; sizeBytes: number; createdAt: Date }>;
+      attachments?: Array<{ id: string; fileName: string; mimeType: string; sizeBytes: number; createdAt: Date; scanStatus?: string | null }>;
     }>;
-    attachments?: Array<{ id: string; fileName: string; mimeType: string; sizeBytes: number; createdAt: Date }>;
+    attachments?: Array<{ id: string; fileName: string; mimeType: string; sizeBytes: number; createdAt: Date; scanStatus?: string | null }>;
   }) {
     return {
       trackingToken: ticket.publicTrackingToken,
@@ -701,6 +701,7 @@ export class PublicTicketService {
         mimeType: attachment.mimeType,
         sizeBytes: attachment.sizeBytes,
         createdAt: attachment.createdAt,
+        scanStatus: attachment.scanStatus ?? null,
       })),
       publicMessages: (ticket.messages ?? []).map((message) => ({
         body: message.body,
@@ -712,6 +713,7 @@ export class PublicTicketService {
           mimeType: attachment.mimeType,
           sizeBytes: attachment.sizeBytes,
           createdAt: attachment.createdAt,
+          scanStatus: attachment.scanStatus ?? null,
         })),
       })),
     };

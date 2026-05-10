@@ -153,12 +153,15 @@ export type TicketListItem = {
   assignedTo?: { id: string; fullName: string; email: string } | null;
 };
 
+export type AttachmentScanStatusKey = 'PENDING' | 'CLEAN' | 'INFECTED' | 'ERROR' | 'SKIPPED';
+
 export type AttachmentSummary = {
   id: string;
   fileName: string;
   mimeType: string;
   sizeBytes: number;
   createdAt: string;
+  scanStatus?: AttachmentScanStatusKey | null;
 };
 
 type TicketAiSummary = {
@@ -262,6 +265,21 @@ export const adminApi = {
   conversationSegments: (token: string) =>
     apiFetch<AnalyticsConversationSegments>('/analytics/conversation-segments', { token }),
   aiUsage: (token: string) => apiFetch<AnalyticsAiUsage>('/analytics/ai-usage', { token }),
+  rescanAttachment: (token: string, attachmentId: string) =>
+    apiFetch<{ attachmentId: string; scanStatus: 'PENDING' }>(`/attachments/${attachmentId}/rescan`, { method: 'POST', token }),
+  quarantinedAttachments: (token: string) =>
+    apiFetch<Array<{
+      attachmentId: string;
+      fileName: string;
+      mimeType: string;
+      sizeBytes: number;
+      scanStatus: string;
+      scanThreat: string | null;
+      scannedAt: string | null;
+      ticketId: string | null;
+      ticketNo: string | null;
+      ticketTitle: string | null;
+    }>>('/attachments/quarantined', { token }),
   tickets: (token: string, filters?: TicketListFilters) => apiFetch<TicketListItem[]>(`/tickets${buildQuery(filters)}`, { token }),
   ticket: (token: string, id: string) => apiFetch<TicketDetail>(`/tickets/${id}`, { token }),
   auditLog: (token: string, id: string) => apiFetch<AuditLogItem[]>(`/tickets/${id}/audit-log`, { token }),

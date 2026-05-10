@@ -15,6 +15,19 @@ const transitions: Record<string, string[]> = {
   REJECTED: [],
 };
 
+const adminScanLabels: Record<string, string> = {
+  PENDING: '[tarama bekleniyor]',
+  CLEAN: '[temiz]',
+  INFECTED: '[ENGELLI - ZARARLI]',
+  ERROR: '[tarama hatasi]',
+  SKIPPED: '[atlandi]',
+};
+
+function adminScanLabel(scanStatus: string | null | undefined) {
+  if (!scanStatus) return '';
+  return adminScanLabels[scanStatus] ?? `[${scanStatus}]`;
+}
+
 const statusCopy: Record<string, string> = {
   NEW: 'Yeni kayit',
   TRIAGED: 'On incelemede',
@@ -229,7 +242,13 @@ export default async function TicketDetailPage({
           {ticket?.attachments?.length ? (
             <div className="notice muted" role="note">
               <strong>Talebe bagli ekler</strong>
-              <p>{ticket.attachments.map((attachment) => attachment.fileName).join(', ')}</p>
+              <ul style={{ marginTop: 6, paddingLeft: 18 }}>
+                {ticket.attachments.map((attachment) => (
+                  <li key={attachment.id}>
+                    {attachment.fileName} <small style={{ color: 'var(--muted)' }}>{adminScanLabel(attachment.scanStatus)}</small>
+                  </li>
+                ))}
+              </ul>
             </div>
           ) : null}
           {ticket?.messages?.length ? ticket.messages.map((message) => (
@@ -237,7 +256,13 @@ export default async function TicketDetailPage({
               <strong>{message.visibility === 'INTERNAL' ? 'Ic not' : 'Vatandas mesaji'}</strong>
               <p>{message.body}</p>
               {message.attachments?.length ? (
-                <small>Ekler: {message.attachments.map((attachment) => attachment.fileName).join(', ')}</small>
+                <ul style={{ marginTop: 6, paddingLeft: 18 }}>
+                  {message.attachments.map((attachment) => (
+                    <li key={attachment.id}>
+                      <small>{attachment.fileName} {adminScanLabel(attachment.scanStatus)}</small>
+                    </li>
+                  ))}
+                </ul>
               ) : null}
             </div>
           )) : <p style={{ color: 'var(--muted)' }}>Mesaj yok.</p>}

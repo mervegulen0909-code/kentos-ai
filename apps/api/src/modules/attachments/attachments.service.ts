@@ -164,6 +164,75 @@ export class AttachmentsService {
     }
   }
 
+  async rescanAttachment(user: AuthenticatedUser, attachmentId: string) {
+    const attachment = await this.prisma.attachment.findFirst({
+      where: { id: attachmentId, tenantId: user.tenantId, checksumSha256: { not: null } },
+    });
+    if (!attachment) throw new NotFoundException('Ek bulunamadi.');
+
+    await this.prisma.attachment.update({
+      where: { id: attachmentId },
+      data: {
+        scanStatus: 'PENDING',
+        scanThreat: null,
+        scanResult: null as never,
+        scannedAt: null,
+      },
+    });
+
+    await this.prisma.auditLog.create({
+      data: {
+        tenantId: user.tenantId,
+        ticketId: attachment.ticketId,
+        actorType: AuditActorType.USER,
+        actorUserId: user.id,
+        action: 'attachment.scan_requeued',
+        before: { scanStatus: attachment.scanStatus },
+        after: {
+          attachmentId: attachment.id,
+          fileName: attachment.fileName,
+          previousStatus: attachment.scanStatus,
+          previousThreat: attachment.scanThreat,
+        },
+      },
+    });
+
+    await this.mediaQueue.enqueueAttachment({
+      attachmentId: attachment.id,
+      tenantId: attachment.tenantId,
+      storageKey: attachment.storageKey,
+      mimeType: attachment.mimeType,
+      sizeBytes: attachment.sizeBytes,
+      checksumSha256: attachment.checksumSha256!,
+    });
+
+    return { attachmentId: attachment.id, scanStatus: 'PENDING' as const };
+  }
+
+  async listQuarantined(user: AuthenticatedUser) {
+    const rows = await this.prisma.attachment.findMany({
+      where: { tenantId: user.tenantId, scanStatus: 'INFECTED' },
+      orderBy: { scannedAt: 'desc' },
+      take: 200,
+      include: {
+        ticket: { select: { id: true, ticketNo: true, title: true } },
+        message: { select: { id: true, ticketId: true } },
+      },
+    });
+    return rows.map((row) => ({
+      attachmentId: row.id,
+      fileName: row.fileName,
+      mimeType: row.mimeType,
+      sizeBytes: row.sizeBytes,
+      scanStatus: row.scanStatus,
+      scanThreat: row.scanThreat,
+      scannedAt: row.scannedAt,
+      ticketId: row.ticketId ?? row.message?.ticketId ?? null,
+      ticketNo: row.ticket?.ticketNo ?? null,
+      ticketTitle: row.ticket?.title ?? null,
+    }));
+  }
+
   async attachAdminToTicket(user: AuthenticatedUser, ticketId: string, attachmentIds?: string[]) {
     const ids = this.normalizeAttachmentIds(attachmentIds);
     if (!ids.length) return [];
