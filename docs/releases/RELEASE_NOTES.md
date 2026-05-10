@@ -1,5 +1,26 @@
 # Release Notes
 
+## Next — W2.0-W2.5 attachment milestone — 2026-05-10
+
+### Summary
+
+- Stabilized the W2.0-W2.5 local milestone across admin/citizen UI refresh, handoff workflow, root health ergonomics, and attachment storage.
+- Added S3-compatible presigned attachment upload endpoints for admin and public channels.
+- Added checksum confirmation, attachment audit coverage, and `kentos.media` queue payload handoff with a worker placeholder.
+- Added attachment env controls for S3 region/path style, presign TTL, MIME allowlist, and max upload size.
+
+### Evidence snapshot
+
+- Branch/sync before commit: local `master`, `origin/master...master = 0 1`.
+- Static checks: `pnpm --filter @kentos/api test=passed`, `pnpm typecheck=passed`, `pnpm build=passed`.
+- Diff hygiene: `git diff --check=passed` with only expected CRLF normalization warnings.
+- API surface added: `POST /api/v1/attachments/uploads`, `POST /api/v1/attachments/:id/confirm`, `POST /api/v1/public/:tenantSlug/attachments/uploads`, `POST /api/v1/public/:tenantSlug/attachments/:id/confirm`.
+
+### Risk and rollback
+
+- Risk level: `medium` because the storage foundation is verified statically and with service tests, but browser/API smoke for real MinIO upload and UI attachment workflows is still scheduled for the next slice.
+- Rollback policy: revert the milestone commit if attachment endpoints cause runtime issues; existing ticket/message flows remain backward-compatible because attachment IDs are not yet required by public/admin DTOs.
+
 ## Next — Principal engineer audit hardening — 2026-05-06
 
 ### Summary

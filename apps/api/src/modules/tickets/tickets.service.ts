@@ -326,7 +326,6 @@ export class TicketsService {
       where: {
         id,
         tenantId: user.tenantId,
-        handoffRequested: true,
       },
       include: {
         citizen: true,
@@ -340,9 +339,16 @@ export class TicketsService {
     const contact = this.readConversationContact(context.contact);
     const existingTicket = this.asRecord(context.ticket);
 
-    if (typeof existingTicket?.trackingToken === 'string') {
-      throw new ForbiddenException('Bu konusma icin zaten ticket olusturulmus.');
+    const existingTicketRecord = await this.findConversationTicket(user.tenantId, existingTicket);
+    if (existingTicketRecord) {
+      return {
+        ticketId: existingTicketRecord.id,
+        ticketNo: existingTicketRecord.ticketNo,
+        trackingToken: existingTicketRecord.publicTrackingToken,
+      };
     }
+
+    if (!conversation.handoffRequested) throw new NotFoundException('Operator devri bekleyen konusma bulunamadi.');
 
     const title = typeof latestClassification?.title === 'string' && latestClassification.title.trim().length >= 3
       ? latestClassification.title.trim()
@@ -371,6 +377,8 @@ export class TicketsService {
     const nextContext: Prisma.InputJsonValue = {
       ...context,
       ticket: {
+        ticketId: ticket.id,
+        ticketNo: ticket.ticketNo,
         trackingToken: ticket.publicTrackingToken,
         createdAt: new Date().toISOString(),
         source: 'operator_handoff',
@@ -416,6 +424,28 @@ export class TicketsService {
       ticketNo: ticket.ticketNo,
       trackingToken: ticket.publicTrackingToken,
     };
+  }
+
+  private async findConversationTicket(tenantId: string, ticketContext: Record<string, unknown> | null) {
+    const ticketId = typeof ticketContext?.ticketId === 'string' ? ticketContext.ticketId : null;
+    const trackingToken = typeof ticketContext?.trackingToken === 'string' ? ticketContext.trackingToken : null;
+
+    if (!ticketId && !trackingToken) return null;
+
+    return this.prisma.ticket.findFirst({
+      where: {
+        tenantId,
+        OR: [
+          ...(ticketId ? [{ id: ticketId }] : []),
+          ...(trackingToken ? [{ publicTrackingToken: trackingToken }] : []),
+        ],
+      },
+      select: {
+        id: true,
+        ticketNo: true,
+        publicTrackingToken: true,
+      },
+    });
   }
 
   private async requireTicket(user: AuthenticatedUser, id: string) {

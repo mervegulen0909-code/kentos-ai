@@ -37,6 +37,15 @@ export type NotificationJobData = {
   messageId: string;
 };
 
+export type MediaJobData = {
+  attachmentId: string;
+  tenantId: string;
+  storageKey: string;
+  mimeType: string;
+  sizeBytes: number;
+  checksumSha256: string;
+};
+
 export type IntakeChannel =
   | 'WHATSAPP'
   | 'CITIZEN_WEB'

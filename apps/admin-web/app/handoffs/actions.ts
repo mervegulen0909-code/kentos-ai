@@ -16,13 +16,15 @@ export async function createTicketFromHandoffAction(formData: FormData) {
 
   const token = await requireToken(handoffId);
 
+  let result;
   try {
-    const result = await adminApi.createTicketFromHandoff(token, handoffId);
-    redirect(`/tickets/${result.ticketId}?success=created-from-handoff`);
+    result = await adminApi.createTicketFromHandoff(token, handoffId);
   } catch (error) {
     if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
       redirect(`/handoffs/${handoffId}?error=forbidden`);
     }
     redirect(`/handoffs/${handoffId}?error=create-ticket`);
   }
+
+  redirect(`/tickets/${result.ticketId}?success=created-from-handoff`);
 }

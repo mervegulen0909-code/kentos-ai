@@ -1,5 +1,12 @@
-import { adminApi, type AnalyticsChannelSummary, type AnalyticsConversationSegments } from '../../lib/api';
-import { canManageSettings, canViewAnalytics, getAdminSession, resolveAdminAccessToken } from '../../lib/session';
+import {
+  adminApi,
+  type AnalyticsCategorySummary,
+  type AnalyticsChannelSummary,
+  type AnalyticsConversationSegments,
+  type AnalyticsDepartmentSummary,
+} from '../../lib/api';
+import { canViewAnalytics, resolveAdminSession } from '../../lib/session';
+import { AdminShell } from '../components/admin-shell';
 
 const fallbackOverview = {
   totalOpen: 0,
@@ -11,6 +18,8 @@ const fallbackOverview = {
 };
 
 const fallbackChannels: AnalyticsChannelSummary[] = [];
+const fallbackDepartments: AnalyticsDepartmentSummary[] = [];
+const fallbackCategories: AnalyticsCategorySummary[] = [];
 const fallbackSegments: AnalyticsConversationSegments = {
   totalConversations: 0,
   aiCompleted: 0,
@@ -35,15 +44,14 @@ function formatPercent(value: number) {
 }
 
 export default async function ReportsPage() {
-  const session = await getAdminSession();
+  const session = await resolveAdminSession();
   const hasSession = Boolean(session);
-  const token = hasSession ? await resolveAdminAccessToken() : null;
+  const token = session?.accessToken ?? null;
   const role = session?.user.role ?? null;
   const analyticsVisible = canViewAnalytics(role);
-  const settingsVisible = hasSession && canManageSettings(role);
   let dataUnavailable = false;
 
-  const [overview, channelSummary, segments] = token && analyticsVisible
+  const [overview, channelSummary, departmentSummary, categorySummary, segments] = token && analyticsVisible
     ? await Promise.all([
         adminApi.overview(token).catch(() => {
           dataUnavailable = true;
@@ -53,12 +61,20 @@ export default async function ReportsPage() {
           dataUnavailable = true;
           return fallbackChannels;
         }),
+        adminApi.departmentSummary(token).catch(() => {
+          dataUnavailable = true;
+          return fallbackDepartments;
+        }),
+        adminApi.categorySummary(token).catch(() => {
+          dataUnavailable = true;
+          return fallbackCategories;
+        }),
         adminApi.conversationSegments(token).catch(() => {
           dataUnavailable = true;
           return fallbackSegments;
         }),
       ])
-    : [fallbackOverview, fallbackChannels, fallbackSegments];
+    : [fallbackOverview, fallbackChannels, fallbackDepartments, fallbackCategories, fallbackSegments];
 
   const noOperationalData = !overview.totalOpen && !overview.openedToday && !overview.resolvedToday && !overview.slaBreached && !overview.slaDueSoon;
   const statusRows = overview.byStatus
@@ -68,22 +84,17 @@ export default async function ReportsPage() {
     .slice()
     .sort((left, right) => right.tickets + right.conversations - (left.tickets + left.conversations));
   const noChannelData = !channelRows.length;
+  const departmentRows = departmentSummary
+    .slice()
+    .sort((left, right) => right.openTickets - left.openTickets)
+    .slice(0, 8);
+  const categoryRows = categorySummary
+    .slice()
+    .sort((left, right) => right.tickets - left.tickets)
+    .slice(0, 8);
 
   return (
-    <main className="shell">
-      <aside className="sidebar">
-        <h1>KentOS AI</h1>
-        <p style={{ color: 'var(--muted)' }}>Operasyon komuta paneli</p>
-        <nav style={{ display: 'grid', gap: 12, marginTop: 32 }}>
-          <a href="/">Dashboard</a>
-          <a href="/tickets">Talepler</a>
-          <a href="/handoffs">Operator devri</a>
-          <a href="/queues">Birim kuyruklari</a>
-          {analyticsVisible ? <a href="/reports">Raporlar</a> : null}
-          {settingsVisible ? <a href="/settings">Ayarlar</a> : null}
-        </nav>
-      </aside>
-      <section className="main">
+    <AdminShell hasSession={hasSession} role={role}>
         <p className="badge">Operasyon raporlari - SLA ve cozum gorunumu</p>
         <h1>Gunluk belediye operasyon raporu</h1>
         {!hasSession ? (
@@ -196,6 +207,42 @@ export default async function ReportsPage() {
               )}
             </section>
             <section className="card" style={{ marginTop: 18 }}>
+              <h2>Birim ve kategori yogunlugu</h2>
+              {departmentRows.length || categoryRows.length ? (
+                <div className="grid">
+                  <article className="subpanel">
+                    <h3>Aktif birimler</h3>
+                    <div className="responsive-list">
+                      {departmentRows.map((row) => (
+                        <div className="queue-row compact-row" key={row.id}>
+                          <strong>{row.name}</strong>
+                          <span>{row.code}</span>
+                          <span>{row.openTickets} acik is</span>
+                        </div>
+                      ))}
+                    </div>
+                  </article>
+                  <article className="subpanel">
+                    <h3>Yogun kategoriler</h3>
+                    <div className="responsive-list">
+                      {categoryRows.map((row) => (
+                        <div className="queue-row compact-row" key={row.id}>
+                          <strong>{row.name}</strong>
+                          <span>{row.departmentName ?? 'Birim yok'}</span>
+                          <span>{row.tickets} kayit</span>
+                        </div>
+                      ))}
+                    </div>
+                  </article>
+                </div>
+              ) : (
+                <div className="empty-state">
+                  <strong>Birim veya kategori dagilimi henuz yok.</strong>
+                  <p>Tenant yapilandirmasi ve canli talepler arttikca is yuku dagilimi burada gorunur.</p>
+                </div>
+              )}
+            </section>
+            <section className="card" style={{ marginTop: 18 }}>
               <h2>Operasyon yorumu</h2>
               {noOperationalData ? (
                 <div className="empty-state">
@@ -212,7 +259,6 @@ export default async function ReportsPage() {
             </section>
           </>
         ) : null}
-      </section>
-    </main>
+    </AdminShell>
   );
 }

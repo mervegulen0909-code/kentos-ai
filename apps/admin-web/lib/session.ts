@@ -68,6 +68,13 @@ function getAccessCookieOptions() {
   } as const;
 }
 
+function getLongLivedCookieOptions() {
+  return {
+    ...getAccessCookieOptions(),
+    maxAge: 7 * 24 * 60 * 60,
+  } as const;
+}
+
 function isTokenFresh(token: string | null, safetyWindowSeconds = 30) {
   if (!token) return false;
 
@@ -119,17 +126,7 @@ export async function setSessionAccessToken(accessToken: string) {
 }
 
 export async function resolveAdminAccessToken() {
-  const accessToken = await getSessionToken();
-  if (isTokenFresh(accessToken)) return accessToken;
-
-  const refreshToken = await getRefreshToken();
-  if (!refreshToken) return null;
-
-  try {
-    return await refreshAdminAccessToken(refreshToken);
-  } catch {
-    return null;
-  }
+  return (await resolveAdminSession())?.accessToken ?? null;
 }
 
 export async function getAdminSession(): Promise<AdminSession | null> {
@@ -143,16 +140,31 @@ export async function getAdminSession(): Promise<AdminSession | null> {
   return { accessToken, refreshToken, user };
 }
 
+export async function resolveAdminSession(): Promise<AdminSession | null> {
+  const store = await cookies();
+  const accessToken = store.get(sessionCookieName)?.value ?? null;
+  const refreshToken = store.get(refreshCookieName)?.value ?? null;
+  const user = decodeSessionState(store.get(sessionStateCookieName)?.value);
+
+  if (!refreshToken || !user) return null;
+  if (isTokenFresh(accessToken)) return { accessToken: accessToken!, refreshToken, user };
+
+  try {
+    const refreshedAccessToken = await refreshAdminAccessToken(refreshToken);
+    await setSessionAccessToken(refreshedAccessToken).catch(() => undefined);
+    return { accessToken: refreshedAccessToken, refreshToken, user };
+  } catch {
+    return null;
+  }
+}
+
 export async function setAdminSession(session: AdminSession) {
   const store = await cookies();
   const cookieOptions = getAccessCookieOptions();
 
   store.set(sessionCookieName, session.accessToken, cookieOptions);
-  store.set(refreshCookieName, session.refreshToken, {
-    ...cookieOptions,
-    maxAge: 7 * 24 * 60 * 60,
-  });
-  store.set(sessionStateCookieName, encodeSessionState(session.user), cookieOptions);
+  store.set(refreshCookieName, session.refreshToken, getLongLivedCookieOptions());
+  store.set(sessionStateCookieName, encodeSessionState(session.user), getLongLivedCookieOptions());
 }
 
 export async function clearSessionToken() {

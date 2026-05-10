@@ -834,3 +834,14 @@ Eksik schema ile yazılan checkpoint release kanıtı sayılmaz.
 - **Result:** Passed. PR #3 merge commit is `4699c4e`; PR #4 merge commit is `8409c65`; local `master` is synced with `origin/master` (`0 0`). The previous non-fatal Next `outputFileTracing` warning is resolved.
 - **Next action:** External gates only: production deploy, Anthropic real run, live outbound channel sends, and branch-protection platform enforcement require separate approval/platform support.
 - **Blocker:** None for repo-ready code; external provider and governance gates remain outside this repo-only finalization.
+
+## 2026-05-10 — W2.0-W2.5 milestone stabilization checkpoint
+
+- **Owner:** `1 — Ana Kontrol`
+- **Status:** passed
+- **Action taken:** Consolidated the W2.0-W2.5 local milestone, including admin/citizen UI refresh state, handoff workflow stabilization, root health ergonomics, and W2.5 attachment storage foundation with S3-compatible presigned upload and checksum confirmation endpoints for admin and public channels.
+- **Files changed:** `.env.example`, `apps/api/src/modules/attachments/**`, `apps/api/package.json`, `apps/api/src/app.module.ts`, `apps/worker/src/processors/media.processor.ts`, `packages/shared/src/types.ts`, `pnpm-lock.yaml`, plus the already-verified W2.0-W2.4 UI/test files in the current milestone diff.
+- **Verification run:** `pnpm --filter @kentos/api test`; `pnpm typecheck`; `pnpm build`; `git diff --check`.
+- **Result:** Passed. Attachment service tests cover admin upload/confirm, public contact rejection, and public unattached upload confirmation. Workspace typecheck and build are green; diff hygiene has no whitespace errors beyond expected CRLF normalization warnings.
+- **Next action:** Commit and push the milestone, then continue the next attachment productization slice: DTO-level `attachmentIds`, tenant-safe binding, smoke coverage, UI upload affordances, media processor evidence, and KVKK/release documentation.
+- **Blocker:** None.

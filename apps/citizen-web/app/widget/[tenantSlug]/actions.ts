@@ -5,8 +5,10 @@ import { citizenApi } from '../../../lib/api';
 type WidgetSubmitState = {
   status: 'idle' | 'success' | 'error';
   message: string | null;
+  conversationId: string | null;
   trackingToken: string | null;
   handoffRequested: boolean;
+  missingFields: string[];
 };
 
 export async function submitWidgetMessage(tenantSlug: string, _state: WidgetSubmitState, formData: FormData): Promise<WidgetSubmitState> {
@@ -17,9 +19,11 @@ export async function submitWidgetMessage(tenantSlug: string, _state: WidgetSubm
   if (description.length < 10) {
     return {
       status: 'error',
-      message: 'Talebinizi anlayabilmemiz için en az 10 karakterlik kısa bir açıklama yazın.',
+      message: 'Talebinizi anlayabilmemiz icin en az 10 karakterlik kisa bir aciklama yazin.',
+      conversationId: null,
       trackingToken: null,
       handoffRequested: false,
+      missingFields: [],
     };
   }
 
@@ -37,22 +41,26 @@ export async function submitWidgetMessage(tenantSlug: string, _state: WidgetSubm
     });
 
     return {
-      status: result.trackingToken || result.handoffRequested ? 'success' : 'error',
+      status: 'success',
       message:
         result.assistantMessage ??
         result.followUpQuestion ??
         (result.handoffRequested
-          ? 'Talebiniz insan desteği isteği olarak belediye ekibine iletildi.'
-          : 'Talebiniz için ek bilgi gerekiyor. Lütfen resmi başvuru formundan devam edin.'),
+          ? 'Talebiniz insan destegi istegi olarak belediye ekibine iletildi.'
+          : 'Talebiniz icin ek bilgi gerekiyor. Lutfen resmi basvuru formundan devam edin.'),
+      conversationId: result.conversationId,
       trackingToken: result.trackingToken,
       handoffRequested: result.handoffRequested,
+      missingFields: result.missingFields,
     };
   } catch {
     return {
       status: 'error',
-      message: 'Talep şu anda aktarılamadı. Lütfen biraz sonra tekrar deneyin veya resmi başvuru formuna geçin.',
+      message: 'Talep su anda aktarilamadi. Lutfen biraz sonra tekrar deneyin veya resmi basvuru formuna gecin.',
+      conversationId: null,
       trackingToken: null,
       handoffRequested: false,
+      missingFields: [],
     };
   }
 }

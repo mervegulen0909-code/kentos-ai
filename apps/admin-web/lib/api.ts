@@ -66,6 +66,21 @@ export type AnalyticsConversationSegments = {
   automationRate: number;
 };
 
+export type AnalyticsDepartmentSummary = {
+  id: string;
+  name: string;
+  code: string;
+  openTickets: number;
+};
+
+export type AnalyticsCategorySummary = {
+  id: string;
+  name: string;
+  code: string;
+  departmentName: string | null;
+  tickets: number;
+};
+
 export type WidgetSettings = {
   tenantSlug: string;
   widgetEnabled: boolean;
@@ -88,6 +103,8 @@ export type TicketListItem = {
   priority: string;
   slaState?: 'OK' | 'DUE_SOON' | 'BREACHED' | 'UNKNOWN';
   department?: { name: string } | null;
+  category?: { name: string } | null;
+  assignedTo?: { id: string; fullName: string; email: string } | null;
 };
 
 type TicketAiSummary = {
@@ -157,12 +174,32 @@ export type HandoffCreateTicketResult = {
   trackingToken: string | null;
 };
 
+export type TicketListFilters = {
+  status?: string;
+  departmentId?: string;
+  categoryId?: string;
+  assignedToId?: string;
+  q?: string;
+};
+
+function buildQuery(filters: TicketListFilters = {}) {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(filters)) {
+    const normalized = String(value ?? '').trim();
+    if (normalized) params.set(key, normalized);
+  }
+  const query = params.toString();
+  return query ? `?${query}` : '';
+}
+
 export const adminApi = {
   overview: (token: string) => apiFetch<AnalyticsOverview>('/analytics/overview', { token }),
+  departmentSummary: (token: string) => apiFetch<AnalyticsDepartmentSummary[]>('/analytics/departments', { token }),
+  categorySummary: (token: string) => apiFetch<AnalyticsCategorySummary[]>('/analytics/categories', { token }),
   channelSummary: (token: string) => apiFetch<AnalyticsChannelSummary[]>('/analytics/channels', { token }),
   conversationSegments: (token: string) =>
     apiFetch<AnalyticsConversationSegments>('/analytics/conversation-segments', { token }),
-  tickets: (token: string) => apiFetch<TicketListItem[]>('/tickets', { token }),
+  tickets: (token: string, filters?: TicketListFilters) => apiFetch<TicketListItem[]>(`/tickets${buildQuery(filters)}`, { token }),
   ticket: (token: string, id: string) => apiFetch<TicketDetail>(`/tickets/${id}`, { token }),
   auditLog: (token: string, id: string) => apiFetch<AuditLogItem[]>(`/tickets/${id}/audit-log`, { token }),
   handoffs: (token: string) => apiFetch<HandoffSummary[]>('/tickets/handoffs', { token }),

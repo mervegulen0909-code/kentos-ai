@@ -1,5 +1,6 @@
 import { adminApi, type WidgetEmbedConfig, type WidgetSettings } from '../../lib/api';
-import { canManageSettings, getAdminSession } from '../../lib/session';
+import { canManageSettings, resolveAdminSession } from '../../lib/session';
+import { AdminShell } from '../components/admin-shell';
 import { PendingFieldset, PendingSubmitButton } from '../components/form-controls';
 import { WidgetStatusProbe } from './widget-status-probe';
 import {
@@ -52,10 +53,11 @@ const errorCopy: Record<string, FeedbackCopy> = {
 };
 
 export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ success?: string; error?: string; errorMessage?: string }> }) {
-  const session = await getAdminSession();
+  const session = await resolveAdminSession();
   const hasSession = Boolean(session);
   const token = session?.accessToken ?? null;
-  const canEditSettings = canManageSettings(session?.user.role);
+  const role = session?.user.role ?? null;
+  const canEditSettings = canManageSettings(role);
   const controlsDisabled = !hasSession || !canEditSettings;
   const { success, error, errorMessage } = await searchParams;
   const fallbackWidgetSettings: WidgetSettings = {
@@ -77,7 +79,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
   const widgetEmbed = buildWidgetEmbedConfig(widgetSettings);
 
   return (
-    <main className="main">
+    <AdminShell hasSession={hasSession} role={role}>
       <p className="badge">Tenant ayarlari</p>
       <h1>Belediye yapilandirmasi</h1>
       {success ? (
@@ -289,6 +291,6 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
           ))}
         </section>
       </div>
-    </main>
+    </AdminShell>
   );
 }

@@ -2,9 +2,9 @@ import { citizenApi } from '../../../lib/api';
 import { WidgetChatForm } from './widget-chat-form';
 
 const suggestedMessages = [
-  'Sokak lambası yanmıyor, akşam çok karanlık oluyor.',
-  'Çocuk parkındaki salıncak kırık, kontrol edilmesi gerekiyor.',
-  'Mazgal tıkanmış olabilir, yağmurda su birikiyor.',
+  'Sokak lambasi yanmiyor, aksam cok karanlik oluyor.',
+  'Cocuk parkindaki salincak kirik, kontrol edilmesi gerekiyor.',
+  'Mazgal tikanmis olabilir, yagmurda su birikiyor.',
 ];
 
 export default async function WidgetPreviewPage({ params }: { params: Promise<{ tenantSlug: string }> }) {
@@ -12,8 +12,8 @@ export default async function WidgetPreviewPage({ params }: { params: Promise<{ 
   const widgetSettings = await citizenApi.getWidgetSettings(tenantSlug).catch(() => ({
     tenantSlug,
     widgetEnabled: true,
-    widgetTitle: 'KentOS Belediye Asistanı',
-    widgetWelcome: 'Merhaba. Talebinizi kısa bir cümleyle yazın. Eksik bilgi varsa size bir takip sorusu sorarım, ardından resmi başvuruya geçeriz.',
+    widgetTitle: 'KentOS Belediye Asistani',
+    widgetWelcome: 'Merhaba. Talebinizi kisa bir cumleyle yazin. Eksik bilgi varsa size bir takip sorusu sorarim, ardindan resmi basvuruya geceriz.',
     widgetAllowedOrigins: [],
   }));
   const trackHref = `/${tenantSlug}/track`;
@@ -23,22 +23,22 @@ export default async function WidgetPreviewPage({ params }: { params: Promise<{ 
       <section className="widget-preview-shell">
         <div className="widget-preview-header">
           <div>
-            <p className="widget-preview-eyebrow">Gömülebilir belediye asistanı · Önizleme</p>
+            <p className="widget-preview-eyebrow">Gomulebilir belediye asistani - canli akis</p>
             <h1 className="widget-preview-title">{widgetSettings.widgetTitle}</h1>
           </div>
           <p className="widget-preview-copy">
-            Bu ekran, belediye anasayfasına eklenecek sohbet kutusunun ilk kabuğunu temsil eder. Gerçek zamanlı konuşma yerine,
-            kullanıcıyı resmi başvuru ve takip akışına yönlendirir.
+            Bu ekran, belediye sitesine eklenecek widget akisini canli API uzerinden calistirir. Mesaj WEB_CHAT konusmasina yazilir;
+            sonucuna gore takip kodu, eksik bilgi veya operator devri bilgisi ayni ekranda gorunur.
           </p>
         </div>
 
-        <section className="widget-chat-card" aria-label="Widget sohbet önizlemesi">
+        <section className="widget-chat-card" aria-label="Widget sohbet akisi">
           <div className="widget-chat-toolbar">
             <div>
-              <strong>KentOS Belediye Asistanı</strong>
-              <p>Vatandaş talebini topla, gerekiyorsa resmi başvuruya taşı.</p>
+              <strong>KentOS Belediye Asistani</strong>
+              <p>Vatandas talebini topla, AI intake ile siniflandir, ticket veya handoff akisini baslat.</p>
             </div>
-            <span className="widget-status-pill">Önizleme</span>
+            <span className="widget-status-pill">{widgetSettings.widgetEnabled ? 'Aktif' : 'Pasif'}</span>
           </div>
 
           <div className="widget-message-list">
@@ -51,7 +51,8 @@ export default async function WidgetPreviewPage({ params }: { params: Promise<{ 
               </div>
             ))}
             <div className="widget-message widget-message-assistant">
-              İlk dalgada mesajınız güvenli şekilde WEB_CHAT kanalıyla mevcut başvuru omurgasına aktarılır. Takip kodunuz konuşma içinde gösterilir.
+              Asagidaki form gercek konusma kaydi olusturur. Tamamlanan talepler takip koduyla, eksik talepler takip sorusuyla,
+              insan destegi gerekenler operator devri kuyruguyla devam eder.
             </div>
           </div>
 

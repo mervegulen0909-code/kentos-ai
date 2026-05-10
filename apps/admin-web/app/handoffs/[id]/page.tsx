@@ -1,6 +1,7 @@
 import Link from 'next/link';
-import { canMutateTickets, canManageSettings, canViewAnalytics, getAdminSession, resolveAdminAccessToken } from '../../../lib/session';
+import { canAssignTickets, resolveAdminSession } from '../../../lib/session';
 import { PendingFieldset, PendingSubmitButton } from '../../components/form-controls';
+import { AdminShell } from '../../components/admin-shell';
 import { createTicketFromHandoffAction } from '../actions';
 import { adminApi, formatMissingFieldLabel } from '../../../lib/api';
 
@@ -52,13 +53,11 @@ export default async function HandoffDetailPage({
 }) {
   const { id } = await params;
   const { error } = await searchParams;
-  const session = await getAdminSession();
+  const session = await resolveAdminSession();
   const hasSession = Boolean(session);
-  const token = hasSession ? await resolveAdminAccessToken() : null;
+  const token = session?.accessToken ?? null;
   const role = session?.user.role ?? null;
-  const analyticsVisible = canViewAnalytics(role);
-  const settingsVisible = hasSession && canManageSettings(role);
-  const canCreateTicket = canMutateTickets(role);
+  const canCreateTicket = canAssignTickets(role);
   let dataUnavailable = false;
 
   const handoff = token
@@ -69,20 +68,7 @@ export default async function HandoffDetailPage({
     : null;
 
   return (
-    <main className="shell">
-      <aside className="sidebar">
-        <h1>KentOS AI</h1>
-        <p style={{ color: 'var(--muted)' }}>Operasyon komuta paneli</p>
-        <nav style={{ display: 'grid', gap: 12, marginTop: 32 }}>
-          <a href="/">Dashboard</a>
-          <a href="/tickets">Talepler</a>
-          <a href="/handoffs">Operator devri</a>
-          <a href="/queues">Birim kuyruklari</a>
-          {analyticsVisible ? <a href="/reports">Raporlar</a> : null}
-          {settingsVisible ? <a href="/settings">Ayarlar</a> : null}
-        </nav>
-      </aside>
-      <section className="main">
+    <AdminShell hasSession={hasSession} role={role}>
         <p className="badge">Operator devri detayi</p>
         <h1>Konusma gecmisi ve AI ozetleri</h1>
         <p style={{ color: 'var(--muted)' }}>
@@ -193,7 +179,6 @@ export default async function HandoffDetailPage({
             </section>
           </>
         ) : null}
-      </section>
-    </main>
+    </AdminShell>
   );
 }

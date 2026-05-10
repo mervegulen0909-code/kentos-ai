@@ -1,10 +1,10 @@
 import { redirect } from 'next/navigation';
 import { PendingSubmitButton } from '../components/form-controls';
-import { getAdminSession } from '../../lib/session';
+import { resolveAdminSession } from '../../lib/session';
 import { loginAction } from './actions';
 
 export default async function LoginPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
-  const session = await getAdminSession();
+  const session = await resolveAdminSession();
   const { error } = await searchParams;
 
   if (session) redirect('/');

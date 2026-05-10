@@ -1,5 +1,6 @@
 import { adminApi, formatMissingFieldLabel } from '../../../lib/api';
-import { canAssignTickets, canMutateTickets, getAdminSession, getRoleFromToken, isReadOnlyRole, resolveAdminAccessToken } from '../../../lib/session';
+import { canAssignTickets, canMutateTickets, isReadOnlyRole, resolveAdminSession } from '../../../lib/session';
+import { AdminShell } from '../../components/admin-shell';
 import { PendingFieldset, PendingSubmitButton } from '../../components/form-controls';
 import { addInternalNoteAction, addPublicMessageAction, assignTicketAction, updateStatusAction } from '../actions';
 
@@ -121,10 +122,10 @@ export default async function TicketDetailPage({
 }) {
   const { id } = await params;
   const { success, error, errorMessage } = await searchParams;
-  const session = await getAdminSession();
-  const token = await resolveAdminAccessToken();
+  const session = await resolveAdminSession();
+  const token = session?.accessToken ?? null;
   const hasSession = Boolean(token);
-  const role = session?.user.role ?? getRoleFromToken(token);
+  const role = session?.user.role ?? null;
   const ticket = token ? await adminApi.ticket(token, id).catch(() => null) : null;
   const auditLog = token ? await adminApi.auditLog(token, id).catch(() => []) : [];
   const departments = token ? await adminApi.departments(token).catch(() => []) : [];
@@ -137,7 +138,7 @@ export default async function TicketDetailPage({
   const aiClassification = aiSummary?.classification ?? null;
 
   return (
-    <main className="main">
+    <AdminShell hasSession={hasSession} role={role}>
       <p className="badge">Talep detayi - {ticket?.ticketNo ?? id}</p>
       <h1>{ticket?.title ?? 'Talep detayi icin giris yapin'}</h1>
       {token && ticket ? (
@@ -281,6 +282,6 @@ export default async function TicketDetailPage({
           )}
         </section>
       </div>
-    </main>
+    </AdminShell>
   );
 }

@@ -1,5 +1,6 @@
 import { adminApi, type TicketListItem } from '../../lib/api';
-import { canManageSettings, canViewAnalytics, getAdminSession, resolveAdminAccessToken } from '../../lib/session';
+import { resolveAdminSession } from '../../lib/session';
+import { AdminShell } from '../components/admin-shell';
 
 const fallbackRows: TicketListItem[] = [];
 
@@ -22,12 +23,10 @@ function groupByDepartment(rows: TicketListItem[]) {
 }
 
 export default async function QueuesPage() {
-  const session = await getAdminSession();
+  const session = await resolveAdminSession();
   const hasSession = Boolean(session);
-  const token = hasSession ? await resolveAdminAccessToken() : null;
+  const token = session?.accessToken ?? null;
   const role = session?.user.role ?? null;
-  const analyticsVisible = canViewAnalytics(role);
-  const settingsVisible = hasSession && canManageSettings(role);
   let dataUnavailable = false;
 
   const rows = token
@@ -42,20 +41,7 @@ export default async function QueuesPage() {
   const dueSoon = rows.filter((ticket) => ticket.slaState === 'DUE_SOON');
 
   return (
-    <main className="shell">
-      <aside className="sidebar">
-        <h1>KentOS AI</h1>
-        <p style={{ color: 'var(--muted)' }}>Operasyon komuta paneli</p>
-        <nav style={{ display: 'grid', gap: 12, marginTop: 32 }}>
-          <a href="/">Dashboard</a>
-          <a href="/tickets">Talepler</a>
-          <a href="/handoffs">Operator devri</a>
-          <a href="/queues">Birim kuyruklari</a>
-          {analyticsVisible ? <a href="/reports">Raporlar</a> : null}
-          {settingsVisible ? <a href="/settings">Ayarlar</a> : null}
-        </nav>
-      </aside>
-      <section className="main">
+    <AdminShell hasSession={hasSession} role={role}>
         <p className="badge">Birim kuyruklari - SLA ve is yuku</p>
         <h1>Departman operasyon yogunlugu</h1>
         {!hasSession ? (
@@ -127,7 +113,6 @@ export default async function QueuesPage() {
             </div>
           )}
         </section>
-      </section>
-    </main>
+    </AdminShell>
   );
 }

@@ -1,5 +1,6 @@
 import { adminApi } from '../lib/api';
-import { canManageSettings, canViewAnalytics, getAdminSession, resolveAdminAccessToken } from '../lib/session';
+import { canViewAnalytics, resolveAdminSession } from '../lib/session';
+import { AdminShell } from './components/admin-shell';
 
 const fallbackOverview = { totalOpen: 0, slaBreached: 0, resolvedToday: 0 };
 const fallbackTickets: Array<{
@@ -29,12 +30,11 @@ const slaCopy: Record<string, string> = {
 };
 
 export default async function AdminHome() {
-  const session = await getAdminSession();
+  const session = await resolveAdminSession();
   const hasSession = Boolean(session);
   const role = session?.user.role ?? null;
   const analyticsVisible = canViewAnalytics(role);
-  const token = hasSession ? await resolveAdminAccessToken() : null;
-  const settingsVisible = hasSession && canManageSettings(role);
+  const token = session?.accessToken ?? null;
   let dataUnavailable = false;
 
   const [overview, tickets] = token
@@ -53,20 +53,7 @@ export default async function AdminHome() {
     : [fallbackOverview, fallbackTickets];
 
   return (
-    <main className="shell">
-      <aside className="sidebar">
-        <h1>KentOS AI</h1>
-        <p style={{ color: 'var(--muted)' }}>Operasyon komuta paneli</p>
-        <nav style={{ display: 'grid', gap: 12, marginTop: 32 }}>
-          <a href="/">Dashboard</a>
-          <a href="/tickets">Talepler</a>
-          <a href="/handoffs">Operator devri</a>
-          <a href="/queues">Birim kuyruklari</a>
-          {analyticsVisible ? <a href="/reports">Raporlar</a> : null}
-          {settingsVisible ? <a href="/settings">Ayarlar</a> : null}
-        </nav>
-      </aside>
-      <section className="main">
+    <AdminShell hasSession={hasSession} role={role}>
         <p className="badge">
           {session?.user.role ? `${session.user.role} oturumu` : 'Oturum dogrulamasi bekleniyor'} - Rol ve SLA odakli operasyon ozeti
         </p>
@@ -118,7 +105,6 @@ export default async function AdminHome() {
             </div>
           )}
         </section>
-      </section>
-    </main>
+    </AdminShell>
   );
 }

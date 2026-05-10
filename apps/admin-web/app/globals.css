@@ -63,6 +63,19 @@ fieldset[data-pending='true'] { opacity: 0.82; }
   transition: background 160ms, color 160ms, border-color 160ms, transform 160ms;
 }
 .sidebar nav a:hover { color: var(--text); border-color: var(--line); background: var(--surface-2); transform: translateX(1px); }
+.sidebar-status {
+  margin-top: 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  padding: 10px 11px;
+  color: var(--muted);
+  background: var(--surface-2);
+  font-size: .84rem;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+.sidebar-logout { margin-top: 10px; }
+.sidebar-logout button { width: 100%; background: var(--surface); color: var(--text); border-color: var(--line); }
 .main { padding: clamp(22px, 3vw, 40px); min-width: 0; }
 .main > h1,
 .main > h2 {
@@ -84,6 +97,13 @@ fieldset[data-pending='true'] { opacity: 0.82; }
   overflow: hidden;
 }
 .card h2, .card h3 { margin-top: 0; letter-spacing: 0; }
+.subpanel {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  padding: 14px;
+  background: color-mix(in oklch, var(--surface-2) 45%, transparent);
+}
+.subpanel h3 { margin-top: 0; }
 .grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr)); }
 .kpi { font-size: clamp(1.65rem, 2.5vw, 2.35rem); line-height: 1; letter-spacing: 0; margin: 2px 0; }
 .badge { display: inline-flex; width: fit-content; max-width: 100%; border: 1px solid var(--line); border-radius: var(--radius-md); padding: 5px 9px; color: var(--muted); background: var(--surface); font-size: .82rem; font-weight: 750; letter-spacing: 0; overflow-wrap: anywhere; white-space: normal; }
@@ -115,12 +135,33 @@ button, .button-like {
   cursor: pointer;
   font-weight: 750;
 }
+.secondary-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface);
+  color: var(--text);
+  border-color: var(--line);
+}
+.filter-card { margin: 0 0 18px; }
+.filter-grid {
+  display: grid;
+  grid-template-columns: minmax(220px, 1.5fr) repeat(4, minmax(150px, 1fr)) auto;
+  gap: 12px;
+  align-items: end;
+}
+.filter-grid label { display: grid; gap: 6px; color: var(--muted); font-size: .9rem; font-weight: 700; }
+.filter-grid input,
+.filter-grid select { min-height: 42px; color: var(--text); font-weight: 500; }
+.filter-actions { display: flex; gap: 8px; align-items: center; }
+.filter-summary { margin: 12px 0 0; color: var(--muted); font-size: .92rem; }
 
 .timeline-item { display: grid; gap: 4px; border-left: 3px solid color-mix(in oklch, var(--accent) 58%, var(--line)); padding: 0 0 14px 14px; margin: 0 0 14px; }
 .timeline-item time { color: var(--muted); font-size: .92rem; }
 .responsive-list { display: grid; gap: 10px; }
 .queue-row { display: grid; grid-template-columns: 1.2fr 1fr 1fr 1fr; gap: 12px; padding: 12px; border: 1px solid var(--line); border-radius: var(--radius-md); min-width: 0; background: color-mix(in oklch, var(--surface-2) 55%, white); }
 .queue-row > * { min-width: 0; overflow-wrap: anywhere; }
+.queue-row.compact-row { grid-template-columns: 1.3fr 1fr .8fr; }
 .ticket-list { display: grid; gap: 10px; }
 .ticket-list-row { display: grid; grid-template-columns: minmax(124px, .9fr) minmax(0, 1.6fr) minmax(0, 1fr) minmax(0, .95fr) minmax(0, .9fr); gap: 12px; padding: 12px; border: 1px solid var(--line); border-radius: var(--radius-md); align-items: start; min-width: 0; background: color-mix(in oklch, var(--surface-2) 55%, white); }
 .ticket-list-row > * { min-width: 0; overflow-wrap: anywhere; }
@@ -147,6 +188,8 @@ button, .button-like {
   .sidebar { position: static; min-height: auto; border-right: 0; border-bottom: 1px solid var(--line); padding: 12px 14px; overflow: hidden; }
   .sidebar h1 { font-size: 1.08rem; }
   .sidebar p { display: none; }
+  .sidebar-status { display: none; }
+  .sidebar-logout { display: none; }
   .sidebar nav {
     display: flex !important;
     flex-wrap: wrap;
@@ -176,5 +219,7 @@ button, .button-like {
   .queue-row { grid-template-columns: 1fr; gap: 6px; }
   .ticket-list-row { grid-template-columns: 1fr; gap: 10px; }
   .ticket-list-label { display: block; }
+  .filter-grid { grid-template-columns: 1fr; }
+  .filter-actions { align-items: stretch; flex-direction: column; }
   .install-code-grid { grid-template-columns: 1fr; }
 }
