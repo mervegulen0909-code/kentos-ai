@@ -11,6 +11,7 @@ const OUTBOUND_GATEWAY_PATHS: Partial<Record<IntakeChannel, string>> = {
   INSTAGRAM: '/internal/instagram/outbound',
   FACEBOOK: '/internal/facebook/outbound',
   SMS: '/internal/sms/outbound',
+  EMAIL: '/internal/email/outbound',
 };
 
 function resolveGatewayUrl(channel: IntakeChannel): string | null {

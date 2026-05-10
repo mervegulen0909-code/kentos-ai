@@ -19,9 +19,8 @@ It is not a toy chatbot or landing page. The MVP turns citizen messages from Wha
 apps/api                NestJS business API
 apps/admin-web          Next.js staff/admin/manager panel
 apps/citizen-web        Next.js citizen reporting and tracking UI
-apps/whatsapp-gateway   WhatsApp provider adapter boundary
-apps/ai-service         AI prompt/provider boundary
-apps/worker             Queue processors for SLA, notifications, reports
+apps/whatsapp-gateway   WhatsApp/IG/FB/SMS/EMAIL channel adapter boundary
+apps/worker             Queue processors for SLA, notifications, reports, retention, media, outbound
 packages/database       Prisma schema, migrations, seed
 packages/shared         Shared types and validation schemas
 infra                   Local infrastructure

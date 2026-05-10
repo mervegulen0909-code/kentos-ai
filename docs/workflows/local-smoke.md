@@ -145,7 +145,6 @@ For the current AI/TK-only baseline, contract and parser regression coverage mea
 - `pnpm --filter @kentos/api typecheck` passes after keeping `aiSummary` staff-only on ticket detail.
 - `pnpm --filter @kentos/admin-web typecheck` passes after rendering the admin-side AI intake summary card.
 - `pnpm --filter @kentos/shared test` prints `shared intake schema tests passed` and proves valid intake payloads parse while invalid email, unsupported `missingFields`, out-of-range confidence, and legacy `KNT-*` status references are rejected.
-- `pnpm --filter @kentos/ai-service test` prints `ai service intake tests passed` and proves deterministic fallback classification preserves canonical TK tracking tokens for status queries.
 - `pnpm --filter @kentos/citizen-web test` prints `track actions checks passed` and proves citizen tracking redirects only canonical TK tokens while rejecting malformed and legacy internal ticket numbers.
 
 ## Manual endpoint probes
