@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
-import { ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { AuditActorType, ChannelType, MessageVisibility, TicketStatus } from '@kentos/database';
+import { ForbiddenException, Inject, Injectable, NotFoundException, Optional } from '@nestjs/common';
+import { AuditActorType, ChannelType, MessageVisibility, TicketStatus, type Prisma } from '@kentos/database';
 import {
   buildDeterministicIntakeClassification,
   intakeClassificationSchema,
@@ -16,26 +16,233 @@ import { NotificationQueueService } from '../tickets/notification-queue.service.
 import { NotificationTemplateService } from '../tickets/notification-template.service.js';
 import { SlaService } from '../tickets/sla.service.js';
 import { TicketNumberService } from '../tickets/ticket-number.service.js';
+import {
+  decideAiBudget,
+  estimateCostMicros,
+  extractAnthropicUsage,
+  extractOpenAiUsage,
+  readAiBudgetConfig,
+  totalTokens,
+  type AiBudgetConfig,
+  type AiUsageInput,
+} from './ai-cost-guard.js';
 import { CitizenIdentityService } from './citizen-identity.service.js';
 import { CreatePublicMessageDto } from './dto/create-public-message.dto.js';
 import { CreatePublicTicketDto } from './dto/create-public-ticket.dto.js';
 
+const AI_PURPOSE = 'public-intake-classification';
+
+type AiProviderResult = PublicTicketAiIntakeResult & {
+  __usage?: AiUsageInput;
+  __success: boolean;
+  __errorReason?: string;
+};
+
 @Injectable()
 export class PublicTicketAiService {
+  constructor(@Optional() @Inject(PrismaService) private readonly prisma?: PrismaService) {}
+
   async classify(input: PublicTicketAiIntakeRequest): Promise<PublicTicketAiIntakeResult> {
     const request = publicTicketAiIntakeRequestSchema.parse(this.normalizeRequestContact(input));
     const requestedAt = new Date().toISOString();
-    const netivaConfig = this.readNetivaConfig();
+    const startedAtMs = Date.now();
+    const tenantId = request.tenantContext.tenantId;
+    const budgetConfig = readAiBudgetConfig();
+    const budget = await this.checkBudget(tenantId, budgetConfig);
 
-    if (netivaConfig.enabled) {
+    let result: AiProviderResult;
+    if (!budget.allowed) {
+      result = this.markStubFallback(this.runDeterministic(request, requestedAt), `budget:${budget.reason}`);
+    } else {
+      result = await this.runProviderWithFallback(request, requestedAt);
+    }
+
+    const latencyMs = Math.max(0, Date.now() - startedAtMs);
+    await this.recordAiRun({
+      tenantId,
+      request,
+      result,
+      latencyMs,
+      budgetConfig,
+    });
+    return this.stripInternals(result);
+  }
+
+  private async checkBudget(tenantId: string, config: AiBudgetConfig) {
+    if (!this.prisma || (config.dailyTokenBudget == null && config.dailyCostBudgetMicros == null)) {
+      return decideAiBudget({ tokensTotal: 0, costMicros: 0 }, config);
+    }
+    const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    try {
+      const aggregate = await this.prisma.aiRun.aggregate({
+        where: { tenantId, purpose: AI_PURPOSE, createdAt: { gte: since } },
+        _sum: { tokensTotal: true, costMicros: true },
+      });
+      return decideAiBudget(
+        {
+          tokensTotal: aggregate._sum.tokensTotal ?? 0,
+          costMicros: aggregate._sum.costMicros ?? 0,
+        },
+        config,
+      );
+    } catch {
+      return decideAiBudget({ tokensTotal: 0, costMicros: 0 }, config);
+    }
+  }
+
+  private async runProviderWithFallback(
+    request: PublicTicketAiIntakeRequest,
+    requestedAt: string,
+  ): Promise<AiProviderResult> {
+    const anthropicConfig = this.readAnthropicConfig();
+    if (anthropicConfig.enabled) {
       try {
-        return await this.classifyWithNetiva(request, requestedAt, netivaConfig);
-      } catch {
-        // AI intake must not block public ticket creation; keep the deterministic path as a safe fallback.
+        return this.markSuccess(await this.classifyWithAnthropic(request, requestedAt, anthropicConfig));
+      } catch (error) {
+        return this.markStubFallback(
+          this.runDeterministic(request, requestedAt),
+          `anthropic:${error instanceof Error ? error.message.slice(0, 120) : 'error'}`,
+        );
       }
     }
 
-    return this.classifyWithDeterministicFallback(request, requestedAt);
+    const netivaConfig = this.readNetivaConfig();
+    if (netivaConfig.enabled) {
+      try {
+        return this.markSuccess(await this.classifyWithNetiva(request, requestedAt, netivaConfig));
+      } catch (error) {
+        return this.markStubFallback(
+          this.runDeterministic(request, requestedAt),
+          `netiva:${error instanceof Error ? error.message.slice(0, 120) : 'error'}`,
+        );
+      }
+    }
+
+    return this.markSuccess(this.runDeterministic(request, requestedAt));
+  }
+
+  private runDeterministic(input: PublicTicketAiIntakeRequest, requestedAt: string): PublicTicketAiIntakeResult & { __usage?: AiUsageInput } {
+    return {
+      ...this.classifyWithDeterministicFallback(input, requestedAt),
+    };
+  }
+
+  private markSuccess(value: PublicTicketAiIntakeResult & { __usage?: AiUsageInput }): AiProviderResult {
+    return { ...value, __success: true };
+  }
+
+  private markStubFallback(value: PublicTicketAiIntakeResult, reason: string): AiProviderResult {
+    return { ...value, __success: true, __errorReason: reason };
+  }
+
+  private stripInternals(result: AiProviderResult): PublicTicketAiIntakeResult {
+    const { __usage: _usage, __success: _success, __errorReason: _err, ...rest } = result;
+    return rest;
+  }
+
+  private async recordAiRun(input: {
+    tenantId: string;
+    request: PublicTicketAiIntakeRequest;
+    result: AiProviderResult;
+    latencyMs: number;
+    budgetConfig: AiBudgetConfig;
+  }) {
+    if (!this.prisma) return;
+    const usage = input.result.__usage ?? {};
+    const tokensInput = typeof usage.tokensInput === 'number' ? usage.tokensInput : null;
+    const tokensOutput = typeof usage.tokensOutput === 'number' ? usage.tokensOutput : null;
+    const tokensTotal = totalTokens(usage) || null;
+    const costMicros = tokensTotal != null ? estimateCostMicros(usage, input.budgetConfig) : null;
+
+    try {
+      await this.prisma.aiRun.create({
+        data: {
+          tenantId: input.tenantId,
+          purpose: AI_PURPOSE,
+          provider: input.result.provider,
+          model: input.result.model,
+          promptVersion: input.result.promptVersion,
+          input: this.toJsonValue({ tenantSlug: input.request.tenantContext.tenantSlug, channel: input.request.message.channel }),
+          output: this.toJsonValue({
+            confidence: input.result.classification.confidence,
+            intent: input.result.classification.intent,
+            requestType: input.result.classification.requestType,
+          }),
+          confidence: input.result.classification.confidence as unknown as Prisma.Decimal,
+          latencyMs: input.latencyMs,
+          tokensInput: tokensInput ?? undefined,
+          tokensOutput: tokensOutput ?? undefined,
+          tokensTotal: tokensTotal ?? undefined,
+          costMicros: costMicros ?? undefined,
+          success: input.result.__success,
+          errorReason: input.result.__errorReason ?? null,
+        },
+      });
+    } catch {
+      // telemetry failures must never block ticket intake
+    }
+  }
+
+  private toJsonValue(value: unknown): Prisma.InputJsonValue {
+    return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue;
+  }
+
+  private readAnthropicConfig() {
+    const provider = process.env.AI_PROVIDER?.trim().toLowerCase();
+    const apiKey = process.env.ANTHROPIC_API_KEY?.trim() || '';
+    return {
+      enabled: provider === 'anthropic' && Boolean(apiKey),
+      apiKey,
+      baseUrl: this.normalizeBaseUrl(process.env.ANTHROPIC_BASE_URL || 'https://api.anthropic.com'),
+      model: process.env.ANTHROPIC_MODEL?.trim() || process.env.AI_MODEL?.trim() || 'claude-sonnet-4-6',
+      timeoutMs: this.readPositiveInt(process.env.ANTHROPIC_TIMEOUT_MS || process.env.AI_TIMEOUT_MS, 15_000),
+      maxTokens: this.readPositiveInt(process.env.ANTHROPIC_MAX_TOKENS || process.env.AI_MAX_TOKENS, 1_200),
+      version: process.env.ANTHROPIC_API_VERSION?.trim() || '2023-06-01',
+    };
+  }
+
+  private async classifyWithAnthropic(
+    input: PublicTicketAiIntakeRequest,
+    requestedAt: string,
+    config: ReturnType<PublicTicketAiService['readAnthropicConfig']>,
+  ): Promise<PublicTicketAiIntakeResult & { __usage?: AiUsageInput }> {
+    const response = await fetch(`${config.baseUrl}/v1/messages`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': config.apiKey,
+        'anthropic-version': config.version,
+      },
+      body: JSON.stringify({
+        model: config.model,
+        max_tokens: config.maxTokens,
+        temperature: 0,
+        system: this.buildSystemPrompt(),
+        messages: [{ role: 'user', content: this.buildUserPrompt(input) }],
+      }),
+      signal: AbortSignal.timeout(config.timeoutMs),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Anthropic AI request failed with ${response.status}`);
+    }
+
+    const payload = await response.json() as {
+      content?: Array<{ type?: string; text?: string }>;
+      usage?: { input_tokens?: number; output_tokens?: number };
+    };
+    const content = payload.content?.find((part) => part.type === 'text')?.text;
+    if (!content) throw new Error('Anthropic AI response did not include text content');
+
+    const result = publicTicketAiIntakeResultSchema.parse({
+      provider: 'anthropic',
+      model: config.model,
+      promptVersion: 'intake-classifier.v1',
+      requestedAt,
+      completedAt: new Date().toISOString(),
+      classification: this.parseClassification(content),
+    });
+    return { ...result, __usage: extractAnthropicUsage(payload) };
   }
 
   private normalizeRequestContact(input: PublicTicketAiIntakeRequest): PublicTicketAiIntakeRequest {
@@ -87,7 +294,7 @@ export class PublicTicketAiService {
     input: PublicTicketAiIntakeRequest,
     requestedAt: string,
     config: ReturnType<PublicTicketAiService['readNetivaConfig']>,
-  ): Promise<PublicTicketAiIntakeResult> {
+  ): Promise<PublicTicketAiIntakeResult & { __usage?: AiUsageInput }> {
     const response = await fetch(`${config.baseUrl}/chat/completions`, {
       method: 'POST',
       headers: {
@@ -114,11 +321,12 @@ export class PublicTicketAiService {
 
     const payload = await response.json() as {
       choices?: Array<{ message?: { content?: string | null }; text?: string | null }>;
+      usage?: unknown;
     };
     const content = payload.choices?.[0]?.message?.content ?? payload.choices?.[0]?.text;
     if (!content) throw new Error('Netiva AI response did not include content');
 
-    return publicTicketAiIntakeResultSchema.parse({
+    const result = publicTicketAiIntakeResultSchema.parse({
       provider: 'netiva',
       model: config.model,
       promptVersion: 'intake-classifier.v1',
@@ -126,6 +334,7 @@ export class PublicTicketAiService {
       completedAt: new Date().toISOString(),
       classification: this.parseClassification(content),
     });
+    return { ...result, __usage: extractOpenAiUsage(payload) };
   }
 
   private parseClassification(content: string): IntakeClassification {

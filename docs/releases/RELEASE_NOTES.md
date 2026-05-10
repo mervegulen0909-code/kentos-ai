@@ -1,5 +1,55 @@
 # Release Notes
 
+## Next — AI provider live wiring + cost cap + telemetry (W3.4) — 2026-05-10
+
+### Summary
+
+- New Anthropic intake provider in `PublicTicketAiService`. When `AI_PROVIDER=anthropic` and `ANTHROPIC_API_KEY` is set, the service POSTs to `https://api.anthropic.com/v1/messages` with `x-api-key` and `anthropic-version` headers, captures `usage.input_tokens` / `usage.output_tokens`, and persists those into the `AiRun` row. No SDK dependency — direct `fetch` keeps `apps/api` package.json untouched.
+- Provider preference order: `anthropic` (preferred) → `netiva` → `stub` (deterministic). Each layer falls back to the next on error or when its credentials are unset; stub fallbacks record an `errorReason` like `anthropic:request failed with 429`.
+- Budget guard: `AI_DAILY_TOKEN_BUDGET` and `AI_DAILY_COST_BUDGET_MICROS` enforce a per-tenant 24h cap. Before each live call, `AiRun` aggregates over the last 24h for the tenant are summed; if either cap is reached the call is short-circuited to the deterministic stub with `errorReason='budget:token-budget-exceeded'` (or cost-budget). Calls inside the budget run normally and contribute to the next aggregate.
+- Token cost is computed per-request via `AI_COST_INPUT_MICROS_PER_TOKEN` (default 3) and `AI_COST_OUTPUT_MICROS_PER_TOKEN` (default 15) — the published claude-sonnet-4-6 list price of $3/$15 per million tokens.
+- Telemetry: every classify call writes an `AiRun` row with provider, model, promptVersion, latencyMs, token counts, costMicros, success, errorReason. Failures during telemetry persistence are swallowed so the citizen-facing ticket flow never breaks because of a logging issue.
+
+### Schema (forward-only)
+
+Migration `20260510140000_add_ai_run_telemetry` extends `AiRun` with `tokensInput`, `tokensOutput`, `tokensTotal`, `costMicros` (all nullable INT), `success` (NOT NULL DEFAULT true), `errorReason` (TEXT), and a new index on `(tenantId, createdAt)` for the daily aggregate query path.
+
+### Configuration
+
+```
+AI_PROVIDER=stub | netiva | anthropic
+AI_DAILY_TOKEN_BUDGET=        # leave empty for unlimited
+AI_DAILY_COST_BUDGET_MICROS=  # leave empty for unlimited
+AI_PER_REQUEST_TOKEN_LIMIT=
+AI_DAILY_BUDGET_BLOCK_MODE=fallback   # fallback (default) | error
+AI_COST_INPUT_MICROS_PER_TOKEN=3
+AI_COST_OUTPUT_MICROS_PER_TOKEN=15
+ANTHROPIC_API_KEY=
+ANTHROPIC_BASE_URL=https://api.anthropic.com
+ANTHROPIC_MODEL=claude-sonnet-4-6
+ANTHROPIC_TIMEOUT_MS=15000
+ANTHROPIC_MAX_TOKENS=1200
+ANTHROPIC_API_VERSION=2023-06-01
+```
+
+### Safety / KVKK posture
+
+- `AI_PROVIDER=stub` remains the default; no live model call happens until the operator flips it and provides a key.
+- Budget caps default to "unlimited" only because operators may want to set them per environment. The runbook now lists daily budget configuration as a pre-go-live step. Without a budget set the audit trail still records every run's token count and cost.
+- Telemetry payload (`input` and `output` JSON columns) intentionally records only `tenantSlug`, channel, intent, requestType, and confidence — no citizen contact, no AI prompt, no model-internal reasoning.
+
+### Evidence snapshot
+
+- `PRISMA_GENERATE_NO_ENGINE=true pnpm db:generate=passed`.
+- `pnpm typecheck=passed` for all 8 workspace projects.
+- `pnpm --filter @kentos/api test=passed` 11 new ai-cost-guard tests covering env config parsing, budget decision logic for token and cost caps, cost estimation with input/output rates, anthropic and OpenAI usage extractors, and missing-usage handling. Existing citizen identity reconciliation and attachment service tests still pass.
+- `pnpm build=passed`.
+
+### Risk and rollback
+
+- Risk level: `medium`. Schema change is additive and forward-only; the AiRun model is now actively written. Provider switch defaults to stub when keys are unset, so the change is safe to deploy without immediately enabling live calls.
+- Rollback policy: revert the W3.4 commit; the new `AiRun` columns and index remain (forward-only) but unused. To stop live calls without reverting, set `AI_PROVIDER=stub` and restart the api.
+
 ## Next — ClamAV virus scanning (W3.3) — 2026-05-10
 
 ### Summary

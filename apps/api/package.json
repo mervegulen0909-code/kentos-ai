@@ -9,7 +9,7 @@
     "start": "node dist/main.js",
     "lint": "tsc -p tsconfig.json --noEmit",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "pnpm typecheck && tsx src/modules/public/citizen-identity-reconciliation.test.ts && tsx src/modules/attachments/attachments.service.test.ts",
+    "test": "pnpm typecheck && tsx src/modules/public/citizen-identity-reconciliation.test.ts && tsx src/modules/attachments/attachments.service.test.ts && tsx src/modules/public/ai-cost-guard.test.ts",
     "citizen-identity:backfill": "tsx src/citizen-identity-backfill.ts"
   },
   "dependencies": {

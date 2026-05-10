@@ -12,8 +12,14 @@
 
 - [ ] Store only necessary citizen contact data.
 - [ ] Keep internal notes separate from public messages.
-- [ ] Do not expose AI reasoning to citizens.
+- [x] AI runs do not expose chain-of-thought to citizens; AiRun.input/output JSON columns intentionally store only tenantSlug, channel, intent, requestType, confidence — no citizen contact, no prompt, no model-internal reasoning.
 - [ ] Keep export/delete readiness in model and API design.
+
+## AI provider safety
+
+- [x] `AI_PROVIDER=stub` is the default; live providers (`anthropic`, `netiva`) require an explicit credential to activate.
+- [x] Daily token + cost budgets per tenant enforced at runtime via `AiRun` aggregate query before each live call. Budget exceedance silently falls back to the deterministic stub and records `errorReason='budget:token-budget-exceeded'` for audit visibility.
+- [x] AiRun telemetry rows (`tokensInput`, `tokensOutput`, `tokensTotal`, `costMicros`, `latencyMs`, `success`, `errorReason`) support per-tenant cost review without exposing prompt content.
 
 ## Access control
 

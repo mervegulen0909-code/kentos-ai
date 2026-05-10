@@ -124,7 +124,7 @@ export const publicTicketAiIntakeRequestSchema = z.object({
 });
 
 export const publicTicketAiIntakeResultSchema = z.object({
-  provider: z.enum(['stub', 'netiva']),
+  provider: z.enum(['stub', 'netiva', 'anthropic']),
   model: z.string().min(1),
   promptVersion: z.string().min(1),
   classification: intakeClassificationSchema,

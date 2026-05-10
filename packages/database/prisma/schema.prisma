@@ -486,12 +486,19 @@ model AiRun {
   output        Json
   confidence    Decimal? @db.Decimal(4, 3)
   latencyMs     Int?
+  tokensInput   Int?
+  tokensOutput  Int?
+  tokensTotal   Int?
+  costMicros    Int?
+  success       Boolean  @default(true)
+  errorReason   String?
   createdAt     DateTime @default(now())
 
   tenant        Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   ticket        Ticket? @relation(fields: [ticketId], references: [id], onDelete: SetNull)
 
   @@index([tenantId, purpose, createdAt])
+  @@index([tenantId, createdAt])
 }
 
 model ManagerReport {
