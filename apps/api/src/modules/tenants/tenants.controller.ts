@@ -70,6 +70,12 @@ export class TenantsController {
     return this.tenants.updateRetentionSettings(user, dto);
   }
 
+  @Roles('SUPER_ADMIN', 'TENANT_ADMIN')
+  @Post('retention-settings/run-now')
+  runRetentionNow(@CurrentUser() user: AuthenticatedUser) {
+    return this.tenants.runRetentionNow(user);
+  }
+
   @Get('ai-budget-settings')
   aiBudgetSettings(@CurrentUser() user: AuthenticatedUser) {
     return this.tenants.aiBudgetSettings(user.tenantId);

@@ -7,6 +7,7 @@ import {
   createCategoryAction,
   createDepartmentAction,
   createSlaPolicyAction,
+  runRetentionNowAction,
   updateAiBudgetSettingsAction,
   updateCategoryAction,
   updateDepartmentAction,
@@ -28,6 +29,7 @@ const successCopy: Record<string, FeedbackCopy> = {
   'template-updated': { title: 'Mesaj sablonu kaydedildi.', detail: 'Vatandasla paylasilan standart metin guncel haliyle kullanilacak.' },
   'widget-updated': { title: 'Widget ayarlari kaydedildi.', detail: 'Baslik, karsilama metni ve origin izin listesi yeni widget isteklerinde kullanilacak.' },
   'retention-updated': { title: 'Saklama suresi ayarlari kaydedildi.', detail: 'Yeni degerler bir sonraki retention worker dongusunde uygulanir; bos birakilan kapsamlar varsayilana doner.' },
+  'retention-run-triggered': { title: 'Retention isi kuyruga eklendi.', detail: 'Worker dry-run/canli bayraklarina gore aktif kapsamlari isler. Bu islem dosya/dB silmeyi tetiklemez ki RETENTION_DRY_RUN=false olmadikca.' },
   'ai-budget-updated': { title: 'AI butce ayarlari kaydedildi.', detail: 'Tenant butce sinirlari sonraki vatandas intake cagrisinda gecerli olur; bos birakilan alanlar global env varsayilanina doner.' },
 };
 
@@ -225,6 +227,15 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
           <strong>KVKK notu</strong>
           <p>Tenant bazli kisaltmalar daha kati saklama sureleri saglayabilir. Belirlenen pencere sonunda silme hala worker tarafindaki dry-run/canli bayraklarina baglidir; bu ekran yalniz kapsam basina pencereyi belirler.</p>
         </div>
+        <form action={runRetentionNowAction} style={{ display: 'grid', gap: 8, marginTop: 12 }}>
+          <PendingFieldset style={{ display: 'grid', gap: 8 }}>
+            <input type="hidden" name="intent" value="retention-run-now" />
+            <p style={{ color: 'var(--muted)', margin: 0 }}>
+              Daily 03:00 (UTC) cron is registered automatically; bu butonla kuyruga manuel bir is ekleyebilirsiniz. Worker dry-run modunda yalnizca sayar.
+            </p>
+            <PendingSubmitButton type="submit" disabled={controlsDisabled} idleLabel="Retention isi simdi calistir" pendingLabel="Kuyruga eklendi..." />
+          </PendingFieldset>
+        </form>
       </section>
       <section className="card">
         <p className="badge">AI butce kontrolu</p>

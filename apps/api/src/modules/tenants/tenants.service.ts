@@ -18,11 +18,21 @@ import { UpdateMessageTemplateDto } from './dto/message-template.dto.js';
 import { UpdateRetentionSettingsDto } from './dto/retention-settings.dto.js';
 import { CreateSlaPolicyDto, UpdateSlaPolicyDto } from './dto/sla-policy.dto.js';
 import { UpdateWidgetSettingsDto } from './dto/widget-settings.dto.js';
+import { RetentionQueueService } from './retention-queue.service.js';
 import { normalizeTenantAiBudgetOverrides, type TenantAiBudgetOverrides } from '../public/ai-cost-guard.js';
 
 @Injectable()
 export class TenantsService {
-  constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
+  constructor(
+    @Inject(PrismaService) private readonly prisma: PrismaService,
+    @Inject(RetentionQueueService) private readonly retentionQueue: RetentionQueueService,
+  ) {}
+
+  async runRetentionNow(user: AuthenticatedUser) {
+    const enqueued = await this.retentionQueue.enqueueNow({ tenantId: user.tenantId, scope: 'all' });
+    await this.audit(user, 'tenant.retention_run_triggered', undefined, { tenantId: user.tenantId, enqueued });
+    return { enqueued, tenantId: user.tenantId };
+  }
 
   async getCurrent(tenantId: string) {
     const tenant = await this.prisma.tenant.findUnique({

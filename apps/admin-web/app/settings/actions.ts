@@ -181,6 +181,13 @@ export async function updateWidgetSettingsAction(formData: FormData) {
   }));
 }
 
+export async function runRetentionNowAction(formData: FormData) {
+  await runSettingsMutation(formData, 'retention-run-triggered', (token) => apiFetch('/retention-settings/run-now', {
+    method: 'POST',
+    token,
+  }));
+}
+
 export async function updateAiBudgetSettingsAction(formData: FormData) {
   const fields = ['dailyTokenBudget', 'dailyCostBudgetMicros', 'perRequestTokenLimit'] as const;
   const payload: Record<string, number | null> = {};

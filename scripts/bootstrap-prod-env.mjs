@@ -75,6 +75,8 @@ const lines = [
   '',
   'RETENTION_DRY_RUN=true',
   'RETENTION_DELETE_ATTACHMENT_OBJECTS=false',
+  'RETENTION_CRON_PATTERN=0 3 * * *',
+  'RETENTION_SCHEDULE_DISABLED=false',
   '',
   'AI_PROVIDER=stub',
   'AI_API_KEY=',

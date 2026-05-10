@@ -326,4 +326,6 @@ export const adminApi = {
   aiBudgetSettings: (token: string) => apiFetch<AiBudgetSettings>('/ai-budget-settings', { token }),
   updateAiBudgetSettings: (token: string, input: UpdateAiBudgetInput) =>
     apiFetch<AiBudgetSettings>('/ai-budget-settings', { method: 'PATCH', token, body: JSON.stringify(input) }),
+  runRetentionNow: (token: string) =>
+    apiFetch<{ enqueued: boolean; tenantId: string }>('/retention-settings/run-now', { method: 'POST', token }),
 };
