@@ -1,5 +1,6 @@
 import {
   adminApi,
+  type AnalyticsAiUsage,
   type AnalyticsCategorySummary,
   type AnalyticsChannelSummary,
   type AnalyticsConversationSegments,
@@ -28,6 +29,22 @@ const fallbackSegments: AnalyticsConversationSegments = {
   automationRate: 0,
 };
 
+const fallbackAiUsage: AnalyticsAiUsage = {
+  generatedAt: new Date(0).toISOString(),
+  windows: {
+    last24h: { runs: 0, successCount: 0, failureCount: 0, successRate: 0, tokensTotal: 0, costMicros: 0, averageLatencyMs: 0 },
+    last7d: { runs: 0, successCount: 0, failureCount: 0, successRate: 0, tokensTotal: 0, costMicros: 0, averageLatencyMs: 0 },
+    last30d: { runs: 0, successCount: 0, failureCount: 0, successRate: 0, tokensTotal: 0, costMicros: 0, averageLatencyMs: 0 },
+  },
+  byProvider: [],
+};
+
+function formatCostMicrosAsTl(value: number) {
+  // 1 micro = 1 / 1_000_000 USD; we display as USD cents-equivalent.
+  // Operator can convert to TRY per their accounting; the dashboard remains denominated in USD micros.
+  return `$${(value / 1_000_000).toFixed(4)}`;
+}
+
 const channelLabels: Record<string, string> = {
   WEB_CHAT: 'Web sohbet',
   WHATSAPP: 'WhatsApp',
@@ -51,7 +68,7 @@ export default async function ReportsPage() {
   const analyticsVisible = canViewAnalytics(role);
   let dataUnavailable = false;
 
-  const [overview, channelSummary, departmentSummary, categorySummary, segments] = token && analyticsVisible
+  const [overview, channelSummary, departmentSummary, categorySummary, segments, aiUsage] = token && analyticsVisible
     ? await Promise.all([
         adminApi.overview(token).catch(() => {
           dataUnavailable = true;
@@ -73,8 +90,12 @@ export default async function ReportsPage() {
           dataUnavailable = true;
           return fallbackSegments;
         }),
+        adminApi.aiUsage(token).catch(() => {
+          dataUnavailable = true;
+          return fallbackAiUsage;
+        }),
       ])
-    : [fallbackOverview, fallbackChannels, fallbackDepartments, fallbackCategories, fallbackSegments];
+    : [fallbackOverview, fallbackChannels, fallbackDepartments, fallbackCategories, fallbackSegments, fallbackAiUsage];
 
   const noOperationalData = !overview.totalOpen && !overview.openedToday && !overview.resolvedToday && !overview.slaBreached && !overview.slaDueSoon;
   const statusRows = overview.byStatus
@@ -166,6 +187,52 @@ export default async function ReportsPage() {
                   <p style={{ color: 'var(--muted)' }}>Toplam {segments.totalConversations} konusmanin AI ile sonuclanan orani.</p>
                 </article>
               </div>
+            </section>
+            <section className="card" style={{ marginTop: 18 }}>
+              <h2>AI kullanim ve maliyet</h2>
+              <p style={{ color: 'var(--muted)' }}>
+                Vatandas intake siniflandirmasi icin yapilan model cagrilarinin saglik metrikleri. Maliyet, modelin liste fiyatina gore mikro-dolar tahminidir; tenant anlasmasina gore yeniden hesaplayin.
+              </p>
+              <div className="grid" style={{ marginTop: 12 }}>
+                <article className="card">
+                  <p>Son 24 saat - calisma</p>
+                  <p className="kpi">{aiUsage.windows.last24h.runs}</p>
+                  <p style={{ color: 'var(--muted)' }}>Basari orani: {formatPercent(aiUsage.windows.last24h.successRate)}</p>
+                </article>
+                <article className="card">
+                  <p>Son 24 saat - tahmini maliyet</p>
+                  <p className="kpi">{formatCostMicrosAsTl(aiUsage.windows.last24h.costMicros)}</p>
+                  <p style={{ color: 'var(--muted)' }}>{aiUsage.windows.last24h.tokensTotal} token</p>
+                </article>
+                <article className="card">
+                  <p>Son 7 gun - calisma</p>
+                  <p className="kpi">{aiUsage.windows.last7d.runs}</p>
+                  <p style={{ color: 'var(--muted)' }}>Ortalama gecikme: {aiUsage.windows.last7d.averageLatencyMs} ms</p>
+                </article>
+                <article className="card">
+                  <p>Son 30 gun - tahmini maliyet</p>
+                  <p className="kpi">{formatCostMicrosAsTl(aiUsage.windows.last30d.costMicros)}</p>
+                  <p style={{ color: 'var(--muted)' }}>{aiUsage.windows.last30d.tokensTotal} token / {aiUsage.windows.last30d.runs} cagri</p>
+                </article>
+              </div>
+              {aiUsage.byProvider.length ? (
+                <div className="responsive-list" style={{ marginTop: 12 }}>
+                  {aiUsage.byProvider.map((row) => (
+                    <div className="queue-row" key={row.provider}>
+                      <strong>{row.provider}</strong>
+                      <span>{row.runs} cagri</span>
+                      <span>Basari: {formatPercent(row.successRate)}</span>
+                      <span>{row.tokensTotal} token</span>
+                      <span>{formatCostMicrosAsTl(row.costMicros)}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="empty-state" style={{ marginTop: 12 }}>
+                  <strong>Son 30 gunde AI cagrisi yok.</strong>
+                  <p>Stub fallback'a dustugunde de buraya kayit gelir; bos gorunmesi henuz hic intake yapilmadigi anlamina gelir.</p>
+                </div>
+              )}
             </section>
             <section className="card" style={{ marginTop: 18 }}>
               <h2>Kanal performansi</h2>

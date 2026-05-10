@@ -41,4 +41,9 @@ export class AnalyticsController {
   conversationSegments(@CurrentUser() user: AuthenticatedUser) {
     return this.analytics.conversationSegments(user);
   }
+
+  @Get('ai-usage')
+  aiUsage(@CurrentUser() user: AuthenticatedUser) {
+    return this.analytics.aiUsage(user);
+  }
 }

@@ -67,6 +67,36 @@ export type AnalyticsConversationSegments = {
   automationRate: number;
 };
 
+export type AnalyticsAiUsageWindow = {
+  runs: number;
+  successCount: number;
+  failureCount: number;
+  successRate: number;
+  tokensTotal: number;
+  costMicros: number;
+  averageLatencyMs: number;
+};
+
+export type AnalyticsAiUsageProviderSummary = {
+  provider: string;
+  runs: number;
+  successCount: number;
+  failureCount: number;
+  successRate: number;
+  tokensTotal: number;
+  costMicros: number;
+};
+
+export type AnalyticsAiUsage = {
+  generatedAt: string;
+  windows: {
+    last24h: AnalyticsAiUsageWindow;
+    last7d: AnalyticsAiUsageWindow;
+    last30d: AnalyticsAiUsageWindow;
+  };
+  byProvider: AnalyticsAiUsageProviderSummary[];
+};
+
 export type AnalyticsDepartmentSummary = {
   id: string;
   name: string;
@@ -231,6 +261,7 @@ export const adminApi = {
   channelSummary: (token: string) => apiFetch<AnalyticsChannelSummary[]>('/analytics/channels', { token }),
   conversationSegments: (token: string) =>
     apiFetch<AnalyticsConversationSegments>('/analytics/conversation-segments', { token }),
+  aiUsage: (token: string) => apiFetch<AnalyticsAiUsage>('/analytics/ai-usage', { token }),
   tickets: (token: string, filters?: TicketListFilters) => apiFetch<TicketListItem[]>(`/tickets${buildQuery(filters)}`, { token }),
   ticket: (token: string, id: string) => apiFetch<TicketDetail>(`/tickets/${id}`, { token }),
   auditLog: (token: string, id: string) => apiFetch<AuditLogItem[]>(`/tickets/${id}/audit-log`, { token }),

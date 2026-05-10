@@ -2,6 +2,13 @@ import { Inject, Injectable } from '@nestjs/common';
 import { AuditActorType, MessageVisibility, TicketStatus } from '@kentos/database';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import {
+  summarizeAiUsageByProvider,
+  summarizeAiUsageWindow,
+  type AiRunGroupRow,
+  type AiUsageReport,
+  type AiUsageWindow,
+} from './ai-usage.js';
 
 @Injectable()
 export class AnalyticsService {
@@ -128,6 +135,57 @@ export class AnalyticsService {
       awaitingInfo: awaitingInfo < 0 ? 0 : awaitingInfo,
       automationRate,
     };
+  }
+
+  async aiUsage(user: AuthenticatedUser): Promise<AiUsageReport> {
+    const now = new Date();
+    const windows: Array<{ key: 'last24h' | 'last7d' | 'last30d'; days: number }> = [
+      { key: 'last24h', days: 1 },
+      { key: 'last7d', days: 7 },
+      { key: 'last30d', days: 30 },
+    ];
+    const fetched = await Promise.all(
+      windows.map(async ({ key, days }) => ({
+        key,
+        rows: await this.aiUsageRowsForWindow(user.tenantId, new Date(now.getTime() - days * 86_400_000)),
+      })),
+    );
+    const summarized: Record<'last24h' | 'last7d' | 'last30d', AiUsageWindow> = {
+      last24h: summarizeAiUsageWindow(fetched.find((entry) => entry.key === 'last24h')?.rows ?? []),
+      last7d: summarizeAiUsageWindow(fetched.find((entry) => entry.key === 'last7d')?.rows ?? []),
+      last30d: summarizeAiUsageWindow(fetched.find((entry) => entry.key === 'last30d')?.rows ?? []),
+    };
+    const byProvider = summarizeAiUsageByProvider(
+      fetched.find((entry) => entry.key === 'last30d')?.rows ?? [],
+    );
+    return {
+      generatedAt: now.toISOString(),
+      windows: summarized,
+      byProvider,
+    };
+  }
+
+  private async aiUsageRowsForWindow(tenantId: string, since: Date): Promise<AiRunGroupRow[]> {
+    const grouped = await this.prisma.aiRun.groupBy({
+      by: ['provider'],
+      where: { tenantId, createdAt: { gte: since } },
+      _count: { _all: true },
+      _sum: { tokensTotal: true, costMicros: true, latencyMs: true },
+    });
+    const successGrouped = await this.prisma.aiRun.groupBy({
+      by: ['provider'],
+      where: { tenantId, createdAt: { gte: since }, success: true },
+      _count: { _all: true },
+    });
+    const successByProvider = new Map(successGrouped.map((row) => [row.provider, row._count._all]));
+    return grouped.map((row) => ({
+      provider: row.provider,
+      runs: row._count._all,
+      successCount: successByProvider.get(row.provider) ?? 0,
+      tokensTotal: row._sum.tokensTotal ?? 0,
+      costMicros: row._sum.costMicros ?? 0,
+      totalLatencyMs: row._sum.latencyMs ?? 0,
+    }));
   }
 
   async channels(user: AuthenticatedUser) {
