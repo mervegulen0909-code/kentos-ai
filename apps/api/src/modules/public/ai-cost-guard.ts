@@ -7,6 +7,16 @@ export type AiBudgetConfig = {
   blockMode: 'fallback' | 'error';
 };
 
+export type TenantAiBudgetOverrides = {
+  dailyTokenBudget?: number | null;
+  dailyCostBudgetMicros?: number | null;
+  perRequestTokenLimit?: number | null;
+};
+
+const TENANT_BUDGET_MIN = 1;
+const TENANT_BUDGET_MAX_TOKENS = 1_000_000_000;
+const TENANT_BUDGET_MAX_COST_MICROS = 10_000_000_000;
+
 export type AiBudgetUsage = {
   tokensTotal: number;
   costMicros: number;
@@ -92,6 +102,40 @@ function parseOptionalInt(value: string | undefined): number | null {
   const numeric = Number.parseInt(trimmed, 10);
   if (!Number.isFinite(numeric) || numeric <= 0) return null;
   return numeric;
+}
+
+export function normalizeTenantAiBudgetOverrides(value: unknown): TenantAiBudgetOverrides {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  const result: TenantAiBudgetOverrides = {};
+  const rec = value as Record<string, unknown>;
+  result.dailyTokenBudget = sanitizeBudgetField(rec.dailyTokenBudget, TENANT_BUDGET_MAX_TOKENS);
+  result.dailyCostBudgetMicros = sanitizeBudgetField(rec.dailyCostBudgetMicros, TENANT_BUDGET_MAX_COST_MICROS);
+  result.perRequestTokenLimit = sanitizeBudgetField(rec.perRequestTokenLimit, TENANT_BUDGET_MAX_TOKENS);
+  return result;
+}
+
+function sanitizeBudgetField(raw: unknown, max: number): number | undefined {
+  if (raw === undefined || raw === null) return undefined;
+  const numeric = typeof raw === 'number' ? raw : Number(raw);
+  if (!Number.isInteger(numeric)) return undefined;
+  if (numeric < TENANT_BUDGET_MIN || numeric > max) return undefined;
+  return numeric;
+}
+
+export function mergeTenantBudget(envConfig: AiBudgetConfig, tenantOverrides: TenantAiBudgetOverrides | null | undefined): AiBudgetConfig {
+  if (!tenantOverrides) return envConfig;
+  return {
+    ...envConfig,
+    dailyTokenBudget: typeof tenantOverrides.dailyTokenBudget === 'number'
+      ? tenantOverrides.dailyTokenBudget
+      : envConfig.dailyTokenBudget,
+    dailyCostBudgetMicros: typeof tenantOverrides.dailyCostBudgetMicros === 'number'
+      ? tenantOverrides.dailyCostBudgetMicros
+      : envConfig.dailyCostBudgetMicros,
+    perRequestTokenLimit: typeof tenantOverrides.perRequestTokenLimit === 'number'
+      ? tenantOverrides.perRequestTokenLimit
+      : envConfig.perRequestTokenLimit,
+  };
 }
 
 function parseFloatWithDefault(value: string | undefined, fallback: number): number {

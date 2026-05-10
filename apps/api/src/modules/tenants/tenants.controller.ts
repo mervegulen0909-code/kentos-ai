@@ -3,6 +3,7 @@ import { AuthGuard } from '@nestjs/passport';
 import { Roles } from '../../common/decorators/roles.decorator.js';
 import { CurrentUser } from '../../common/decorators/current-user.decorator.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
+import { UpdateAiBudgetSettingsDto } from './dto/ai-budget-settings.dto.js';
 import { CreateCategoryDto, UpdateCategoryDto } from './dto/category.dto.js';
 import { CreateDepartmentDto, UpdateDepartmentDto } from './dto/department.dto.js';
 import { UpdateMessageTemplateDto } from './dto/message-template.dto.js';
@@ -67,6 +68,17 @@ export class TenantsController {
   @Patch('retention-settings')
   updateRetentionSettings(@CurrentUser() user: AuthenticatedUser, @Body() dto: UpdateRetentionSettingsDto) {
     return this.tenants.updateRetentionSettings(user, dto);
+  }
+
+  @Get('ai-budget-settings')
+  aiBudgetSettings(@CurrentUser() user: AuthenticatedUser) {
+    return this.tenants.aiBudgetSettings(user.tenantId);
+  }
+
+  @Roles('SUPER_ADMIN', 'TENANT_ADMIN')
+  @Patch('ai-budget-settings')
+  updateAiBudgetSettings(@CurrentUser() user: AuthenticatedUser, @Body() dto: UpdateAiBudgetSettingsDto) {
+    return this.tenants.updateAiBudgetSettings(user, dto);
   }
 
   @Roles('SUPER_ADMIN', 'TENANT_ADMIN')

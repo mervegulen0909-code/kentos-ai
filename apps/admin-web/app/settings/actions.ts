@@ -181,6 +181,29 @@ export async function updateWidgetSettingsAction(formData: FormData) {
   }));
 }
 
+export async function updateAiBudgetSettingsAction(formData: FormData) {
+  const fields = ['dailyTokenBudget', 'dailyCostBudgetMicros', 'perRequestTokenLimit'] as const;
+  const payload: Record<string, number | null> = {};
+  for (const field of fields) {
+    const raw = String(formData.get(field) ?? '').trim();
+    if (raw === '') {
+      payload[field] = null;
+      continue;
+    }
+    const numeric = Number(raw);
+    if (!Number.isInteger(numeric) || numeric < 1) {
+      throw new Error('update-ai-budget');
+    }
+    payload[field] = numeric;
+  }
+
+  await runSettingsMutation(formData, 'ai-budget-updated', (token) => apiFetch('/ai-budget-settings', {
+    method: 'PATCH',
+    token,
+    body: JSON.stringify(payload),
+  }));
+}
+
 export async function updateRetentionSettingsAction(formData: FormData) {
   const scopes = ['channel-events', 'audit-logs', 'outbound-deliveries', 'conversations', 'attachments'] as const;
   const payload: Record<string, number | null> = {};

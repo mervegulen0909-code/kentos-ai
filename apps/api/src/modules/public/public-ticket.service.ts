@@ -21,6 +21,8 @@ import {
   estimateCostMicros,
   extractAnthropicUsage,
   extractOpenAiUsage,
+  mergeTenantBudget,
+  normalizeTenantAiBudgetOverrides,
   readAiBudgetConfig,
   totalTokens,
   type AiBudgetConfig,
@@ -47,7 +49,9 @@ export class PublicTicketAiService {
     const requestedAt = new Date().toISOString();
     const startedAtMs = Date.now();
     const tenantId = request.tenantContext.tenantId;
-    const budgetConfig = readAiBudgetConfig();
+    const envConfig = readAiBudgetConfig();
+    const tenantOverrides = await this.loadTenantBudgetOverrides(tenantId);
+    const budgetConfig = mergeTenantBudget(envConfig, tenantOverrides);
     const budget = await this.checkBudget(tenantId, budgetConfig);
 
     let result: AiProviderResult;
@@ -66,6 +70,16 @@ export class PublicTicketAiService {
       budgetConfig,
     });
     return this.stripInternals(result);
+  }
+
+  private async loadTenantBudgetOverrides(tenantId: string) {
+    if (!this.prisma) return null;
+    try {
+      const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantId }, select: { aiBudgetOverrides: true } });
+      return normalizeTenantAiBudgetOverrides(tenant?.aiBudgetOverrides);
+    } catch {
+      return null;
+    }
   }
 
   private async checkBudget(tenantId: string, config: AiBudgetConfig) {

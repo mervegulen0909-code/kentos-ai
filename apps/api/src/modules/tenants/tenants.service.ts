@@ -11,12 +11,14 @@ import {
 } from '@kentos/shared';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { UpdateAiBudgetSettingsDto } from './dto/ai-budget-settings.dto.js';
 import { CreateCategoryDto, UpdateCategoryDto } from './dto/category.dto.js';
 import { CreateDepartmentDto, UpdateDepartmentDto } from './dto/department.dto.js';
 import { UpdateMessageTemplateDto } from './dto/message-template.dto.js';
 import { UpdateRetentionSettingsDto } from './dto/retention-settings.dto.js';
 import { CreateSlaPolicyDto, UpdateSlaPolicyDto } from './dto/sla-policy.dto.js';
 import { UpdateWidgetSettingsDto } from './dto/widget-settings.dto.js';
+import { normalizeTenantAiBudgetOverrides, type TenantAiBudgetOverrides } from '../public/ai-cost-guard.js';
 
 @Injectable()
 export class TenantsService {
@@ -123,6 +125,38 @@ export class TenantsService {
       overrides: this.normalizeRetentionOverrides(tenant.retentionOverrides),
     };
     await this.audit(user, 'tenant.retention_settings_updated', before, after);
+    return after;
+  }
+
+  async aiBudgetSettings(tenantId: string) {
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: { slug: true, aiBudgetOverrides: true },
+    });
+    if (!tenant) throw new NotFoundException('Belediye bulunamadi.');
+    return {
+      tenantSlug: tenant.slug,
+      overrides: normalizeTenantAiBudgetOverrides(tenant.aiBudgetOverrides),
+    };
+  }
+
+  async updateAiBudgetSettings(user: AuthenticatedUser, dto: UpdateAiBudgetSettingsDto) {
+    const before = await this.aiBudgetSettings(user.tenantId);
+    const incoming: TenantAiBudgetOverrides = {};
+    if (typeof dto.dailyTokenBudget === 'number') incoming.dailyTokenBudget = dto.dailyTokenBudget;
+    if (typeof dto.dailyCostBudgetMicros === 'number') incoming.dailyCostBudgetMicros = dto.dailyCostBudgetMicros;
+    if (typeof dto.perRequestTokenLimit === 'number') incoming.perRequestTokenLimit = dto.perRequestTokenLimit;
+
+    const tenant = await this.prisma.tenant.update({
+      where: { id: user.tenantId },
+      data: { aiBudgetOverrides: incoming as Prisma.InputJsonValue },
+      select: { slug: true, aiBudgetOverrides: true },
+    });
+    const after = {
+      tenantSlug: tenant.slug,
+      overrides: normalizeTenantAiBudgetOverrides(tenant.aiBudgetOverrides),
+    };
+    await this.audit(user, 'tenant.ai_budget_settings_updated', before, after);
     return after;
   }
 

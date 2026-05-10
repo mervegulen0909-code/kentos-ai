@@ -1,4 +1,4 @@
-import { adminApi, type RetentionSettings, type WidgetEmbedConfig, type WidgetSettings } from '../../lib/api';
+import { adminApi, type AiBudgetSettings, type RetentionSettings, type WidgetEmbedConfig, type WidgetSettings } from '../../lib/api';
 import { canManageSettings, resolveAdminSession } from '../../lib/session';
 import { AdminShell } from '../components/admin-shell';
 import { PendingFieldset, PendingSubmitButton } from '../components/form-controls';
@@ -7,6 +7,7 @@ import {
   createCategoryAction,
   createDepartmentAction,
   createSlaPolicyAction,
+  updateAiBudgetSettingsAction,
   updateCategoryAction,
   updateDepartmentAction,
   updateRetentionSettingsAction,
@@ -27,6 +28,7 @@ const successCopy: Record<string, FeedbackCopy> = {
   'template-updated': { title: 'Mesaj sablonu kaydedildi.', detail: 'Vatandasla paylasilan standart metin guncel haliyle kullanilacak.' },
   'widget-updated': { title: 'Widget ayarlari kaydedildi.', detail: 'Baslik, karsilama metni ve origin izin listesi yeni widget isteklerinde kullanilacak.' },
   'retention-updated': { title: 'Saklama suresi ayarlari kaydedildi.', detail: 'Yeni degerler bir sonraki retention worker dongusunde uygulanir; bos birakilan kapsamlar varsayilana doner.' },
+  'ai-budget-updated': { title: 'AI butce ayarlari kaydedildi.', detail: 'Tenant butce sinirlari sonraki vatandas intake cagrisinda gecerli olur; bos birakilan alanlar global env varsayilanina doner.' },
 };
 
 const retentionScopeCopy: Record<string, { title: string; detail: string }> = {
@@ -59,6 +61,7 @@ const errorCopy: Record<string, FeedbackCopy> = {
   'update-template': { title: 'Sablon kaydedilemedi.', detail: 'Vatandas mesaji bos olmamali; metni sade ve islem odakli tutun.' },
   'update-widget': { title: 'Widget ayarlari kaydedilemedi.', detail: 'Baslik, karsilama metni ve origin satirlarini kontrol edip tekrar deneyin.' },
   'update-retention': { title: 'Saklama ayarlari kaydedilemedi.', detail: 'Her kapsam icin 1 ile 3650 gun arasi tam sayi girin ya da bos birakarak varsayilana donmesini saglayin.' },
+  'update-ai-budget': { title: 'AI butce ayarlari kaydedilemedi.', detail: 'Her alan pozitif tam sayi olmali ya da bos kalmali; bos alan global env varsayilani kullanmaya doner.' },
   forbidden: { title: 'Ayar degisikligi bu rol icin kapali.', detail: 'Frontend ayar mutasyonlarini yonetici rolleriyle sinirlandiriyor; son yetki kontrolu yine backend tarafinda.' },
   general: { title: 'Ayar kaydedilemedi.', detail: 'Baglanti, yetki veya kayit durumunu kontrol edip islemi tekrar deneyin.' },
 };
@@ -89,7 +92,11 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
     },
     overrides: {},
   };
-  const [departments, categories, slaPolicies, templates, widgetSettings, retentionSettings] = token
+  const fallbackAiBudgetSettings: AiBudgetSettings = {
+    tenantSlug: session?.user.tenantSlug ?? 'demo-belediye',
+    overrides: {},
+  };
+  const [departments, categories, slaPolicies, templates, widgetSettings, retentionSettings, aiBudgetSettings] = token
     ? await Promise.all([
         adminApi.departments(token).catch(() => []),
         adminApi.categories(token).catch(() => []),
@@ -97,8 +104,9 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
         adminApi.messageTemplates(token).catch(() => []),
         adminApi.widgetSettings(token).catch(() => fallbackWidgetSettings),
         adminApi.retentionSettings(token).catch(() => fallbackRetentionSettings),
+        adminApi.aiBudgetSettings(token).catch(() => fallbackAiBudgetSettings),
       ])
-    : [[], [], [], [], fallbackWidgetSettings, fallbackRetentionSettings];
+    : [[], [], [], [], fallbackWidgetSettings, fallbackRetentionSettings, fallbackAiBudgetSettings];
   const widgetEmbed = buildWidgetEmbedConfig(widgetSettings);
   const retentionScopes = Object.keys(retentionSettings.defaults) as Array<keyof typeof retentionSettings.defaults>;
 
@@ -216,6 +224,65 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
         <div className="notice muted" role="note">
           <strong>KVKK notu</strong>
           <p>Tenant bazli kisaltmalar daha kati saklama sureleri saglayabilir. Belirlenen pencere sonunda silme hala worker tarafindaki dry-run/canli bayraklarina baglidir; bu ekran yalniz kapsam basina pencereyi belirler.</p>
+        </div>
+      </section>
+      <section className="card">
+        <p className="badge">AI butce kontrolu</p>
+        <h2>Tenant bazli AI bütçe sınırları</h2>
+        <p style={{ color: 'var(--muted)', maxWidth: 820 }}>
+          Bos birakilan alanlar global env varsayilanini kullanir (<code>AI_DAILY_TOKEN_BUDGET</code>, <code>AI_DAILY_COST_BUDGET_MICROS</code>, <code>AI_PER_REQUEST_TOKEN_LIMIT</code>). Buradaki tenant degerleri yalniz mevcut belediye icin uygulanir; sinir asilirsa intake otomatik olarak deterministik stub'a duser.
+        </p>
+        <form action={updateAiBudgetSettingsAction} style={{ display: 'grid', gap: 12, marginTop: 12 }}>
+          <PendingFieldset style={{ display: 'grid', gap: 12 }}>
+            <input type="hidden" name="intent" value="update-ai-budget" />
+            <label style={{ display: 'grid', gap: 4 }}>
+              <span><strong>Gunluk token butcesi</strong> <span style={{ color: 'var(--muted)' }}>(opsiyonel)</span></span>
+              <span style={{ color: 'var(--muted)', fontSize: 12 }}>Son 24 saatte tenantin toplam tokeni bu sayiyi asarsa stub fallback'a duser.</span>
+              <input
+                name="dailyTokenBudget"
+                type="number"
+                min={1}
+                step={1}
+                inputMode="numeric"
+                placeholder="ornek: 50000"
+                defaultValue={typeof aiBudgetSettings.overrides.dailyTokenBudget === 'number' ? aiBudgetSettings.overrides.dailyTokenBudget : ''}
+                disabled={controlsDisabled}
+              />
+            </label>
+            <label style={{ display: 'grid', gap: 4 }}>
+              <span><strong>Gunluk maliyet limiti (mikro-USD)</strong> <span style={{ color: 'var(--muted)' }}>(opsiyonel)</span></span>
+              <span style={{ color: 'var(--muted)', fontSize: 12 }}>1.000.000 mikro = 1 USD. Ornek: 50000000 yaklasik 50 USD/gun limit anlamina gelir.</span>
+              <input
+                name="dailyCostBudgetMicros"
+                type="number"
+                min={1}
+                step={1}
+                inputMode="numeric"
+                placeholder="ornek: 50000000"
+                defaultValue={typeof aiBudgetSettings.overrides.dailyCostBudgetMicros === 'number' ? aiBudgetSettings.overrides.dailyCostBudgetMicros : ''}
+                disabled={controlsDisabled}
+              />
+            </label>
+            <label style={{ display: 'grid', gap: 4 }}>
+              <span><strong>Cagri basina max token</strong> <span style={{ color: 'var(--muted)' }}>(opsiyonel)</span></span>
+              <span style={{ color: 'var(--muted)', fontSize: 12 }}>Bu degeri asan cagriyi provider yine de cevaplayabilir; sinir telemetri amaclidir, hard cap olarak Anthropic max_tokens'i frenler.</span>
+              <input
+                name="perRequestTokenLimit"
+                type="number"
+                min={1}
+                step={1}
+                inputMode="numeric"
+                placeholder="ornek: 1200"
+                defaultValue={typeof aiBudgetSettings.overrides.perRequestTokenLimit === 'number' ? aiBudgetSettings.overrides.perRequestTokenLimit : ''}
+                disabled={controlsDisabled}
+              />
+            </label>
+            <PendingSubmitButton type="submit" disabled={controlsDisabled} idleLabel="AI butce ayarlarini kaydet" pendingLabel="Kaydediliyor..." />
+          </PendingFieldset>
+        </form>
+        <div className="notice muted" role="note">
+          <strong>Maliyet uyarisi</strong>
+          <p>Sinir asildiginda intake hala calisir, ancak deterministik stub uretir; vatandas algilamaz. Audit log'da `errorReason: budget:*` olarak gorunur.</p>
         </div>
       </section>
       <div className="grid">

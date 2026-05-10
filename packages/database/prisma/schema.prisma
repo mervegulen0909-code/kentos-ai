@@ -97,6 +97,7 @@ model Tenant {
   widgetWelcome        String   @default("Merhaba, belediyeye iletmek istediğiniz konuyu yazın.")
   widgetAllowedOrigins Json?
   retentionOverrides   Json?
+  aiBudgetOverrides    Json?
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
 

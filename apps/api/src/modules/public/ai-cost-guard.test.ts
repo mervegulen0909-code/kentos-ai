@@ -4,6 +4,8 @@ import {
   estimateCostMicros,
   extractAnthropicUsage,
   extractOpenAiUsage,
+  mergeTenantBudget,
+  normalizeTenantAiBudgetOverrides,
   readAiBudgetConfig,
   totalTokens,
 } from './ai-cost-guard.js';
@@ -89,6 +91,46 @@ await run('extractOpenAiUsage returns empty object for missing usage', () => {
   assert.deepEqual(extractOpenAiUsage(undefined), {});
   assert.deepEqual(extractOpenAiUsage(null), {});
   assert.deepEqual(extractOpenAiUsage({ choices: [] }), {});
+});
+
+await run('normalizeTenantAiBudgetOverrides accepts integer budgets in range', () => {
+  const out = normalizeTenantAiBudgetOverrides({ dailyTokenBudget: 50_000, dailyCostBudgetMicros: 200_000_000, perRequestTokenLimit: 1500 });
+  assert.equal(out.dailyTokenBudget, 50_000);
+  assert.equal(out.dailyCostBudgetMicros, 200_000_000);
+  assert.equal(out.perRequestTokenLimit, 1500);
+});
+
+await run('normalizeTenantAiBudgetOverrides ignores junk and out-of-range', () => {
+  const out = normalizeTenantAiBudgetOverrides({ dailyTokenBudget: 0, dailyCostBudgetMicros: 'bad', perRequestTokenLimit: -50 });
+  assert.equal(out.dailyTokenBudget, undefined);
+  assert.equal(out.dailyCostBudgetMicros, undefined);
+  assert.equal(out.perRequestTokenLimit, undefined);
+});
+
+await run('normalizeTenantAiBudgetOverrides returns empty object for non-objects', () => {
+  assert.deepEqual(normalizeTenantAiBudgetOverrides(null), {});
+  assert.deepEqual(normalizeTenantAiBudgetOverrides('foo'), {});
+  assert.deepEqual(normalizeTenantAiBudgetOverrides([]), {});
+});
+
+await run('mergeTenantBudget overrides env values when present', () => {
+  const env = readAiBudgetConfig({ AI_DAILY_TOKEN_BUDGET: '100000' } as NodeJS.ProcessEnv);
+  const merged = mergeTenantBudget(env, { dailyTokenBudget: 25_000, perRequestTokenLimit: 800 });
+  assert.equal(merged.dailyTokenBudget, 25_000);
+  assert.equal(merged.perRequestTokenLimit, 800);
+  assert.equal(merged.dailyCostBudgetMicros, env.dailyCostBudgetMicros);
+});
+
+await run('mergeTenantBudget keeps env values when override missing', () => {
+  const env = readAiBudgetConfig({ AI_DAILY_TOKEN_BUDGET: '100000' } as NodeJS.ProcessEnv);
+  const merged = mergeTenantBudget(env, {});
+  assert.equal(merged.dailyTokenBudget, 100_000);
+});
+
+await run('mergeTenantBudget tolerates null overrides', () => {
+  const env = readAiBudgetConfig({ AI_DAILY_TOKEN_BUDGET: '100000' } as NodeJS.ProcessEnv);
+  const merged = mergeTenantBudget(env, null);
+  assert.equal(merged.dailyTokenBudget, 100_000);
 });
 
 console.log('all ai-cost-guard tests passed');

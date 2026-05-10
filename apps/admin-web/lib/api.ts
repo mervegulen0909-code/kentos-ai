@@ -135,6 +135,21 @@ export type RetentionSettings = {
 
 export type UpdateRetentionInput = Partial<Record<RetentionScopeKey, number | null>>;
 
+export type AiBudgetSettings = {
+  tenantSlug: string;
+  overrides: {
+    dailyTokenBudget?: number;
+    dailyCostBudgetMicros?: number;
+    perRequestTokenLimit?: number;
+  };
+};
+
+export type UpdateAiBudgetInput = {
+  dailyTokenBudget?: number | null;
+  dailyCostBudgetMicros?: number | null;
+  perRequestTokenLimit?: number | null;
+};
+
 export type WidgetEmbedConfig = WidgetSettings & {
   scriptPath: string;
   previewPath: string;
@@ -308,4 +323,7 @@ export const adminApi = {
   retentionSettings: (token: string) => apiFetch<RetentionSettings>('/retention-settings', { token }),
   updateRetentionSettings: (token: string, input: UpdateRetentionInput) =>
     apiFetch<RetentionSettings>('/retention-settings', { method: 'PATCH', token, body: JSON.stringify(input) }),
+  aiBudgetSettings: (token: string) => apiFetch<AiBudgetSettings>('/ai-budget-settings', { token }),
+  updateAiBudgetSettings: (token: string, input: UpdateAiBudgetInput) =>
+    apiFetch<AiBudgetSettings>('/ai-budget-settings', { method: 'PATCH', token, body: JSON.stringify(input) }),
 };
