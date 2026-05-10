@@ -1,5 +1,40 @@
 # Release Notes
 
+## Next — ClamAV virus scanning (W3.3) — 2026-05-10
+
+### Summary
+
+- Real attachment virus scanning is now wired into the worker `kentos.media` queue. Replaces the previous `placeholder` no-op.
+- New `Attachment.scanStatus` (`PENDING | CLEAN | INFECTED | ERROR | SKIPPED`), `scanProvider`, `scanThreat`, `scanResult`, `scannedAt` columns via forward-only migration `20260510134500_add_attachment_scan_status`. Existing rows default to `PENDING`.
+- Dependency-free ClamAV INSTREAM client (`apps/worker/src/scan/clamav-client.ts`) — opens a TCP socket, sends `zINSTREAM`, streams 4-byte length-prefixed chunks, parses OK/FOUND/ERROR, supports a configurable timeout.
+- `media.processor` refactored to `runMediaJob({ scan, updateAttachment })` for dependency-injection-friendly testing. Production wiring streams the S3 object via `GetObjectCommand` straight to ClamAV without buffering the full file. Skips with status `SKIPPED` when `ATTACHMENT_SCAN_PROVIDER=placeholder`, missing, or unknown.
+- Infected attachments are blocked at download: both admin (`createAdminDownload`) and public (`createPublicDownload`) signed-URL paths return `403 Forbidden` when `scanStatus='INFECTED'`. Citizen path inherits the same guard via the shared service method.
+- `infra/docker-compose.prod.yml` adds a `clamav/clamav:1.4` service with a `clamav-prod-data` volume and a `nc`-based PING healthcheck. Worker depends on `clamav: service_healthy` and receives `CLAMAV_HOST=clamav`, `CLAMAV_PORT=3310`.
+
+### Configuration
+
+- `ATTACHMENT_SCAN_PROVIDER` — set to `clamav` to enable real scanning. Any other value (including the default `placeholder`) results in `SKIPPED` with a clear reason.
+- `CLAMAV_HOST`, `CLAMAV_PORT`, `CLAMAV_TIMEOUT_MS`, `CLAMAV_CHUNK_SIZE` — ClamAV connection parameters.
+
+### Safety / KVKK posture
+
+- Scanning is opt-in. Until the operator switches `ATTACHMENT_SCAN_PROVIDER` from `placeholder` to `clamav` and the daemon is reachable, attachments stay `PENDING` and downloads work normally.
+- Infected attachments are never deleted automatically. They are left in S3 with `scanStatus='INFECTED'` and the download path is blocked. Retention can clear them later through the existing dry-run/live-delete worker flags.
+- Scan failures (`ERROR`) do not block downloads to avoid breaking citizen support during transient daemon outages; operator-visible status is recorded for follow-up.
+
+### Evidence snapshot
+
+- `PRISMA_GENERATE_NO_ENGINE=true pnpm db:generate=passed`.
+- `pnpm typecheck=passed` for all 8 workspace projects.
+- `pnpm --filter @kentos/worker test=passed` 26/26, including 10 new ClamAV client tests against an in-process stub TCP server (clean OK, infected FOUND with threat name, ERROR response, silent timeout) and 5 new media processor tests with injected scanner/updater (CLEAN persistence, INFECTED with threat, scanner not called on validation failure, ERROR persistence, DB persistence failure does not fail the job).
+- `pnpm --filter @kentos/api test=passed`.
+- `pnpm build=passed` for api/admin-web/citizen-web/whatsapp-gateway/worker.
+
+### Risk and rollback
+
+- Risk level: `low` to `medium`. Schema change is additive (new columns + new enum, default `PENDING`). Existing media flow continues without scanning until `ATTACHMENT_SCAN_PROVIDER=clamav` is set, so the change is safe to deploy without the daemon up. The download guard only activates on `INFECTED` rows, which can only be created once scanning is live.
+- Rollback policy: revert the W3.3 commit; the schema columns and `AttachmentScanStatus` enum remain in the DB (forward-only) but are unused. To stop scanning without reverting code, set `ATTACHMENT_SCAN_PROVIDER=placeholder` and restart the worker.
+
 ## Next — EMAIL outbound provider scaffold (W3.2) — 2026-05-10
 
 ### Summary

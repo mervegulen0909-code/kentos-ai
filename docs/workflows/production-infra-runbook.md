@@ -13,6 +13,7 @@ This repository now includes a self-hosted production scaffold for a single VPS/
 - Citizen Next.js app
 - WhatsApp/channel gateway
 - Caddy reverse proxy with automatic TLS
+- ClamAV daemon (TCP 3310) for attachment virus scanning
 
 ## Generate Production Env
 
@@ -35,7 +36,7 @@ Edit the generated file before server use:
 - Set `WIDGET_ORIGIN_ALLOWLIST` to the real citizen/widget origins.
 - Keep `RETENTION_DRY_RUN=true` until a data cleanup window is explicitly approved.
 - Keep all `*_OUTBOUND_LIVE=false` until provider credentials and operator approval are recorded.
-- Replace `ATTACHMENT_SCAN_PROVIDER=placeholder` when a real scan provider is selected.
+- Replace `ATTACHMENT_SCAN_PROVIDER=placeholder` with `clamav` once the in-stack ClamAV daemon is healthy. The compose file already starts a ClamAV service on `clamav:3310`; the worker reads `CLAMAV_HOST`/`CLAMAV_PORT` from env and falls back to skipping scans when those are unset.
 
 ## Server Bootstrap
 

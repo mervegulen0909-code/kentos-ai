@@ -35,7 +35,7 @@
 - [ ] Confirmed attachments can be linked only within the same tenant and expected actor scope.
 - [ ] Closed/rejected tickets reject new attachment upload, confirm, or binding attempts.
 - [ ] Private object access uses signed download endpoints instead of permanent public object URLs.
-- [ ] Media processor evidence records object metadata checks; virus scanning remains a documented placeholder until a scanning provider is approved and stays independent from retention.
+- [x] Media processor records object metadata checks plus per-attachment scan status (`PENDING|CLEAN|INFECTED|ERROR|SKIPPED`); ClamAV INSTREAM is wired in and runs when `ATTACHMENT_SCAN_PROVIDER=clamav`. Infected attachments are blocked at the signed-download API for both admin and public paths. Scan results stay independent from retention.
 
 ## Channel security
 

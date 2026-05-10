@@ -369,6 +369,11 @@ model Attachment {
   publicUrl       String?
   checksumSha256  String?
   uploadedByType  AuditActorType
+  scanStatus      AttachmentScanStatus @default(PENDING)
+  scanProvider    String?
+  scanThreat      String?
+  scanResult      Json?
+  scannedAt       DateTime?
   createdAt       DateTime       @default(now())
 
   ticket          Ticket?        @relation(fields: [ticketId], references: [id], onDelete: Cascade)
@@ -376,6 +381,15 @@ model Attachment {
 
   @@index([tenantId, ticketId])
   @@index([tenantId, messageId])
+  @@index([tenantId, scanStatus])
+}
+
+enum AttachmentScanStatus {
+  PENDING
+  CLEAN
+  INFECTED
+  ERROR
+  SKIPPED
 }
 
 model Conversation {

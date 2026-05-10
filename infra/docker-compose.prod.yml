@@ -48,6 +48,20 @@ services:
       "
     restart: "no"
 
+  clamav:
+    image: clamav/clamav:1.4
+    restart: unless-stopped
+    environment:
+      CLAMAV_NO_FRESHCLAMD: "false"
+    volumes:
+      - clamav-prod-data:/var/lib/clamav
+    healthcheck:
+      test: ["CMD", "/bin/sh", "-c", "echo PING | nc -w 5 127.0.0.1 3310 | grep -q PONG"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 120s
+
   api:
     build:
       context: ..
@@ -93,9 +107,13 @@ services:
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
       S3_ENDPOINT: http://minio:9000
       S3_FORCE_PATH_STYLE: "true"
+      CLAMAV_HOST: clamav
+      CLAMAV_PORT: "3310"
     command: ["pnpm", "--filter", "@kentos/worker", "start"]
     depends_on:
       api:
+        condition: service_healthy
+      clamav:
         condition: service_healthy
 
   admin-web:
@@ -176,5 +194,6 @@ volumes:
   postgres-prod-data:
   redis-prod-data:
   minio-prod-data:
+  clamav-prod-data:
   caddy-prod-data:
   caddy-prod-config:

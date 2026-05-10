@@ -131,6 +131,7 @@ export class AttachmentsService {
     });
     if (!attachment) throw new NotFoundException('Ek bulunamadi.');
     await this.requireAdminAttachmentScope(user, attachment.ticketId ?? attachment.message?.ticketId ?? null);
+    this.guardScanStatusForDownload(attachment.scanStatus);
     return this.storage.createPresignedDownload(attachment.storageKey, attachment.fileName);
   }
 
@@ -153,7 +154,14 @@ export class AttachmentsService {
       },
     });
     if (!attachment) throw new NotFoundException('Ek bulunamadi.');
+    this.guardScanStatusForDownload(attachment.scanStatus);
     return this.storage.createPresignedDownload(attachment.storageKey, attachment.fileName);
+  }
+
+  private guardScanStatusForDownload(scanStatus: unknown) {
+    if (scanStatus === 'INFECTED') {
+      throw new ForbiddenException('Ek tarama sonucunda tehdit tespit edildi; indirilemez.');
+    }
   }
 
   async attachAdminToTicket(user: AuthenticatedUser, ticketId: string, attachmentIds?: string[]) {
