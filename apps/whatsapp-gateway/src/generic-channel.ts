@@ -38,7 +38,11 @@ export function inboundToEnvelope(message: GenericInboundMessage): ChannelIntake
     text,
     media: message.media,
     receivedAt: message.receivedAt,
-    citizenContact: { phone: message.channel === 'SMS' ? message.from : undefined, displayName: message.from },
+    citizenContact: {
+      phone: message.channel === 'SMS' ? message.from : undefined,
+      email: message.channel === 'EMAIL' ? message.from : undefined,
+      displayName: message.from,
+    },
     raw: message,
   };
 }

@@ -19,6 +19,34 @@ export function verifyMetaWebhookSignature(rawBody: string, signatureHeader: str
 }
 
 /**
+ * Postmark inbound webhook Basic Auth dogrulamasi.
+ * Postmark inbound webhook bir HTTPS POST + Basic Auth ile gelir.
+ * Authorization header: `Basic base64(user:password)`.
+ */
+export function verifyPostmarkBasicAuth(authorizationHeader: string | undefined, expectedUser: string, expectedPassword: string): boolean {
+  if (!authorizationHeader || !expectedUser || !expectedPassword) return false;
+  const match = authorizationHeader.match(/^Basic\s+(.+)$/i);
+  if (!match) return false;
+  let decoded: string;
+  try {
+    decoded = Buffer.from(match[1], 'base64').toString('utf8');
+  } catch {
+    return false;
+  }
+  const sepIndex = decoded.indexOf(':');
+  if (sepIndex === -1) return false;
+  const user = decoded.slice(0, sepIndex);
+  const password = decoded.slice(sepIndex + 1);
+  try {
+    const userOk = crypto.timingSafeEqual(Buffer.from(user, 'utf8'), Buffer.from(expectedUser, 'utf8'));
+    const passwordOk = crypto.timingSafeEqual(Buffer.from(password, 'utf8'), Buffer.from(expectedPassword, 'utf8'));
+    return userOk && passwordOk;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Twilio request imzasi.
  * Header: `X-Twilio-Signature` = base64( HMAC-SHA1( authToken, fullUrl + sortedFormPairs ) ).
  */

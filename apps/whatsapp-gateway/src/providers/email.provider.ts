@@ -1,6 +1,17 @@
 import type { ChannelProvider, GenericInboundMessage, GenericSendInput, SendMessageResult } from '@kentos/shared';
 
 const PROVIDER_NAME_DEFAULT = 'smtp-email';
+const TENANT_ENV_FALLBACK = 'EMAIL_DEFAULT_TENANT_ID';
+
+type PostmarkInboundPayload = {
+  MessageID?: string;
+  From?: string;
+  FromFull?: { Email?: string; Name?: string };
+  Subject?: string;
+  TextBody?: string;
+  StrippedTextReply?: string;
+  Date?: string;
+};
 
 type EmailTransport = 'smtp' | 'postmark';
 
@@ -22,8 +33,28 @@ export class EmailProvider implements ChannelProvider {
   channel = 'EMAIL' as const;
   providerName = PROVIDER_NAME_DEFAULT;
 
-  async parseWebhook(_raw: unknown): Promise<GenericInboundMessage[]> {
-    return [];
+  async parseWebhook(raw: unknown): Promise<GenericInboundMessage[]> {
+    const payload = (raw ?? {}) as PostmarkInboundPayload;
+    const fromAddress = payload.FromFull?.Email?.trim() || payload.From?.trim();
+    const messageId = payload.MessageID?.trim();
+    const text = (payload.StrippedTextReply ?? payload.TextBody ?? '').trim();
+    const subject = (payload.Subject ?? '').trim();
+    const tenantId = process.env[TENANT_ENV_FALLBACK]?.trim();
+    if (!tenantId || !fromAddress || !messageId || !(text || subject)) return [];
+    const composed = subject && text ? `${subject}\n\n${text}` : (text || subject);
+
+    return [
+      {
+        tenantId,
+        channel: 'EMAIL',
+        provider: this.providerName,
+        externalConversationId: `email:${fromAddress}`,
+        externalMessageId: messageId,
+        from: fromAddress,
+        text: composed,
+        receivedAt: payload.Date ? new Date(payload.Date).toISOString() : new Date().toISOString(),
+      },
+    ];
   }
 
   async sendText(input: GenericSendInput): Promise<SendMessageResult> {

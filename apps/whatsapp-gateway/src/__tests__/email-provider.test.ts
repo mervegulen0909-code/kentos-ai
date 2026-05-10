@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { afterEach, beforeEach, test } from 'node:test';
 import { EmailProvider } from '../providers/email.provider.js';
 import { handleGenericOutbound } from '../generic-channel.js';
+import { verifyPostmarkBasicAuth } from '../webhook-signatures.js';
 
 const ORIGINAL_ENV = { ...process.env };
 
@@ -13,6 +14,7 @@ beforeEach(() => {
   delete process.env.SMTP_PORT;
   delete process.env.POSTMARK_SERVER_TOKEN;
   delete process.env.INTERNAL_API_KEY;
+  delete process.env.EMAIL_DEFAULT_TENANT_ID;
 });
 
 afterEach(() => {
@@ -113,6 +115,72 @@ test('handleGenericOutbound EMAIL rejects channel mismatch', async () => {
   );
   assert.equal(result.accepted, false);
   assert.equal(result.reason, 'channel-mismatch');
+});
+
+test('EmailProvider parseWebhook returns empty when EMAIL_DEFAULT_TENANT_ID not set', async () => {
+  const provider = new EmailProvider();
+  const out = await provider.parseWebhook({
+    MessageID: 'msg-1',
+    From: 'citizen@example.test',
+    Subject: 'Hello',
+    TextBody: 'Yardim lazim',
+    Date: '2026-05-10T12:00:00Z',
+  });
+  assert.deepEqual(out, []);
+});
+
+test('EmailProvider parseWebhook builds inbound message with subject + body', async () => {
+  process.env.EMAIL_DEFAULT_TENANT_ID = 'tenant-1';
+  const provider = new EmailProvider();
+  const out = await provider.parseWebhook({
+    MessageID: 'msg-2',
+    From: 'citizen@example.test',
+    FromFull: { Email: 'citizen@example.test', Name: 'Test' },
+    Subject: 'Yol cukuru',
+    TextBody: 'Sokakta cukur var.',
+    Date: '2026-05-10T12:00:00Z',
+  });
+  assert.equal(out.length, 1);
+  assert.equal(out[0].tenantId, 'tenant-1');
+  assert.equal(out[0].channel, 'EMAIL');
+  assert.equal(out[0].from, 'citizen@example.test');
+  assert.equal(out[0].externalMessageId, 'msg-2');
+  assert.ok(out[0].text);
+  assert.match(out[0].text!, /Yol cukuru/);
+  assert.match(out[0].text!, /Sokakta cukur/);
+});
+
+test('EmailProvider parseWebhook prefers StrippedTextReply when present', async () => {
+  process.env.EMAIL_DEFAULT_TENANT_ID = 'tenant-1';
+  const provider = new EmailProvider();
+  const out = await provider.parseWebhook({
+    MessageID: 'msg-3',
+    From: 'citizen@example.test',
+    Subject: 'Re: Soru',
+    TextBody: '... full quoted thread with previous email body ...',
+    StrippedTextReply: 'Sadece yeni cevap.',
+  });
+  assert.equal(out.length, 1);
+  assert.ok(out[0].text);
+  assert.match(out[0].text!, /Sadece yeni cevap/);
+});
+
+test('verifyPostmarkBasicAuth accepts correct user/password', () => {
+  const header = 'Basic ' + Buffer.from('u:p').toString('base64');
+  assert.equal(verifyPostmarkBasicAuth(header, 'u', 'p'), true);
+});
+
+test('verifyPostmarkBasicAuth rejects missing or wrong header', () => {
+  assert.equal(verifyPostmarkBasicAuth(undefined, 'u', 'p'), false);
+  assert.equal(verifyPostmarkBasicAuth('Bearer xxx', 'u', 'p'), false);
+  const bad = 'Basic ' + Buffer.from('u:wrong').toString('base64');
+  assert.equal(verifyPostmarkBasicAuth(bad, 'u', 'p'), false);
+});
+
+test('verifyPostmarkBasicAuth tolerates colons in password', () => {
+  const password = 'p:assw:ord';
+  const header = 'Basic ' + Buffer.from(`u:${password}`).toString('base64');
+  assert.equal(verifyPostmarkBasicAuth(header, 'u', password), true);
 });
 
 test('handleGenericOutbound EMAIL rejects invalid internal key', async () => {

@@ -1,7 +1,7 @@
 import http from 'node:http';
 import { URL } from 'node:url';
 import { handleChannelOutbound, handleChannelWebhook, handleOutbound, handleWebhook } from './main.js';
-import { verifyMetaWebhookSignature, verifyTwilioWebhookSignature } from './webhook-signatures.js';
+import { verifyMetaWebhookSignature, verifyPostmarkBasicAuth, verifyTwilioWebhookSignature } from './webhook-signatures.js';
 
 const PORT = Number(process.env.PORT ?? 3120);
 const META_APP_SECRET = process.env.META_APP_SECRET ?? '';
@@ -38,6 +38,24 @@ const routes: Record<string, RouteHandler> = {
     }
     const payload = body ? JSON.parse(body) : {};
     const result = await handleChannelWebhook('FACEBOOK', payload);
+    return { status: 200, body: result };
+  },
+  'POST /webhooks/email': async (req, body) => {
+    const expectedUser = process.env.POSTMARK_INBOUND_BASIC_USER ?? '';
+    const expectedPassword = process.env.POSTMARK_INBOUND_BASIC_PASS ?? '';
+    if (!expectedUser || !expectedPassword) {
+      return { status: 503, body: { error: 'postmark-inbound-not-configured' } };
+    }
+    if (!verifyPostmarkBasicAuth(readHeader(req, 'authorization'), expectedUser, expectedPassword)) {
+      return { status: 401, body: { error: 'postmark-basic-auth-invalid' } };
+    }
+    let payload: unknown = {};
+    try {
+      payload = body ? JSON.parse(body) : {};
+    } catch {
+      return { status: 400, body: { error: 'invalid-json' } };
+    }
+    const result = await handleChannelWebhook('EMAIL', payload);
     return { status: 200, body: result };
   },
   'POST /webhooks/sms': async (req, body, url) => {
