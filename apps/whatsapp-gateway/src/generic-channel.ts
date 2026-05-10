@@ -6,16 +6,18 @@ import {
   type GenericInboundMessage,
   type SendMessageResult,
 } from '@kentos/shared';
+import { EmailProvider } from './providers/email.provider.js';
 import { FacebookMessengerProvider } from './providers/facebook.provider.js';
 import { InstagramProvider } from './providers/instagram.provider.js';
 import { TwilioSmsProvider } from './providers/sms.provider.js';
 
-export type GenericChannelKey = 'INSTAGRAM' | 'FACEBOOK' | 'SMS';
+export type GenericChannelKey = 'INSTAGRAM' | 'FACEBOOK' | 'SMS' | 'EMAIL';
 
 const PROVIDERS: Record<GenericChannelKey, ChannelProvider> = {
   INSTAGRAM: new InstagramProvider(),
   FACEBOOK: new FacebookMessengerProvider(),
   SMS: new TwilioSmsProvider(),
+  EMAIL: new EmailProvider(),
 };
 
 export function getGenericProvider(channel: GenericChannelKey): ChannelProvider {
@@ -86,7 +88,9 @@ export async function handleGenericOutbound(channel: GenericChannelKey, raw: unk
   if (envelope.channel !== channel) {
     return { accepted: false, delivered: false, reason: 'channel-mismatch' };
   }
-  const recipient = envelope.recipient.phone ?? envelope.recipient.email;
+  const recipient = channel === 'EMAIL'
+    ? envelope.recipient.email ?? envelope.recipient.phone
+    : envelope.recipient.phone ?? envelope.recipient.email;
   if (!recipient) return { accepted: false, delivered: false, reason: 'missing-recipient' };
 
   const provider = getGenericProvider(channel);

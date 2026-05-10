@@ -54,7 +54,7 @@ assert(typeof health.body?.ts === 'string', 'Gateway health response missing tim
 console.log('gateway_health', health.status);
 
 section('internal outbound auth');
-for (const channel of ['whatsapp', 'instagram', 'facebook', 'sms']) {
+for (const channel of ['whatsapp', 'instagram', 'facebook', 'sms', 'email']) {
   const apiChannel = channel.toUpperCase();
   const missingKey = await expectStatus(`/internal/${channel}/outbound`, 400, {
     method: 'POST',

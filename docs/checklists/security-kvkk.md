@@ -43,7 +43,7 @@
 - [ ] Meta Cloud API webhook signatures are verified before production use.
 - [ ] Instagram + Facebook webhook signatures (`X-Hub-Signature-256` / `META_APP_SECRET`) are verified before LIVE outbound flag is enabled for that channel.
 - [ ] Twilio SMS webhook signatures (`X-Twilio-Signature` / `TWILIO_AUTH_TOKEN`) are verified before LIVE outbound flag is enabled.
-- [ ] Each channel `*_OUTBOUND_LIVE=true` toggle is reviewed by tenant operator before enabling and recorded in the run-log.
+- [ ] Each channel `*_OUTBOUND_LIVE=true` toggle is reviewed by tenant operator before enabling and recorded in the run-log. EMAIL channel: `EMAIL_OUTBOUND_LIVE=false` by default; live send requires `EMAIL_FROM_ADDRESS` plus either SMTP host/port credentials or `POSTMARK_SERVER_TOKEN`.
 - [ ] Baileys remains demo/local only.
 
 ## Multi-channel outbound (Faz 4 + Faz 7)

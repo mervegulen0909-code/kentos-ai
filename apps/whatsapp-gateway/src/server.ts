@@ -78,6 +78,12 @@ const routes: Record<string, RouteHandler> = {
     const result = await handleChannelOutbound('SMS', payload, internalKey);
     return { status: result.accepted ? 200 : 400, body: result };
   },
+  'POST /internal/email/outbound': async (req, body) => {
+    const internalKey = readHeader(req, 'x-kentos-internal-key');
+    const payload = body ? JSON.parse(body) : {};
+    const result = await handleChannelOutbound('EMAIL', payload, internalKey);
+    return { status: result.accepted ? 200 : 400, body: result };
+  },
   'GET /health': async () => ({ status: 200, body: { ok: true, ts: new Date().toISOString() } }),
 };
 

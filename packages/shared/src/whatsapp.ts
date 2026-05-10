@@ -47,7 +47,7 @@ export interface WhatsAppProvider {
   parseWebhook(raw: unknown): Promise<NormalizedInboundMessage[]>;
 }
 
-export type GenericChannelKind = 'INSTAGRAM' | 'FACEBOOK' | 'SMS';
+export type GenericChannelKind = 'INSTAGRAM' | 'FACEBOOK' | 'SMS' | 'EMAIL';
 
 export type GenericInboundMessage = {
   tenantId: string;

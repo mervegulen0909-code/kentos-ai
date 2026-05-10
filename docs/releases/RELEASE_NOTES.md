@@ -1,5 +1,47 @@
 # Release Notes
 
+## Next — EMAIL outbound provider scaffold (W3.2) — 2026-05-10
+
+### Summary
+
+- Added an EMAIL outbound provider to the channel gateway following the existing SMS provider pattern. Dry-run is the default and is exercised whenever `EMAIL_OUTBOUND_LIVE !== 'true'`.
+- Two transports supported behind one `EMAIL_PROVIDER` switch:
+  - `smtp` (default): lazy-imported `nodemailer` runtime dependency. The gateway's `package.json` does **not** add `nodemailer` so the dry-run path stays dependency-free; live SMTP send requires the operator to install `nodemailer` separately. Errors are surfaced clearly.
+  - `postmark`: pure `fetch` POST to `https://api.postmarkapp.com/email` with `X-Postmark-Server-Token` auth.
+- Registered EMAIL alongside INSTAGRAM/FACEBOOK/SMS in `getGenericProvider`. Extended `GenericChannelKind` and `GenericChannelKey` shared/gateway types to include EMAIL.
+- Added `POST /internal/email/outbound` route that mirrors the existing internal-key-protected outbound endpoints. Recipient extraction prefers `recipient.email` when the channel is EMAIL.
+- Smoke (`pnpm smoke:gateway`) and unit tests both assert that missing/wrong internal key is rejected with `invalid-internal-key`, channel mismatch is rejected, and missing recipient is rejected.
+
+### Configuration
+
+New env vars (all default to safe/empty):
+
+- `EMAIL_OUTBOUND_LIVE=false` — must be set to `true` before any real send is attempted.
+- `EMAIL_PROVIDER=smtp` — `smtp` or `postmark`.
+- `EMAIL_FROM_ADDRESS` — required for live send.
+- `EMAIL_DEFAULT_SUBJECT` — defaults to `Belediye Bilgilendirmesi`.
+- `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASSWORD` — SMTP transport config.
+- `POSTMARK_SERVER_TOKEN`, `POSTMARK_MESSAGE_STREAM` — Postmark transport config.
+
+### Safety / KVKK posture
+
+- Live send is opt-in; the dry-run code path has no network side effect and writes a single console line.
+- The gateway never logs message bodies beyond a 60-char preview in dry-run.
+- The internal API key check is identical to the existing channel routes; smoke tests assert both missing and wrong key cases.
+- No new outbound credentials are committed; `.env.example` and `scripts/bootstrap-prod-env.mjs` ship blank values that fail closed at runtime.
+
+### Evidence snapshot
+
+- `pnpm typecheck=passed` for all 8 workspace projects.
+- `pnpm --filter @kentos/whatsapp-gateway test=passed` 14/14, including 8 new EMAIL tests covering dry-run envelope, missing config rejection, postmark/SMTP error paths, recipient preference, channel mismatch, and internal-key rejection.
+- `node --check scripts/smoke-gateway.mjs=passed` and `node --check scripts/bootstrap-prod-env.mjs=passed`.
+- `pnpm build=passed` for api/admin-web/citizen-web/whatsapp-gateway/worker.
+
+### Risk and rollback
+
+- Risk level: `low` — additive provider, additive route, additive types union value. Existing channel flows (WhatsApp/Instagram/Facebook/SMS) are untouched. No real outbound send occurs unless the operator explicitly flips the live flag and provides credentials.
+- Rollback policy: revert the W3.2 commit; the EMAIL channel value remains in the schema-side `ChannelType` enum (committed earlier in the W2 EMAIL drift closure) but the gateway no longer attempts to deliver.
+
 ## Next — Per-tenant retention overrides (W3.1) — 2026-05-10
 
 ### Summary
