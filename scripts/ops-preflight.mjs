@@ -241,8 +241,9 @@ function renderMarkdown(summary) {
 
 async function run(command, commandArgs, extraEnv = {}) {
   const started = Date.now();
+  const invocation = buildInvocation(command, commandArgs);
   return new Promise((resolve) => {
-    const child = spawn(resolveCommand(command), commandArgs, {
+    const child = spawn(invocation.command, invocation.args, {
       cwd: REPO_ROOT,
       env: { ...process.env, ...extraEnv, FORCE_COLOR: '0', CI: '1' },
     });
@@ -262,10 +263,17 @@ async function run(command, commandArgs, extraEnv = {}) {
   });
 }
 
-function resolveCommand(command) {
-  if (process.platform !== 'win32') return command;
-  if (command === 'pnpm') return 'pnpm.cmd';
-  return command;
+function buildInvocation(command, commandArgs) {
+  if (process.platform !== 'win32') return { command, args: commandArgs };
+  return {
+    command: 'cmd.exe',
+    args: ['/d', '/c', [command, ...commandArgs].map(quoteCmdArg).join(' ')],
+  };
+}
+
+function quoteCmdArg(value) {
+  if (/^[A-Za-z0-9_./:=@+-]+$/.test(value)) return value;
+  return `"${value.replace(/"/g, '\\"')}"`;
 }
 
 function stamp(date) {
