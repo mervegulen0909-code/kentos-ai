@@ -6,7 +6,8 @@ export type ChannelType =
   | 'OPERATOR'
   | 'INSTAGRAM'
   | 'FACEBOOK'
-  | 'SMS';
+  | 'SMS'
+  | 'EMAIL';
 
 export type TicketStatus =
   | 'NEW'
@@ -61,7 +62,8 @@ export type IntakeChannel =
   | 'MOBILE_APP'
   | 'INSTAGRAM'
   | 'FACEBOOK'
-  | 'SMS';
+  | 'SMS'
+  | 'EMAIL';
 
 export type ChannelOutboundEnvelope = {
   tenantId: string;

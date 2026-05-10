@@ -44,6 +44,7 @@ export class CreatePublicTicketDto {
     ChannelType.INSTAGRAM,
     ChannelType.FACEBOOK,
     ChannelType.SMS,
+    ChannelType.EMAIL,
   ])
   channel?: IntakeChannel;
 

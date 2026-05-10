@@ -1,5 +1,19 @@
 import { Type } from 'class-transformer';
-import { IsDateString, IsEmail, IsIn, IsOptional, IsString, MinLength, ValidateIf, ValidateNested } from 'class-validator';
+import {
+  ArrayMaxSize,
+  IsArray,
+  IsDateString,
+  IsEmail,
+  IsIn,
+  IsInt,
+  IsOptional,
+  IsPositive,
+  IsString,
+  IsUrl,
+  MinLength,
+  ValidateIf,
+  ValidateNested,
+} from 'class-validator';
 import { ChannelType } from '@kentos/database';
 import type { IntakeChannel } from '@kentos/shared';
 
@@ -17,6 +31,29 @@ export class IngestChannelEnvelopeContactDto {
   displayName?: string | null;
 }
 
+export class IngestChannelEnvelopeMediaDto {
+  @IsOptional()
+  @IsString()
+  providerMediaId?: string;
+
+  @IsString()
+  @MinLength(1)
+  mimeType!: string;
+
+  @IsOptional()
+  @IsString()
+  fileName?: string;
+
+  @IsOptional()
+  @IsInt()
+  @IsPositive()
+  sizeBytes?: number;
+
+  @IsOptional()
+  @IsUrl()
+  url?: string;
+}
+
 export class IngestChannelEnvelopeDto {
   @IsOptional()
   @IsString()
@@ -26,7 +63,16 @@ export class IngestChannelEnvelopeDto {
   @IsString()
   tenantSlug?: string;
 
-  @IsIn([ChannelType.WHATSAPP, ChannelType.WEB_CHAT, ChannelType.CITIZEN_WEB, ChannelType.MOBILE_APP])
+  @IsIn([
+    ChannelType.WHATSAPP,
+    ChannelType.WEB_CHAT,
+    ChannelType.CITIZEN_WEB,
+    ChannelType.MOBILE_APP,
+    ChannelType.INSTAGRAM,
+    ChannelType.FACEBOOK,
+    ChannelType.SMS,
+    ChannelType.EMAIL,
+  ])
   channel!: IntakeChannel;
 
   @IsString()
@@ -53,4 +99,11 @@ export class IngestChannelEnvelopeDto {
   @ValidateNested()
   @Type(() => IngestChannelEnvelopeContactDto)
   citizenContact?: IngestChannelEnvelopeContactDto;
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(10)
+  @ValidateNested({ each: true })
+  @Type(() => IngestChannelEnvelopeMediaDto)
+  media?: IngestChannelEnvelopeMediaDto[];
 }

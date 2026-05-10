@@ -16,6 +16,7 @@ enum ChannelType {
   INSTAGRAM
   FACEBOOK
   SMS
+  EMAIL
 }
 
 enum TicketStatus {
@@ -70,6 +71,7 @@ enum CitizenIdentifierSource {
   INSTAGRAM
   FACEBOOK
   SMS
+  EMAIL
   STAFF
   IMPORT
   MERGE

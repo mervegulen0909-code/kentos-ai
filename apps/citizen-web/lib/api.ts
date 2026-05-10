@@ -63,7 +63,7 @@ export type CreatePublicTicketInput = {
   addressText?: string;
   latitude?: number;
   longitude?: number;
-  channel?: 'CITIZEN_WEB' | 'WEB_CHAT' | 'MOBILE_APP';
+  channel?: 'CITIZEN_WEB' | 'WEB_CHAT' | 'MOBILE_APP' | 'WHATSAPP' | 'INSTAGRAM' | 'FACEBOOK' | 'SMS' | 'EMAIL';
   attachmentIds?: string[];
 };
 
@@ -77,7 +77,7 @@ export type PublicWidgetSettings = {
 
 export type PublicConversation = {
   conversationId: string;
-  channel: 'CITIZEN_WEB' | 'WEB_CHAT' | 'MOBILE_APP';
+  channel: 'CITIZEN_WEB' | 'WEB_CHAT' | 'MOBILE_APP' | 'WHATSAPP' | 'INSTAGRAM' | 'FACEBOOK' | 'SMS' | 'EMAIL';
   state: 'OPEN' | 'TICKET_CREATED';
   assistantMessage: string | null;
   missingFields: string[];
@@ -87,7 +87,7 @@ export type PublicConversation = {
 };
 
 export type StartPublicConversationInput = {
-  channel?: 'CITIZEN_WEB' | 'WEB_CHAT' | 'MOBILE_APP';
+  channel?: 'CITIZEN_WEB' | 'WEB_CHAT' | 'MOBILE_APP' | 'WHATSAPP' | 'INSTAGRAM' | 'FACEBOOK' | 'SMS' | 'EMAIL';
   displayName?: string;
   contact?: string;
   initialMessage?: string;

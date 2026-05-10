@@ -9,6 +9,7 @@ export const MESSAGE_TEMPLATE_CHANNELS = [
   'INSTAGRAM',
   'FACEBOOK',
   'SMS',
+  'EMAIL',
 ] as const;
 
 export type MessageTemplateChannel = (typeof MESSAGE_TEMPLATE_CHANNELS)[number];

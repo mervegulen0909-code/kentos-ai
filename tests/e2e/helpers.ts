@@ -7,12 +7,12 @@ export const citizenBaseURL = process.env.E2E_CITIZEN_BASE_URL ?? 'http://127.0.
 export const apiBaseURL = process.env.E2E_API_BASE_URL ?? 'http://127.0.0.1:3100/api/v1';
 
 export async function gotoCitizenReport(page: Page) {
-  await page.goto(`${citizenBaseURL}/${tenantSlug}/report`);
+  await page.goto(`${citizenBaseURL}/${tenantSlug}/report`, { waitUntil: 'domcontentloaded', timeout: 45_000 });
   await expect(page.getByRole('heading', { name: 'Talebinizi belediyeye iletin.' })).toBeVisible();
 }
 
 export async function gotoCitizenTrack(page: Page) {
-  await page.goto(`${citizenBaseURL}/${tenantSlug}/track`);
+  await page.goto(`${citizenBaseURL}/${tenantSlug}/track`, { waitUntil: 'domcontentloaded', timeout: 45_000 });
   await expect(page.getByRole('heading', { name: 'Takip kodunuzu girin.' })).toBeVisible();
 }
 

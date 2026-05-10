@@ -12,6 +12,8 @@
 - Added signed download endpoints for staff and public tracking-code access; public responses expose safe metadata only and no storage keys.
 - Upgraded `kentos.media` from placeholder to metadata-aware processing summary with retry-safe accepted/skipped/failed reasons.
 - Extended channel intake envelopes with media metadata and added attachment counts to channel analytics without moving provider business logic into the gateway.
+- Implemented attachment retention in `kentos.retention` with safe dry-run defaults, explicit DB/object delete flags, storage-key reporting, and S3 `DeleteObjects` support only when enabled.
+- Productized the local DB drift as an intentional `EMAIL` channel by adding the Prisma enum migration, generated schema type, shared channel schemas, and public/channel DTO allowlists without adding live email outbound.
 
 ### Evidence snapshot
 
@@ -22,13 +24,16 @@
 - API surface added for private downloads: `GET /api/v1/attachments/:id/download`, `GET /api/v1/public/:tenantSlug/attachments/:id/download?trackingToken=...`.
 - Focused follow-up checks: `pnpm --filter @kentos/api test=passed`, `pnpm --filter @kentos/worker test=passed`, `pnpm --filter @kentos/shared test=passed`, `pnpm typecheck=passed`, `pnpm build=passed`.
 - Local runtime smoke: `pnpm smoke:api=passed` on `http://127.0.0.1:3110/api/v1`, including admin/public attachment init-confirm-bind-download checks and public metadata storage-key leak assertions.
-- Browser smoke: `pnpm exec playwright test --config=playwright.smoke.config.ts --workers=1 --reporter=list=passed` with 6/6 scenarios on QA ports `3110/3111/3112`.
+- Browser smoke: `pnpm exec playwright test --config=playwright.smoke.config.ts --workers=1 --reporter=list=passed` with 7/7 scenarios on QA ports `3110/3111/3112`, including real `.txt` attachment file selection.
+- Follow-up worker evidence: `pnpm --filter @kentos/worker test=passed` for media processor and attachment retention dry-run/delete summaries.
+- DB drift decision: `20260510130000_channel_type_email` and `20260510131500_citizen_identifier_source_email` are now in repo; local destructive reset is not required for the EMAIL enum drift.
+- Browser file-upload QA: Playwright smoke now includes real `.txt` file selection for citizen report, admin internal note, and admin public message attachment paths.
 
 ### Risk and rollback
 
-- Risk level: `medium` because the storage foundation, binding contracts, worker summary, API smoke, and browser smoke are green; attachment retention/delete/export remains a documented production-hardening follow-up.
+- Risk level: `medium` because storage, binding, signed download, media processing, attachment retention dry-run, API smoke, and browser smoke are covered; real deletion remains opt-in and production approval-gated.
 - Rollback policy: revert the attachment productization commit if signed upload/download or binding endpoints cause runtime issues; existing ticket/message flows remain backward-compatible because `attachmentIds` stay optional.
-- Retention note: attachment retention/delete/export handling is not yet implemented in `kentos.retention`; keep as explicit Faz 5/production-hardening follow-up before any production data policy claim.
+- Retention note: `kentos.retention` includes attachment records and object-key reporting by default in dry-run mode. Actual DB delete requires `dryRun=false`; S3 object delete additionally requires `deleteAttachmentObjects=true` or `RETENTION_DELETE_ATTACHMENT_OBJECTS=true`.
 
 ## Next — Principal engineer audit hardening — 2026-05-06
 

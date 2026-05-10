@@ -1,16 +1,11 @@
 import { expect, test } from '@playwright/test';
-import { adminBaseURL, citizenBaseURL, tenantSlug } from './helpers';
+import { adminBaseURL, citizenBaseURL, loginAdmin, tenantSlug } from './helpers';
 
 test('admin settings shows tenant widget install snippet', async ({ page }) => {
   test.setTimeout(60_000);
 
-  await page.goto(`${adminBaseURL}/login`);
-  await page.getByLabel('Sifre').fill('ChangeMe123!');
-  await page.getByRole('button', { name: 'Guvenli giris yap' }).click();
-  await page.waitForURL(`${adminBaseURL}/`, { timeout: 30_000 });
-
-  await page.getByRole('link', { name: 'Ayarlar' }).click();
-  await page.waitForURL(`${adminBaseURL}/settings`, { timeout: 30_000 });
+  await loginAdmin(page);
+  await page.goto(`${adminBaseURL}/settings`, { waitUntil: 'domcontentloaded', timeout: 45_000 });
 
   await expect(page.getByRole('heading', { name: 'Belediye sitesine tek script ile ekle' })).toBeVisible();
   await expect(page.getByLabel('Widget kurulum kodu')).toContainText(`data-tenant="${tenantSlug}"`);

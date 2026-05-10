@@ -16,6 +16,7 @@ type CitizenIdentifierSource =
   | 'INSTAGRAM'
   | 'FACEBOOK'
   | 'SMS'
+  | 'EMAIL'
   | 'STAFF'
   | 'IMPORT'
   | 'MERGE';

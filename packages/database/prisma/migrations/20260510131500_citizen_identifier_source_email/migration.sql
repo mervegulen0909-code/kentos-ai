@@ -1,0 +1,1 @@
+ALTER TYPE "CitizenIdentifierSource" ADD VALUE IF NOT EXISTS 'EMAIL';

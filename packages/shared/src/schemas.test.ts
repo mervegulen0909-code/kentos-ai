@@ -1,4 +1,4 @@
-import { publicTicketAiIntakeRequestSchema, publicTicketAiIntakeResultSchema } from './schemas.js';
+import { channelIntakeEnvelopeSchema, publicTicketAiIntakeRequestSchema, publicTicketAiIntakeResultSchema } from './schemas.js';
 import type { PublicTicketAiIntakeRequest, PublicTicketAiIntakeResult } from './types.js';
 
 function buildValidRequest(): PublicTicketAiIntakeRequest {
@@ -145,6 +145,20 @@ function testRejectLegacyStatusTicketNo() {
   assert(!parsed.success, 'legacy internal ticket numbers should fail AI result parsing');
 }
 
+function testEmailChannelEnvelopeSchema() {
+  const parsed = channelIntakeEnvelopeSchema.safeParse({
+    tenantSlug: 'demo-belediye',
+    channel: 'EMAIL',
+    provider: 'smtp',
+    externalConversationId: 'email-thread-1',
+    externalMessageId: 'email-message-1',
+    text: 'E-posta ile gelen belediye talebi.',
+    receivedAt: '2026-05-03T12:00:00.000Z',
+    citizenContact: { email: 'vatandas@example.org' },
+  });
+  assert(parsed.success, 'EMAIL channel envelope should parse');
+}
+
 testValidRequestSchema();
 testRejectInvalidRequestEmail();
 testValidResultSchema();
@@ -152,5 +166,6 @@ testValidNetivaResultSchema();
 testRejectInvalidMissingField();
 testRejectInvalidConfidence();
 testRejectLegacyStatusTicketNo();
+testEmailChannelEnvelopeSchema();
 
 console.log('shared intake schema tests passed');

@@ -55,6 +55,7 @@ export const intakeChannelSchema = z.enum([
   'INSTAGRAM',
   'FACEBOOK',
   'SMS',
+  'EMAIL',
 ]);
 
 export const intakeCitizenContactSchema = z.object({

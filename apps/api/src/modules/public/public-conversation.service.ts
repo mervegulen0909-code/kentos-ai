@@ -319,6 +319,7 @@ export class PublicConversationService {
     if (channel === ChannelType.INSTAGRAM) return 'INSTAGRAM';
     if (channel === ChannelType.FACEBOOK) return 'FACEBOOK';
     if (channel === ChannelType.SMS) return 'SMS';
+    if (channel === ChannelType.EMAIL) return 'EMAIL';
     return 'PUBLIC_WEB';
   }
 

@@ -27,7 +27,7 @@
 - [ ] Confirmed attachments can be linked only within the same tenant and expected actor scope.
 - [ ] Closed/rejected tickets reject new attachment upload, confirm, or binding attempts.
 - [ ] Private object access uses signed download endpoints instead of permanent public object URLs.
-- [ ] Media processor evidence records object metadata checks; virus scanning remains a documented placeholder until a scanning provider is approved.
+- [ ] Media processor evidence records object metadata checks; virus scanning remains a documented placeholder until a scanning provider is approved and stays independent from retention.
 
 ## Channel security
 
@@ -53,8 +53,8 @@
 
 ## Retention and KVKK lifecycle
 
-- [ ] Retention worker (`kentos.retention`) is scheduled (or invoked manually per release) for each scope: `channel-events`, `outbound-deliveries`, `audit-logs`, `conversations`.
-- [ ] Attachment retention is either included in the retention processor scope or explicitly marked out of scope with owner/SLA before release.
+- [ ] Retention worker (`kentos.retention`) is scheduled (or invoked manually per release) for each scope: `channel-events`, `outbound-deliveries`, `audit-logs`, `conversations`, `attachments`, or `all`.
+- [x] Attachment retention is included in the retention processor scope with dry-run default; real DB/object deletion requires explicit job/env flags and separate production approval.
 - [ ] Per-tenant retention overrides are documented; default retention windows recorded in run-log.
 - [ ] Citizen identity merges/imports keep the audit trail and do not silently drop prior identifiers.
 
@@ -64,4 +64,4 @@
 - [ ] Public ticket responses expose only safe attachment metadata: id, file name, MIME type, size, and timestamp.
 - [ ] Public responses never expose storage keys, presigned upload URLs after initiation, audit logs, internal notes, AI reasoning, staff-only fields, or permanent object URLs.
 - [ ] Signed download URLs use short TTL (`S3_DOWNLOAD_EXPIRES_SECONDS`) and are generated only after tenant/tracking-token or staff RBAC checks.
-- [ ] Release notes identify whether attachment retention/delete/export handling is implemented or remains a follow-up.
+- [x] Release notes identify attachment retention as implemented with dry-run default; export remains a separate future product requirement.

@@ -52,7 +52,7 @@ Run local API smoke when API, database, auth, RBAC, tenant settings, ticket work
 - [ ] Smoke verifies public attachment metadata does not include storage keys, permanent object URLs, internal notes, audit logs, AI reasoning, or staff-only fields.
 - [ ] Smoke verifies `/public/:tenantSlug/widget-status` returns `widgetReady`, `originAllowed`, and `allowedOriginCount` for the seeded tenant.
 - [ ] Smoke verifies `/analytics/conversation-segments` returns `aiCompleted / operatorHandoff / awaitingInfo / automationRate`.
-- [ ] Smoke verifies `/analytics/channels` returns rows for at least the seeded channels (WEB_CHAT, WHATSAPP, INSTAGRAM, FACEBOOK, SMS) and includes attachment counts when media is linked.
+- [ ] Smoke verifies `/analytics/channels` returns rows for at least the seeded channels (WEB_CHAT, WHATSAPP, INSTAGRAM, FACEBOOK, SMS; EMAIL is accepted without requiring demo data) and includes attachment counts when media is linked.
 - [ ] Smoke verifies internal outbound endpoints (`/internal/<channel>/outbound`) on the gateway reject missing `x-kentos-internal-key`.
 - [ ] Smoke verifies multi-channel webhook intake (`/webhooks/instagram`, `/webhooks/facebook`, `/webhooks/sms`) rejects missing `META_APP_SECRET` / `TWILIO_AUTH_TOKEN` signatures when those env vars are configured.
 
@@ -127,8 +127,8 @@ Run this scope when queue processors, notification delivery guardrails, or worke
 - [ ] SLA processor returns actionable `breached` and `dueSoon` counts with a timestamped summary.
 - [ ] Reports processor returns a timestamped acceptance summary suitable for QA/release evidence.
 - [ ] Outbound processor (`kentos.outbound`) honors retry/backoff and writes terminal `OutboundDelivery.state` (`DISPATCHED`, `FAILED`, `SKIPPED`).
-- [ ] Retention processor (`kentos.retention`) accepts `tenantId / retentionDays / scope` and emits `totals` per scope.
-- [ ] Media processor (`kentos.media`) accepts confirmed attachment payloads, verifies object metadata when S3 is configured, returns retry-safe skip/failure reasons, and documents virus scanning as a placeholder.
+- [ ] Retention processor (`kentos.retention`) accepts `tenantId / retentionDays / scope`, includes `attachments` in scope/all summaries, defaults to dry-run, and reports `attachmentStorageKeys`, `totals.attachments`, `totals.attachmentObjectsDeleted`, and `objectDeleteErrors`.
+- [ ] Media processor (`kentos.media`) accepts confirmed attachment payloads, verifies object metadata when S3 is configured, returns retry-safe skip/failure reasons, and documents virus scanning as a placeholder independent from retention.
 
 ## 7.5 Channel gateway HTTP regression
 
