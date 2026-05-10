@@ -58,6 +58,10 @@ export function WidgetChatForm({ tenantSlug, trackHref }: { tenantSlug: string; 
           <input name="contact" autoComplete="email tel" placeholder="05xx xxx xx xx veya e-posta" />
         </label>
       </div>
+      <label>
+        Foto veya belge
+        <input name="attachment" type="file" accept="image/jpeg,image/png,image/webp,application/pdf,text/plain" />
+      </label>
       {state.message ? (
         <div className={`widget-result widget-result-${state.status}`} role={state.status === 'error' ? 'alert' : 'status'}>
           <p>{state.message}</p>

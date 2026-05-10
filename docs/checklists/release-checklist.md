@@ -48,9 +48,11 @@ Run local API smoke when API, database, auth, RBAC, tenant settings, ticket work
 - [ ] Smoke verifies legacy/internal `KNT-*` ticket numbers do not work on public lookup endpoints.
 - [ ] Smoke verifies WhatsApp/internal channel ingest rejects missing internal key and accepts authorized text-only envelope handoff.
 - [ ] Smoke verifies public widget/ticket endpoint rejects disallowed `Origin` and accepts allowlisted widget origin.
+- [ ] Smoke verifies admin/public attachment presign-init, checksum confirm, ticket/message binding, and signed download contract.
+- [ ] Smoke verifies public attachment metadata does not include storage keys, permanent object URLs, internal notes, audit logs, AI reasoning, or staff-only fields.
 - [ ] Smoke verifies `/public/:tenantSlug/widget-status` returns `widgetReady`, `originAllowed`, and `allowedOriginCount` for the seeded tenant.
 - [ ] Smoke verifies `/analytics/conversation-segments` returns `aiCompleted / operatorHandoff / awaitingInfo / automationRate`.
-- [ ] Smoke verifies `/analytics/channels` returns rows for at least the seeded channels (WEB_CHAT, WHATSAPP, INSTAGRAM, FACEBOOK, SMS).
+- [ ] Smoke verifies `/analytics/channels` returns rows for at least the seeded channels (WEB_CHAT, WHATSAPP, INSTAGRAM, FACEBOOK, SMS) and includes attachment counts when media is linked.
 - [ ] Smoke verifies internal outbound endpoints (`/internal/<channel>/outbound`) on the gateway reject missing `x-kentos-internal-key`.
 - [ ] Smoke verifies multi-channel webhook intake (`/webhooks/instagram`, `/webhooks/facebook`, `/webhooks/sms`) rejects missing `META_APP_SECRET` / `TWILIO_AUTH_TOKEN` signatures when those env vars are configured.
 
@@ -74,11 +76,13 @@ Run browser smoke when admin or citizen UI routes, forms, auth/session, settings
 - [ ] Admin dashboard renders without raw API errors.
 - [ ] Admin ticket list renders rows or designed empty state.
 - [ ] Admin ticket detail supports assignment, internal note, public message, status transition, refresh persistence, and audit timeline.
+- [ ] Admin ticket detail supports internal/public message attachment upload and shows linked attachment metadata without storage keys.
 - [ ] Admin settings supports department/category/SLA/message-template create or update flows currently in scope.
 - [ ] Admin settings shows tenant-specific widget embed script, preview path, expected `WEB_CHAT` channel, and production origin/rate-limit caveat.
 - [ ] Citizen widget preview opens at `/widget/[tenantSlug]`, submits via conversation flow, and returns either follow-up or TK tracking state without raw errors.
-- [ ] Citizen report creates a ticket and redirects to the public ticket page under the `ticket/[trackingToken]` route.
-- [ ] Citizen tracking finds the same public ticket by TK tracking code only under the `ticket/[trackingToken]` route.
+- [ ] Citizen widget preview supports public-safe attachment upload in the ticket-creation path without exposing storage internals.
+- [ ] Citizen report creates a ticket, can attach a file, and redirects to the public ticket page under the `ticket/[trackingToken]` route.
+- [ ] Citizen tracking finds the same public ticket by TK tracking code only under the `ticket/[trackingToken]` route and shows safe attachment metadata.
 - [ ] Citizen invalid ticket state is public-safe and helpful.
 - [ ] Citizen pages do not expose internal notes, audit logs, AI reasoning, stack traces, secrets, or tenant internals.
 - [ ] Browser console has no unexpected errors on the smoke path.
@@ -124,6 +128,7 @@ Run this scope when queue processors, notification delivery guardrails, or worke
 - [ ] Reports processor returns a timestamped acceptance summary suitable for QA/release evidence.
 - [ ] Outbound processor (`kentos.outbound`) honors retry/backoff and writes terminal `OutboundDelivery.state` (`DISPATCHED`, `FAILED`, `SKIPPED`).
 - [ ] Retention processor (`kentos.retention`) accepts `tenantId / retentionDays / scope` and emits `totals` per scope.
+- [ ] Media processor (`kentos.media`) accepts confirmed attachment payloads, verifies object metadata when S3 is configured, returns retry-safe skip/failure reasons, and documents virus scanning as a placeholder.
 
 ## 7.5 Channel gateway HTTP regression
 

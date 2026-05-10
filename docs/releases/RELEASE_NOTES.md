@@ -8,6 +8,10 @@
 - Added S3-compatible presigned attachment upload endpoints for admin and public channels.
 - Added checksum confirmation, attachment audit coverage, and `kentos.media` queue payload handoff with a worker placeholder.
 - Added attachment env controls for S3 region/path style, presign TTL, MIME allowlist, and max upload size.
+- Productized attachment binding with `attachmentIds` on admin/public ticket and message create paths, including tenant/actor/confirmed-checksum checks.
+- Added signed download endpoints for staff and public tracking-code access; public responses expose safe metadata only and no storage keys.
+- Upgraded `kentos.media` from placeholder to metadata-aware processing summary with retry-safe accepted/skipped/failed reasons.
+- Extended channel intake envelopes with media metadata and added attachment counts to channel analytics without moving provider business logic into the gateway.
 
 ### Evidence snapshot
 
@@ -15,11 +19,16 @@
 - Static checks: `pnpm --filter @kentos/api test=passed`, `pnpm typecheck=passed`, `pnpm build=passed`.
 - Diff hygiene: `git diff --check=passed` with only expected CRLF normalization warnings.
 - API surface added: `POST /api/v1/attachments/uploads`, `POST /api/v1/attachments/:id/confirm`, `POST /api/v1/public/:tenantSlug/attachments/uploads`, `POST /api/v1/public/:tenantSlug/attachments/:id/confirm`.
+- API surface added for private downloads: `GET /api/v1/attachments/:id/download`, `GET /api/v1/public/:tenantSlug/attachments/:id/download?trackingToken=...`.
+- Focused follow-up checks: `pnpm --filter @kentos/api test=passed`, `pnpm --filter @kentos/worker test=passed`, `pnpm --filter @kentos/shared test=passed`, `pnpm typecheck=passed`, `pnpm build=passed`.
+- Local runtime smoke: `pnpm smoke:api=passed` on `http://127.0.0.1:3110/api/v1`, including admin/public attachment init-confirm-bind-download checks and public metadata storage-key leak assertions.
+- Browser smoke: `pnpm exec playwright test --config=playwright.smoke.config.ts --workers=1 --reporter=list=passed` with 6/6 scenarios on QA ports `3110/3111/3112`.
 
 ### Risk and rollback
 
-- Risk level: `medium` because the storage foundation is verified statically and with service tests, but browser/API smoke for real MinIO upload and UI attachment workflows is still scheduled for the next slice.
-- Rollback policy: revert the milestone commit if attachment endpoints cause runtime issues; existing ticket/message flows remain backward-compatible because attachment IDs are not yet required by public/admin DTOs.
+- Risk level: `medium` because the storage foundation, binding contracts, worker summary, API smoke, and browser smoke are green; attachment retention/delete/export remains a documented production-hardening follow-up.
+- Rollback policy: revert the attachment productization commit if signed upload/download or binding endpoints cause runtime issues; existing ticket/message flows remain backward-compatible because `attachmentIds` stay optional.
+- Retention note: attachment retention/delete/export handling is not yet implemented in `kentos.retention`; keep as explicit Faz 5/production-hardening follow-up before any production data policy claim.
 
 ## Next — Principal engineer audit hardening — 2026-05-06
 

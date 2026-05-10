@@ -1,4 +1,4 @@
-import { IsEmail, IsIn, IsLatitude, IsLongitude, IsOptional, IsPhoneNumber, IsString, MinLength } from 'class-validator';
+import { ArrayMaxSize, IsArray, IsEmail, IsIn, IsLatitude, IsLongitude, IsOptional, IsPhoneNumber, IsString, MinLength } from 'class-validator';
 import { ChannelType } from '@kentos/database';
 import type { IntakeChannel } from '@kentos/shared';
 
@@ -46,4 +46,10 @@ export class CreatePublicTicketDto {
     ChannelType.SMS,
   ])
   channel?: IntakeChannel;
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(10)
+  @IsString({ each: true })
+  attachmentIds?: string[];
 }

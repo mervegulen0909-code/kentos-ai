@@ -11,6 +11,7 @@ export function toChannelIntakeEnvelope(message: NormalizedInboundMessage): Chan
     externalConversationId: message.externalConversationId,
     externalMessageId: message.externalMessageId,
     text,
+    media: message.media,
     receivedAt: message.receivedAt,
     citizenContact: {
       phone: message.from,

@@ -196,6 +196,7 @@ export class PublicConversationService {
         latitude: aiResult.classification.location?.latitude,
         longitude: aiResult.classification.location?.longitude,
         channel: channel as CreatePublicTicketDto['channel'],
+        attachmentIds: dto.attachmentIds,
       }, {
         preferredCitizenId: citizen?.id ?? conversation.citizenId,
       });
@@ -277,6 +278,7 @@ export class PublicConversationService {
             direction: 'INBOUND',
             externalConversationId: envelope.externalConversationId,
             text: envelope.text,
+            media: envelope.media ?? [],
             citizenContact: envelope.citizenContact,
             raw: envelope.raw ?? null,
           },

@@ -11,6 +11,7 @@ import {
   type PublicTicketAiIntakeResult,
 } from '@kentos/shared';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { AttachmentsService } from '../attachments/attachments.service.js';
 import { NotificationQueueService } from '../tickets/notification-queue.service.js';
 import { NotificationTemplateService } from '../tickets/notification-template.service.js';
 import { SlaService } from '../tickets/sla.service.js';
@@ -204,6 +205,7 @@ export class PublicTicketService {
     @Inject(TicketNumberService) private readonly ticketNumbers: TicketNumberService,
     @Inject(PublicTicketAiService) private readonly ai: PublicTicketAiService,
     @Inject(CitizenIdentityService) private readonly citizenIdentity: CitizenIdentityService,
+    @Inject(AttachmentsService) private readonly attachments: AttachmentsService,
   ) {}
 
   async create(tenantSlug: string, dto: CreatePublicTicketDto, options: { preferredCitizenId?: string | null } = {}) {
@@ -298,6 +300,7 @@ export class PublicTicketService {
       include: { department: true, category: true },
     });
 
+    await this.attachments.attachPublicToTicket(tenant.id, ticket.id, dto.attachmentIds);
     const createdMessage = await this.templates.renderForTicket(ticket.id, 'TICKET_RECEIVED');
     if (createdMessage) {
       const message = await this.prisma.ticketMessage.create({
@@ -326,7 +329,21 @@ export class PublicTicketService {
         messages: {
           where: { visibility: MessageVisibility.PUBLIC },
           orderBy: { createdAt: 'asc' },
-          select: { body: true, createdAt: true, senderType: true },
+          select: {
+            body: true,
+            createdAt: true,
+            senderType: true,
+            attachments: {
+              where: { checksumSha256: { not: null } },
+              orderBy: { createdAt: 'asc' },
+              select: { id: true, fileName: true, mimeType: true, sizeBytes: true, createdAt: true },
+            },
+          },
+        },
+        attachments: {
+          where: { messageId: null, checksumSha256: { not: null } },
+          orderBy: { createdAt: 'asc' },
+          select: { id: true, fileName: true, mimeType: true, sizeBytes: true, createdAt: true },
         },
       },
     });
@@ -369,6 +386,7 @@ export class PublicTicketService {
       },
     });
 
+    await this.attachments.attachPublicToMessage(ticket.tenantId, ticket.id, message.id, dto.attachmentIds);
     return this.get(tenantSlug, identifier);
   }
 
@@ -448,7 +466,13 @@ export class PublicTicketService {
     createdAt: Date;
     department?: { name: string } | null;
     category?: { name: string } | null;
-    messages?: Array<{ body: string; createdAt: Date; senderType: string }>;
+    messages?: Array<{
+      body: string;
+      createdAt: Date;
+      senderType: string;
+      attachments?: Array<{ id: string; fileName: string; mimeType: string; sizeBytes: number; createdAt: Date }>;
+    }>;
+    attachments?: Array<{ id: string; fileName: string; mimeType: string; sizeBytes: number; createdAt: Date }>;
   }) {
     return {
       trackingToken: ticket.publicTrackingToken,
@@ -461,10 +485,24 @@ export class PublicTicketService {
       categoryName: ticket.category?.name ?? null,
       resolutionDueAt: ticket.resolutionDueAt,
       createdAt: ticket.createdAt,
+      attachments: (ticket.attachments ?? []).map((attachment) => ({
+        id: attachment.id,
+        fileName: attachment.fileName,
+        mimeType: attachment.mimeType,
+        sizeBytes: attachment.sizeBytes,
+        createdAt: attachment.createdAt,
+      })),
       publicMessages: (ticket.messages ?? []).map((message) => ({
         body: message.body,
         createdAt: message.createdAt,
         author: message.senderType === AuditActorType.CITIZEN ? 'citizen' : 'municipality',
+        attachments: (message.attachments ?? []).map((attachment) => ({
+          id: attachment.id,
+          fileName: attachment.fileName,
+          mimeType: attachment.mimeType,
+          sizeBytes: attachment.sizeBytes,
+          createdAt: attachment.createdAt,
+        })),
       })),
     };
   }

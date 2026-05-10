@@ -10,5 +10,6 @@ import { PublicAttachmentsController } from './public-attachments.controller.js'
 @Module({
   controllers: [AttachmentsController, PublicAttachmentsController],
   providers: [AttachmentsService, AttachmentStorageService, AttachmentMediaQueueService, PublicChannelGuard, RateLimitService],
+  exports: [AttachmentsService],
 })
 export class AttachmentsModule {}

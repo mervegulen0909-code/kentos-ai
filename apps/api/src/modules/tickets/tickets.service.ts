@@ -3,6 +3,7 @@ import { AuditActorType, ChannelType, MessageVisibility, TicketStatus, UserRole 
 import type { Prisma } from '@kentos/database';
 import type { IntakeClassification } from '@kentos/shared';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
+import { AttachmentsService } from '../attachments/attachments.service.js';
 import { NotificationQueueService } from './notification-queue.service.js';
 import { NotificationTemplateService } from './notification-template.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
@@ -21,6 +22,7 @@ export class TicketsService {
     @Inject(NotificationTemplateService) private readonly templates: NotificationTemplateService,
     @Inject(SlaService) private readonly sla: SlaService,
     @Inject(TicketNumberService) private readonly ticketNumbers: TicketNumberService,
+    @Inject(AttachmentsService) private readonly attachments: AttachmentsService,
   ) {}
 
   async list(
@@ -99,6 +101,7 @@ export class TicketsService {
       include: { auditLogs: true },
     });
 
+    await this.attachments.attachAdminToTicket(user, ticket.id, dto.attachmentIds);
     return ticket;
   }
 
@@ -112,7 +115,10 @@ export class TicketsService {
         category: true,
         citizen: true,
         department: true,
-        messages: { orderBy: { createdAt: 'asc' } },
+        messages: {
+          orderBy: { createdAt: 'asc' },
+          include: { attachments: true },
+        },
       },
     });
 
@@ -203,6 +209,7 @@ export class TicketsService {
     });
 
     await this.audit(user, id, 'ticket.internal_note_added', undefined, { messageId: message.id });
+    await this.attachments.attachAdminToMessage(user, id, message.id, dto.attachmentIds);
     return message;
   }
 
@@ -223,6 +230,7 @@ export class TicketsService {
     });
 
     await this.audit(user, id, 'ticket.public_message_added', undefined, { messageId: message.id });
+    await this.attachments.attachAdminToMessage(user, id, message.id, dto.attachmentIds);
     await this.notifications.enqueueMessage(message.id);
     return message;
   }

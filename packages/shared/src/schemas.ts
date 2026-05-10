@@ -70,6 +70,14 @@ export const intakeMessageInputSchema = z.object({
   citizenContact: intakeCitizenContactSchema.optional(),
 });
 
+export const channelMediaMetadataSchema = z.object({
+  providerMediaId: z.string().optional(),
+  mimeType: z.string().min(1),
+  fileName: z.string().min(1).optional(),
+  sizeBytes: z.number().int().positive().optional(),
+  url: z.string().url().optional(),
+});
+
 export const channelIntakeEnvelopeSchema = z.object({
   tenantId: z.string().min(1).optional(),
   tenantSlug: z.string().min(1).optional(),
@@ -78,6 +86,7 @@ export const channelIntakeEnvelopeSchema = z.object({
   externalConversationId: z.string().min(1).optional(),
   externalMessageId: z.string().min(1).optional(),
   text: z.string().min(1),
+  media: z.array(channelMediaMetadataSchema).optional(),
   receivedAt: z.string().datetime(),
   citizenContact: intakeCitizenContactSchema.optional(),
   raw: z.unknown().optional(),

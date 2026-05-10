@@ -1,4 +1,4 @@
-import { Body, Controller, Inject, Param, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Inject, Param, Post, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { CurrentUser } from '../../common/decorators/current-user.decorator.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
@@ -23,5 +23,10 @@ export class AttachmentsController {
   @Post(':id/confirm')
   confirm(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string, @Body() dto: ConfirmAttachmentUploadDto) {
     return this.attachments.confirmAdminUpload(user, id, dto);
+  }
+
+  @Get(':id/download')
+  download(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+    return this.attachments.createAdminDownload(user, id);
   }
 }

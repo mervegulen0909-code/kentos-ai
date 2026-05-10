@@ -1,4 +1,4 @@
-import { Body, Controller, Inject, Param, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Inject, Param, Post, Query, UseGuards } from '@nestjs/common';
 import { PublicChannelGuard } from '../../common/guards/public-channel.guard.js';
 import { AttachmentsService } from './attachments.service.js';
 import { ConfirmAttachmentUploadDto } from './dto/confirm-attachment-upload.dto.js';
@@ -17,5 +17,10 @@ export class PublicAttachmentsController {
   @Post(':id/confirm')
   confirm(@Param('tenantSlug') tenantSlug: string, @Param('id') id: string, @Body() dto: ConfirmAttachmentUploadDto) {
     return this.attachments.confirmPublicUpload(tenantSlug, id, dto);
+  }
+
+  @Get(':id/download')
+  download(@Param('tenantSlug') tenantSlug: string, @Param('id') id: string, @Query('trackingToken') trackingToken = '') {
+    return this.attachments.createPublicDownload(tenantSlug, id, trackingToken);
   }
 }

@@ -57,6 +57,7 @@ export type GenericInboundMessage = {
   externalMessageId: string;
   from: string;
   text?: string;
+  media?: NormalizedMedia[];
   receivedAt: string;
 };
 

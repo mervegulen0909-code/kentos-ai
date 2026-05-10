@@ -89,7 +89,9 @@ export class AttachmentsService {
       include: { message: true, ticket: true },
     });
     if (!attachment) throw new NotFoundException('Ek bulunamadi.');
-    await this.requireAdminAttachmentScope(user, attachment.ticketId ?? attachment.message?.ticketId ?? null);
+    const auditTicketId = attachment.ticketId ?? attachment.message?.ticketId ?? null;
+    await this.requireAdminAttachmentScope(user, auditTicketId);
+    if (auditTicketId) await this.requireMutableTicketForAttachment(user.tenantId, auditTicketId);
 
     return this.confirmAttachment({
       attachmentId,
@@ -97,7 +99,7 @@ export class AttachmentsService {
       checksumSha256: dto.checksumSha256,
       actorType: AuditActorType.USER,
       actorUserId: user.id,
-      auditTicketId: attachment.ticketId ?? attachment.message?.ticketId ?? null,
+      auditTicketId,
     });
   }
 
@@ -110,13 +112,105 @@ export class AttachmentsService {
       include: { message: true },
     });
     if (!attachment) throw new NotFoundException('Ek bulunamadi.');
+    const auditTicketId = attachment.ticketId ?? attachment.message?.ticketId ?? null;
+    if (auditTicketId) await this.requireMutableTicketForAttachment(tenant.id, auditTicketId);
 
     return this.confirmAttachment({
       attachmentId,
       tenantId: tenant.id,
       checksumSha256: dto.checksumSha256,
       actorType: AuditActorType.CITIZEN,
-      auditTicketId: attachment.ticketId ?? attachment.message?.ticketId ?? null,
+      auditTicketId,
+    });
+  }
+
+  async createAdminDownload(user: AuthenticatedUser, attachmentId: string) {
+    const attachment = await this.prisma.attachment.findFirst({
+      where: { id: attachmentId, tenantId: user.tenantId, checksumSha256: { not: null } },
+      include: { message: true },
+    });
+    if (!attachment) throw new NotFoundException('Ek bulunamadi.');
+    await this.requireAdminAttachmentScope(user, attachment.ticketId ?? attachment.message?.ticketId ?? null);
+    return this.storage.createPresignedDownload(attachment.storageKey, attachment.fileName);
+  }
+
+  async createPublicDownload(tenantSlug: string, attachmentId: string, trackingToken: string) {
+    const ticket = await this.prisma.ticket.findFirst({
+      where: { tenant: { slug: tenantSlug, status: 'ACTIVE' }, publicTrackingToken: trackingToken.trim().toUpperCase() },
+      select: { id: true, tenantId: true },
+    });
+    if (!ticket) throw new NotFoundException('Basvuru bulunamadi.');
+
+    const attachment = await this.prisma.attachment.findFirst({
+      where: {
+        id: attachmentId,
+        tenantId: ticket.tenantId,
+        checksumSha256: { not: null },
+        OR: [
+          { ticketId: ticket.id },
+          { message: { ticketId: ticket.id } },
+        ],
+      },
+    });
+    if (!attachment) throw new NotFoundException('Ek bulunamadi.');
+    return this.storage.createPresignedDownload(attachment.storageKey, attachment.fileName);
+  }
+
+  async attachAdminToTicket(user: AuthenticatedUser, ticketId: string, attachmentIds?: string[]) {
+    const ids = this.normalizeAttachmentIds(attachmentIds);
+    if (!ids.length) return [];
+    await this.requireAdminAttachmentScope(user, ticketId);
+    await this.requireMutableTicketForAttachment(user.tenantId, ticketId);
+    return this.attachConfirmed({
+      tenantId: user.tenantId,
+      ticketId,
+      attachmentIds: ids,
+      uploadedByType: AuditActorType.USER,
+      actorType: AuditActorType.USER,
+      actorUserId: user.id,
+    });
+  }
+
+  async attachAdminToMessage(user: AuthenticatedUser, ticketId: string, messageId: string, attachmentIds?: string[]) {
+    const ids = this.normalizeAttachmentIds(attachmentIds);
+    if (!ids.length) return [];
+    await this.requireAdminAttachmentScope(user, ticketId);
+    await this.requireMutableTicketForAttachment(user.tenantId, ticketId);
+    return this.attachConfirmed({
+      tenantId: user.tenantId,
+      ticketId,
+      messageId,
+      attachmentIds: ids,
+      uploadedByType: AuditActorType.USER,
+      actorType: AuditActorType.USER,
+      actorUserId: user.id,
+    });
+  }
+
+  async attachPublicToTicket(tenantId: string, ticketId: string, attachmentIds?: string[]) {
+    const ids = this.normalizeAttachmentIds(attachmentIds);
+    if (!ids.length) return [];
+    await this.requireMutableTicketForAttachment(tenantId, ticketId);
+    return this.attachConfirmed({
+      tenantId,
+      ticketId,
+      attachmentIds: ids,
+      uploadedByType: AuditActorType.CITIZEN,
+      actorType: AuditActorType.CITIZEN,
+    });
+  }
+
+  async attachPublicToMessage(tenantId: string, ticketId: string, messageId: string, attachmentIds?: string[]) {
+    const ids = this.normalizeAttachmentIds(attachmentIds);
+    if (!ids.length) return [];
+    await this.requireMutableTicketForAttachment(tenantId, ticketId);
+    return this.attachConfirmed({
+      tenantId,
+      ticketId,
+      messageId,
+      attachmentIds: ids,
+      uploadedByType: AuditActorType.CITIZEN,
+      actorType: AuditActorType.CITIZEN,
     });
   }
 
@@ -165,6 +259,60 @@ export class AttachmentsService {
     return this.toAttachmentResponse(attachment);
   }
 
+  private async attachConfirmed(input: {
+    tenantId: string;
+    ticketId: string;
+    messageId?: string;
+    attachmentIds: string[];
+    uploadedByType: AuditActorType;
+    actorType: AuditActorType;
+    actorUserId?: string;
+  }) {
+    const attachments = await this.prisma.attachment.findMany({
+      where: {
+        id: { in: input.attachmentIds },
+        tenantId: input.tenantId,
+        uploadedByType: input.uploadedByType,
+      },
+    });
+    if (attachments.length !== input.attachmentIds.length) throw new NotFoundException('Ek bulunamadi.');
+
+    const invalid = attachments.find((attachment) => {
+      if (!attachment.checksumSha256) return true;
+      if (attachment.ticketId && attachment.ticketId !== input.ticketId) return true;
+      if (attachment.messageId && attachment.messageId !== input.messageId) return true;
+      return false;
+    });
+    if (invalid) throw new ForbiddenException('Ek bu isleme baglanamaz veya yukleme onayi eksik.');
+
+    await this.prisma.attachment.updateMany({
+      where: { id: { in: input.attachmentIds }, tenantId: input.tenantId },
+      data: {
+        ticketId: input.ticketId,
+        messageId: input.messageId ?? null,
+      },
+    });
+
+    await this.prisma.auditLog.create({
+      data: {
+        tenantId: input.tenantId,
+        ticketId: input.ticketId,
+        actorType: input.actorType,
+        actorUserId: input.actorUserId,
+        action: input.messageId ? 'ticket.message_attachments_linked' : 'ticket.attachments_linked',
+        after: {
+          attachmentIds: input.attachmentIds,
+          messageId: input.messageId ?? null,
+        },
+      },
+    });
+
+    return this.prisma.attachment.findMany({
+      where: { id: { in: input.attachmentIds }, tenantId: input.tenantId },
+      orderBy: { createdAt: 'asc' },
+    });
+  }
+
   private normalizeMetadata(dto: InitiateAttachmentUploadDto) {
     const fileName = dto.fileName.trim();
     const mimeType = dto.mimeType.trim().toLowerCase();
@@ -183,6 +331,7 @@ export class AttachmentsService {
       });
       if (!message) throw new NotFoundException('Mesaj bulunamadi.');
       await this.requireAdminAttachmentScope(user, message.ticketId);
+      await this.requireMutableTicketForAttachment(user.tenantId, message.ticketId);
       return { ticketId: dto.ticketId, messageId: dto.messageId };
     }
 
@@ -193,11 +342,13 @@ export class AttachmentsService {
       });
       if (!message) throw new NotFoundException('Mesaj bulunamadi.');
       await this.requireAdminAttachmentScope(user, message.ticketId);
+      await this.requireMutableTicketForAttachment(user.tenantId, message.ticketId);
       return { messageId: dto.messageId };
     }
 
     if (dto.ticketId) {
       await this.requireAdminAttachmentScope(user, dto.ticketId);
+      await this.requireMutableTicketForAttachment(user.tenantId, dto.ticketId);
       return { ticketId: dto.ticketId };
     }
 
@@ -220,6 +371,17 @@ export class AttachmentsService {
         })
       : null;
     if (!allowedDepartment) throw new ForbiddenException('Bu talep icin ek yukleme yetkiniz yok.');
+  }
+
+  private async requireMutableTicketForAttachment(tenantId: string, ticketId: string) {
+    const ticket = await this.prisma.ticket.findFirst({
+      where: { id: ticketId, tenantId },
+      select: { status: true },
+    });
+    if (!ticket) throw new NotFoundException('Talep bulunamadi.');
+    if (ticket.status === TicketStatus.CLOSED || ticket.status === TicketStatus.REJECTED) {
+      throw new ForbiddenException(`${ticket.status} durumundaki talebe ek baglanamaz.`);
+    }
   }
 
   private async requirePublicTicketForAttachment(tenantId: string, trackingToken: string, contact?: string) {
@@ -259,13 +421,16 @@ export class AttachmentsService {
     return checksum;
   }
 
+  private normalizeAttachmentIds(attachmentIds?: string[]) {
+    return [...new Set((attachmentIds ?? []).map((id) => id.trim()).filter(Boolean))];
+  }
+
   private toInitiateResponse(
-    attachment: { id: string; storageKey: string; fileName: string; mimeType: string; sizeBytes: number },
+    attachment: { id: string; fileName: string; mimeType: string; sizeBytes: number },
     presigned: { uploadUrl: string; headers: Record<string, string>; expiresAt: string },
   ) {
     return {
       attachmentId: attachment.id,
-      storageKey: attachment.storageKey,
       fileName: attachment.fileName,
       mimeType: attachment.mimeType,
       sizeBytes: attachment.sizeBytes,

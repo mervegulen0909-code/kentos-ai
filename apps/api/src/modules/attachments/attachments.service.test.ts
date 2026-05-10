@@ -5,7 +5,7 @@ import { AttachmentsService } from './attachments.service.js';
 
 const checksum = 'a'.repeat(64);
 
-function buildService() {
+function buildService(options: { ticketStatus?: string } = {}) {
   const state = {
     attachments: [] as any[],
     audits: [] as any[],
@@ -22,7 +22,7 @@ function buildService() {
             id: 'ticket-1',
             tenantId: 'tenant-1',
             departmentId: 'dep-1',
-            status: 'NEW',
+            status: options.ticketStatus ?? 'NEW',
             citizen: { phone: '+905551112233', email: 'vatandas@example.org' },
           };
         }
@@ -51,10 +51,30 @@ function buildService() {
           return true;
         }) ?? null;
       },
+      findMany: async ({ where }: any) => {
+        const ids = where.id?.in ?? [];
+        return state.attachments.filter((attachment) => {
+          if (ids.length && !ids.includes(attachment.id)) return false;
+          if (where.tenantId && attachment.tenantId !== where.tenantId) return false;
+          if (where.uploadedByType && attachment.uploadedByType !== where.uploadedByType) return false;
+          return true;
+        });
+      },
       update: async ({ where, data }: any) => {
         const attachment = state.attachments.find((item) => item.id === where.id);
         Object.assign(attachment, data);
         return attachment;
+      },
+      updateMany: async ({ where, data }: any) => {
+        const ids = where.id?.in ?? [];
+        let count = 0;
+        for (const attachment of state.attachments) {
+          if (ids.length && !ids.includes(attachment.id)) continue;
+          if (where.tenantId && attachment.tenantId !== where.tenantId) continue;
+          Object.assign(attachment, data);
+          count += 1;
+        }
+        return { count };
       },
     },
     auditLog: {
@@ -90,6 +110,7 @@ async function testAdminUploadAndConfirm() {
   );
   assert.equal(initiated.attachmentId, 'att-1');
   assert.equal(initiated.mimeType, 'image/png');
+  assert.equal(Object.hasOwn(initiated, 'storageKey'), false);
 
   const confirmed = await service.confirmAdminUpload(
     { id: 'admin-1', tenantId: 'tenant-1', email: 'admin@example.org', role: 'TENANT_ADMIN' },
@@ -127,8 +148,62 @@ async function testPublicUploadCanConfirmUnattached() {
   assert.equal(state.queued[0].storageKey, 'attachments/tenant-1/test/kimlik.png');
 }
 
+async function testRequiresConfirmedAttachmentBeforeBinding() {
+  const { service } = buildService();
+  const initiated = await service.initiateAdminUpload(
+    { id: 'admin-1', tenantId: 'tenant-1', email: 'admin@example.org', role: 'TENANT_ADMIN' },
+    { fileName: 'photo.png', mimeType: 'image/png', sizeBytes: 512 },
+  );
+
+  await assert.rejects(
+    () => service.attachAdminToTicket(
+      { id: 'admin-1', tenantId: 'tenant-1', email: 'admin@example.org', role: 'TENANT_ADMIN' },
+      'ticket-1',
+      [initiated.attachmentId],
+    ),
+    ForbiddenException,
+  );
+}
+
+async function testRejectsClosedTicketBinding() {
+  const { service } = buildService({ ticketStatus: 'CLOSED' });
+  await assert.rejects(
+    () => service.initiateAdminUpload(
+      { id: 'admin-1', tenantId: 'tenant-1', email: 'admin@example.org', role: 'TENANT_ADMIN' },
+      { fileName: 'photo.png', mimeType: 'image/png', sizeBytes: 512, ticketId: 'ticket-1' },
+    ),
+    ForbiddenException,
+  );
+}
+
+async function testBindsConfirmedAttachmentToMessage() {
+  const { service, state } = buildService();
+  const initiated = await service.initiateAdminUpload(
+    { id: 'admin-1', tenantId: 'tenant-1', email: 'admin@example.org', role: 'TENANT_ADMIN' },
+    { fileName: 'photo.png', mimeType: 'image/png', sizeBytes: 512 },
+  );
+  await service.confirmAdminUpload(
+    { id: 'admin-1', tenantId: 'tenant-1', email: 'admin@example.org', role: 'TENANT_ADMIN' },
+    initiated.attachmentId,
+    { checksumSha256: checksum },
+  );
+  await service.attachAdminToMessage(
+    { id: 'admin-1', tenantId: 'tenant-1', email: 'admin@example.org', role: 'TENANT_ADMIN' },
+    'ticket-1',
+    'message-1',
+    [initiated.attachmentId],
+  );
+
+  assert.equal(state.attachments[0].ticketId, 'ticket-1');
+  assert.equal(state.attachments[0].messageId, 'message-1');
+  assert.equal(state.audits.at(-1).action, 'ticket.message_attachments_linked');
+}
+
 await testAdminUploadAndConfirm();
 await testPublicUploadRequiresTicketContact();
 await testPublicUploadCanConfirmUnattached();
+await testRequiresConfirmedAttachmentBeforeBinding();
+await testRejectsClosedTicketBinding();
+await testBindsConfirmedAttachmentToMessage();
 
 console.log('attachment upload service tests passed');

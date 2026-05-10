@@ -39,6 +39,9 @@ const auditActionCopy: Record<string, string> = {
   'ticket.status_changed': 'Durum degistirildi',
   'ticket.internal_note_added': 'Ic not eklendi',
   'ticket.public_message_added': 'Vatandas mesaji eklendi',
+  'ticket.attachment_confirmed': 'Ek onaylandi',
+  'ticket.attachments_linked': 'Ek talebe baglandi',
+  'ticket.message_attachments_linked': 'Ek mesaja baglandi',
 };
 
 const dateFormatter = new Intl.DateTimeFormat('tr-TR', {
@@ -223,8 +226,20 @@ export default async function TicketDetailPage({
         </section>
         <section className="card">
           <h2>Mesajlar</h2>
+          {ticket?.attachments?.length ? (
+            <div className="notice muted" role="note">
+              <strong>Talebe bagli ekler</strong>
+              <p>{ticket.attachments.map((attachment) => attachment.fileName).join(', ')}</p>
+            </div>
+          ) : null}
           {ticket?.messages?.length ? ticket.messages.map((message) => (
-            <p key={message.id}><strong>{message.visibility === 'INTERNAL' ? 'Ic not' : 'Vatandas mesaji'}</strong> - {message.body}</p>
+            <div key={message.id} className="timeline-item">
+              <strong>{message.visibility === 'INTERNAL' ? 'Ic not' : 'Vatandas mesaji'}</strong>
+              <p>{message.body}</p>
+              {message.attachments?.length ? (
+                <small>Ekler: {message.attachments.map((attachment) => attachment.fileName).join(', ')}</small>
+              ) : null}
+            </div>
           )) : <p style={{ color: 'var(--muted)' }}>Mesaj yok.</p>}
         </section>
         <section className="card">
@@ -252,6 +267,7 @@ export default async function TicketDetailPage({
               <input type="hidden" name="intent" value="internal-note" />
               <input type="hidden" name="ticketId" value={ticket?.id ?? id} />
               <textarea name="body" rows={4} placeholder="Sadece personel gorur" disabled={!canUpdateTicket} />
+              <input name="attachment" type="file" accept="image/jpeg,image/png,image/webp,application/pdf,text/plain" disabled={!canUpdateTicket} />
               <PendingSubmitButton type="submit" disabled={!canUpdateTicket} idleLabel="Notu kaydet" pendingLabel="Kaydediliyor..." />
             </PendingFieldset>
           </form>
@@ -263,6 +279,7 @@ export default async function TicketDetailPage({
               <input type="hidden" name="intent" value="public-message" />
               <input type="hidden" name="ticketId" value={ticket?.id ?? id} />
               <textarea name="body" rows={4} placeholder="Vatandas takip ekraninda gorunur" disabled={!canUpdateTicket} />
+              <input name="attachment" type="file" accept="image/jpeg,image/png,image/webp,application/pdf,text/plain" disabled={!canUpdateTicket} />
               <PendingSubmitButton type="submit" disabled={!canUpdateTicket} idleLabel="Mesaji gonder" pendingLabel="Gonderiliyor..." />
             </PendingFieldset>
           </form>

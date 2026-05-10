@@ -182,6 +182,12 @@ export default async function PublicTicketPage({ params }: { params: Promise<{ t
                   <p>{ticket.addressText}</p>
                 </div>
               ) : null}
+              {ticket.attachments?.length ? (
+                <div className="notice ticket-location-note" role="status">
+                  <strong>Ekler alindi.</strong>
+                  <p>{ticket.attachments.map((attachment) => attachment.fileName).join(', ')}</p>
+                </div>
+              ) : null}
             </>
           ) : (
             <div className="ticket-empty-panel">
@@ -211,6 +217,9 @@ export default async function PublicTicketPage({ params }: { params: Promise<{ t
                       <time dateTime={message.createdAt}>{formatDate(message.createdAt)}</time>
                     </div>
                     <p>{message.body}</p>
+                    {message.attachments?.length ? (
+                      <p>Ekler: {message.attachments.map((attachment) => attachment.fileName).join(', ')}</p>
+                    ) : null}
                   </div>
                 </article>
               ))}

@@ -55,6 +55,7 @@ export type AnalyticsChannelSummary = {
   conversations: number;
   publicMessages: number;
   aiMessages: number;
+  attachments: number;
   automationRate: number;
 };
 
@@ -107,6 +108,14 @@ export type TicketListItem = {
   assignedTo?: { id: string; fullName: string; email: string } | null;
 };
 
+export type AttachmentSummary = {
+  id: string;
+  fileName: string;
+  mimeType: string;
+  sizeBytes: number;
+  createdAt: string;
+};
+
 type TicketAiSummary = {
   confidence: number | null;
   classification: IntakeClassification | null;
@@ -121,7 +130,15 @@ export type TicketDetail = TicketListItem & {
   description: string;
   addressText: string | null;
   aiSummary?: TicketAiSummary | null;
-  messages: Array<{ id: string; body: string; visibility: string; senderType: string; createdAt: string }>;
+  attachments?: AttachmentSummary[];
+  messages: Array<{
+    id: string;
+    body: string;
+    visibility: string;
+    senderType: string;
+    createdAt: string;
+    attachments?: AttachmentSummary[];
+  }>;
   auditLogs?: Array<{ id: string; action: string; createdAt: string }>;
 };
 
@@ -205,6 +222,18 @@ export const adminApi = {
   handoffs: (token: string) => apiFetch<HandoffSummary[]>('/tickets/handoffs', { token }),
   handoff: (token: string, id: string) => apiFetch<HandoffDetail>(`/tickets/handoffs/${id}`, { token }),
   createTicketFromHandoff: (token: string, id: string) => apiFetch<HandoffCreateTicketResult>(`/tickets/handoffs/${id}/create-ticket`, { method: 'POST', token }),
+  initiateAttachmentUpload: (token: string, input: { fileName: string; mimeType: string; sizeBytes: number; ticketId?: string }) =>
+    apiFetch<{ attachmentId: string; uploadUrl: string; headers: Record<string, string>; expiresAt: string }>('/attachments/uploads', {
+      method: 'POST',
+      token,
+      body: JSON.stringify(input),
+    }),
+  confirmAttachmentUpload: (token: string, attachmentId: string, checksumSha256: string) =>
+    apiFetch<{ attachmentId: string; checksumSha256: string }>(`/attachments/${attachmentId}/confirm`, {
+      method: 'POST',
+      token,
+      body: JSON.stringify({ checksumSha256 }),
+    }),
   departments: (token: string) => apiFetch<Department[]>('/departments', { token }),
   categories: (token: string) => apiFetch<Category[]>('/categories', { token }),
   slaPolicies: (token: string) => apiFetch<SlaPolicy[]>('/sla-policies', { token }),

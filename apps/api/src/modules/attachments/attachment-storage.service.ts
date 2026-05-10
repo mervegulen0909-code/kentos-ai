@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { Inject, Injectable, InternalServerErrorException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
 type PresignInput = {
@@ -35,6 +35,21 @@ export class AttachmentStorageService {
       headers: {
         'content-type': input.mimeType,
       },
+      expiresAt: new Date(Date.now() + expiresIn * 1000).toISOString(),
+    };
+  }
+
+  async createPresignedDownload(storageKey: string, fileName: string) {
+    const bucket = this.requiredConfig('S3_BUCKET');
+    const expiresIn = this.readPositiveInt('S3_DOWNLOAD_EXPIRES_SECONDS', 300);
+    const command = new GetObjectCommand({
+      Bucket: bucket,
+      Key: storageKey,
+      ResponseContentDisposition: `attachment; filename="${this.safeFileName(fileName)}"`,
+    });
+
+    return {
+      downloadUrl: await getSignedUrl(this.getClient(), command, { expiresIn }),
       expiresAt: new Date(Date.now() + expiresIn * 1000).toISOString(),
     };
   }

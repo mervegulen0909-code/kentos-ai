@@ -1,5 +1,5 @@
 import { ChannelType, TicketPriority } from '@kentos/database';
-import { IsEnum, IsLatitude, IsLongitude, IsOptional, IsString, MinLength } from 'class-validator';
+import { ArrayMaxSize, IsArray, IsEnum, IsLatitude, IsLongitude, IsOptional, IsString, MinLength } from 'class-validator';
 
 export class CreateTicketDto {
   @IsEnum(ChannelType)
@@ -40,4 +40,10 @@ export class CreateTicketDto {
   @IsOptional()
   @IsLongitude()
   longitude?: number;
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(10)
+  @IsString({ each: true })
+  attachmentIds?: string[];
 }

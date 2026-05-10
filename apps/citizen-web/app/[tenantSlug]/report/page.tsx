@@ -96,6 +96,11 @@ export default async function ReportPage({
             <input id="email" name="email" type="email" placeholder="ornek@posta.com" autoComplete="email" aria-invalid={field === 'email'} aria-describedby="email-help" />
             <small id="email-help">İsteğe bağlıdır. Girerseniz süreç güncellemeleri bu kanaldan da paylaşılabilir.</small>
           </div>
+          <div className="field">
+            <label htmlFor="attachment">Foto veya belge</label>
+            <input id="attachment" name="attachment" type="file" accept="image/jpeg,image/png,image/webp,application/pdf,text/plain" />
+            <small>Istege baglidir. Fotograf, PDF veya kisa metin dosyasi ekleyebilirsiniz.</small>
+          </div>
           <button className="cta" type="submit">Başvuruyu oluştur</button>
         </form>
       </section>

@@ -46,6 +46,14 @@ export type MediaJobData = {
   checksumSha256: string;
 };
 
+export type ChannelMediaMetadata = {
+  providerMediaId?: string;
+  mimeType: string;
+  fileName?: string;
+  sizeBytes?: number;
+  url?: string;
+};
+
 export type IntakeChannel =
   | 'WHATSAPP'
   | 'CITIZEN_WEB'
@@ -78,6 +86,7 @@ export type ChannelIntakeEnvelope = {
   externalConversationId?: string;
   externalMessageId?: string;
   text: string;
+  media?: ChannelMediaMetadata[];
   receivedAt: string;
   citizenContact?: IntakeCitizenContact;
   raw?: unknown;

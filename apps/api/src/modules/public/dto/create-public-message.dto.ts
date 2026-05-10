@@ -1,4 +1,4 @@
-import { IsString, MinLength } from 'class-validator';
+import { ArrayMaxSize, IsArray, IsOptional, IsString, MinLength } from 'class-validator';
 
 export class CreatePublicMessageDto {
   @IsString()
@@ -7,4 +7,10 @@ export class CreatePublicMessageDto {
 
   @IsString()
   contact!: string;
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(10)
+  @IsString({ each: true })
+  attachmentIds?: string[];
 }

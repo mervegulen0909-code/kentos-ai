@@ -1,8 +1,9 @@
 'use server';
 
+import { createHash } from 'node:crypto';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
-import { ApiError, apiFetch } from '../../lib/api';
+import { adminApi, ApiError, apiFetch } from '../../lib/api';
 import { resolveAdminAccessToken } from '../../lib/session';
 
 async function requireToken(ticketId: string) {
@@ -45,6 +46,30 @@ function requireNonEmpty(formData: FormData, field: string, fallback: string) {
   return normalized;
 }
 
+async function uploadAttachmentIfPresent(token: string, ticketId: string, formData: FormData) {
+  const file = formData.get('attachment');
+  if (!(file instanceof File) || file.size <= 0) return [];
+
+  const bytes = Buffer.from(await file.arrayBuffer());
+  const checksumSha256 = createHash('sha256').update(bytes).digest('hex');
+  const initiated = await adminApi.initiateAttachmentUpload(token, {
+    ticketId,
+    fileName: file.name || 'attachment',
+    mimeType: file.type || 'application/octet-stream',
+    sizeBytes: file.size,
+  });
+
+  const uploadResponse = await fetch(initiated.uploadUrl, {
+    method: 'PUT',
+    headers: initiated.headers,
+    body: bytes,
+  });
+  if (!uploadResponse.ok) throw new ApiError(uploadResponse.status, 'Attachment upload failed');
+
+  await adminApi.confirmAttachmentUpload(token, initiated.attachmentId, checksumSha256);
+  return [initiated.attachmentId];
+}
+
 export async function updateStatusAction(formData: FormData) {
   const status = requireNonEmpty(formData, 'status', 'status');
   const publicMessage = String(formData.get('publicMessage') ?? '').trim();
@@ -69,19 +94,25 @@ export async function assignTicketAction(formData: FormData) {
 export async function addInternalNoteAction(formData: FormData) {
   const body = requireNonEmpty(formData, 'body', 'internal-note');
 
-  await runTicketMutation(formData, 'internal-note-added', (token, ticketId) => apiFetch(`/tickets/${ticketId}/notes`, {
-    method: 'POST',
-    token,
-    body: JSON.stringify({ body }),
-  }));
+  await runTicketMutation(formData, 'internal-note-added', async (token, ticketId) => {
+    const attachmentIds = await uploadAttachmentIfPresent(token, ticketId, formData);
+    await apiFetch(`/tickets/${ticketId}/notes`, {
+      method: 'POST',
+      token,
+      body: JSON.stringify({ body, attachmentIds }),
+    });
+  });
 }
 
 export async function addPublicMessageAction(formData: FormData) {
   const body = requireNonEmpty(formData, 'body', 'public-message');
 
-  await runTicketMutation(formData, 'public-message-sent', (token, ticketId) => apiFetch(`/tickets/${ticketId}/public-messages`, {
-    method: 'POST',
-    token,
-    body: JSON.stringify({ body }),
-  }));
+  await runTicketMutation(formData, 'public-message-sent', async (token, ticketId) => {
+    const attachmentIds = await uploadAttachmentIfPresent(token, ticketId, formData);
+    await apiFetch(`/tickets/${ticketId}/public-messages`, {
+      method: 'POST',
+      token,
+      body: JSON.stringify({ body, attachmentIds }),
+    });
+  });
 }

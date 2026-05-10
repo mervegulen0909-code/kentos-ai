@@ -34,6 +34,7 @@ export function inboundToEnvelope(message: GenericInboundMessage): ChannelIntake
     externalConversationId: message.externalConversationId,
     externalMessageId: message.externalMessageId,
     text,
+    media: message.media,
     receivedAt: message.receivedAt,
     citizenContact: { phone: message.channel === 'SMS' ? message.from : undefined, displayName: message.from },
     raw: message,

@@ -1,4 +1,4 @@
-import { IsEmail, IsOptional, IsPhoneNumber, IsString, MinLength, ValidateIf } from 'class-validator';
+import { ArrayMaxSize, IsArray, IsEmail, IsOptional, IsPhoneNumber, IsString, MinLength, ValidateIf } from 'class-validator';
 
 export class SendPublicConversationMessageDto {
   @IsString()
@@ -16,4 +16,10 @@ export class SendPublicConversationMessageDto {
   @ValidateIf((dto: SendPublicConversationMessageDto) => Boolean(dto.email))
   @IsEmail()
   email?: string;
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(10)
+  @IsString({ each: true })
+  attachmentIds?: string[];
 }

@@ -8,9 +8,10 @@
     "dev": "tsx src/main.ts",
     "lint": "tsc -p tsconfig.json --noEmit",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "pnpm typecheck"
+    "test": "pnpm typecheck && tsx --test src/processors/media.processor.test.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.799.0",
     "@kentos/shared": "workspace:*",
     "@kentos/database": "workspace:*",
     "bullmq": "^5.34.2",

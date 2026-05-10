@@ -417,6 +417,36 @@ const publicMessage = await request(`/tickets/${operatorTicket.body.id}/public-m
 });
 console.log('ticket_public_message', publicMessage.status, Boolean(publicMessage.body.id));
 
+const adminAttachmentUpload = await request('/attachments/uploads', {
+  method: 'POST',
+  token,
+  body: JSON.stringify({
+    ticketId: operatorTicket.body.id,
+    fileName: `smoke-admin-${unique}.txt`,
+    mimeType: 'text/plain',
+    sizeBytes: 24,
+  }),
+});
+assert(adminAttachmentUpload.body.uploadUrl, 'Admin attachment upload did not return a presigned URL.');
+assert(!Object.hasOwn(adminAttachmentUpload.body, 'storageKey'), 'Admin attachment init leaked internal storage key.');
+await request(`/attachments/${adminAttachmentUpload.body.attachmentId}/confirm`, {
+  method: 'POST',
+  token,
+  body: JSON.stringify({ checksumSha256: 'b'.repeat(64) }),
+});
+const adminAttachmentDownload = await request(`/attachments/${adminAttachmentUpload.body.attachmentId}/download`, { token });
+assert(adminAttachmentDownload.body.downloadUrl, 'Admin attachment download did not return a signed URL.');
+const publicMessageWithAttachment = await request(`/tickets/${operatorTicket.body.id}/public-messages`, {
+  method: 'POST',
+  token,
+  body: JSON.stringify({
+    body: 'Smoke public mesaji ekli.',
+    attachmentIds: [adminAttachmentUpload.body.attachmentId],
+  }),
+});
+assert(publicMessageWithAttachment.body.id, 'Admin public message with attachment was not persisted.');
+console.log('admin_attachment_contract', true);
+
 const statusUpdate = await request(`/tickets/${operatorTicket.body.id}/status`, {
   method: 'POST',
   token,
@@ -772,6 +802,23 @@ await expectStatus('/public/demo-belediye/tickets', 403, {
   }),
 });
 
+const publicAttachmentUpload = await request('/public/demo-belediye/attachments/uploads', {
+  method: 'POST',
+  headers: { Origin: 'http://localhost:3112' },
+  body: JSON.stringify({
+    fileName: `smoke-public-${unique}.txt`,
+    mimeType: 'text/plain',
+    sizeBytes: 26,
+  }),
+});
+assert(publicAttachmentUpload.body.uploadUrl, 'Public attachment upload did not return a presigned URL.');
+assert(!Object.hasOwn(publicAttachmentUpload.body, 'storageKey'), 'Public attachment init leaked internal storage key.');
+await request(`/public/demo-belediye/attachments/${publicAttachmentUpload.body.attachmentId}/confirm`, {
+  method: 'POST',
+  headers: { Origin: 'http://localhost:3112' },
+  body: JSON.stringify({ checksumSha256: 'c'.repeat(64) }),
+});
+
 const publicTicket = await request('/public/demo-belediye/tickets', {
   method: 'POST',
   headers: { Origin: 'http://localhost:3112' },
@@ -780,6 +827,7 @@ const publicTicket = await request('/public/demo-belediye/tickets', {
     displayName: `Public Basvuran ${unique}`,
     phone: publicPhone,
     email: `public-${unique}@example.test`,
+    attachmentIds: [publicAttachmentUpload.body.attachmentId],
     addressText: 'Atatürk Mahallesi 12. Sokak',
   }),
 });
@@ -788,6 +836,12 @@ assert(/^TK-[A-F0-9]{16}$/.test(publicTicket.body.trackingToken), 'Public ticket
 assert(!Object.hasOwn(publicTicket.body, 'ticketNo'), 'Public ticket creation leaked internal ticketNo.');
 
 const tracked = await request(`/public/demo-belediye/tickets/${publicTicket.body.trackingToken}`);
+assert(tracked.body.attachments?.some((attachment) => attachment.fileName.startsWith('smoke-public-')), 'Public ticket did not expose safe attachment metadata.');
+assert(!JSON.stringify(tracked.body).includes('storageKey'), 'Public ticket leaked attachment storage key.');
+const publicAttachmentDownload = await request(`/public/demo-belediye/attachments/${publicAttachmentUpload.body.attachmentId}/download?trackingToken=${encodeURIComponent(publicTicket.body.trackingToken)}`, {
+  headers: { Origin: 'http://localhost:3112' },
+});
+assert(publicAttachmentDownload.body.downloadUrl, 'Public attachment download did not return a signed URL.');
 assert(tracked.body.publicMessages.length > 0, 'Public ticket should include an automatic public status message.');
 assert(
   tracked.body.publicMessages.some((message) => message.body === `Kanal özel takip kodu: ${publicTicket.body.trackingToken}.`),

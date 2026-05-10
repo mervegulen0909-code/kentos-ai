@@ -131,7 +131,7 @@ export class AnalyticsService {
   }
 
   async channels(user: AuthenticatedUser) {
-    const [ticketsByChannel, conversationsByChannel, aiCreatedMessagesByChannel, publicMessagesByChannel] = await Promise.all([
+    const [ticketsByChannel, conversationsByChannel, aiCreatedMessagesByChannel, publicMessagesByChannel, attachments] = await Promise.all([
       this.prisma.ticket.groupBy({ by: ['channel'], where: { tenantId: user.tenantId }, _count: { _all: true } }),
       this.prisma.conversation.groupBy({ by: ['channel'], where: { tenantId: user.tenantId }, _count: { _all: true } }),
       this.prisma.ticketMessage.groupBy({
@@ -144,13 +144,27 @@ export class AnalyticsService {
         where: { tenantId: user.tenantId, visibility: MessageVisibility.PUBLIC },
         _count: { _all: true },
       }),
+      this.prisma.attachment.findMany({
+        where: { tenantId: user.tenantId, checksumSha256: { not: null } },
+        select: {
+          ticket: { select: { channel: true } },
+          message: { select: { channel: true, ticket: { select: { channel: true } } } },
+        },
+      }),
     ]);
+    const attachmentsByChannel = new Map<string, number>();
+    for (const attachment of attachments) {
+      const channel = attachment.message?.channel ?? attachment.message?.ticket.channel ?? attachment.ticket?.channel;
+      if (!channel) continue;
+      attachmentsByChannel.set(channel, (attachmentsByChannel.get(channel) ?? 0) + 1);
+    }
 
-    const channels = new Set([
+    const channels = new Set<string>([
       ...ticketsByChannel.map((item) => item.channel),
       ...conversationsByChannel.map((item) => item.channel),
-      ...aiCreatedMessagesByChannel.map((item) => item.channel).filter(Boolean),
-      ...publicMessagesByChannel.map((item) => item.channel).filter(Boolean),
+      ...aiCreatedMessagesByChannel.flatMap((item) => item.channel ? [item.channel] : []),
+      ...publicMessagesByChannel.flatMap((item) => item.channel ? [item.channel] : []),
+      ...attachmentsByChannel.keys(),
     ]);
 
     return [...channels].sort().map((channel) => {
@@ -158,6 +172,7 @@ export class AnalyticsService {
       const conversations = conversationsByChannel.find((item) => item.channel === channel)?._count._all ?? 0;
       const aiMessages = aiCreatedMessagesByChannel.find((item) => item.channel === channel)?._count._all ?? 0;
       const publicMessages = publicMessagesByChannel.find((item) => item.channel === channel)?._count._all ?? 0;
+      const attachmentCount = attachmentsByChannel.get(channel) ?? 0;
 
       return {
         channel,
@@ -165,6 +180,7 @@ export class AnalyticsService {
         conversations,
         publicMessages,
         aiMessages,
+        attachments: attachmentCount,
         automationRate: publicMessages ? Number((aiMessages / publicMessages).toFixed(3)) : 0,
       };
     });
