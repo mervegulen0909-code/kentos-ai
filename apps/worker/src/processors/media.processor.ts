@@ -29,10 +29,20 @@ type AttachmentUpdater = (input: {
   resultPayload: Record<string, unknown>;
 }) => Promise<void>;
 
+type QuarantineHook = (input: {
+  attachmentId: string;
+  tenantId: string;
+  storageKey: string;
+  scanProvider: string;
+  threat?: string;
+  scannedAt?: string;
+}) => Promise<void>;
+
 type MediaDependencies = {
   readObjectMetadata?: (storageKey: string) => Promise<ObjectMetadata | null | undefined>;
   scan?: ScanRunner;
   updateAttachment?: AttachmentUpdater;
+  onInfected?: QuarantineHook;
 };
 
 let s3Client: S3Client | null = null;
@@ -42,6 +52,7 @@ export async function processMediaJob(job: { name: string; data: MediaJobData })
     readObjectMetadata,
     scan: defaultScanRunner,
     updateAttachment: defaultAttachmentUpdater,
+    onInfected: defaultQuarantineHook,
   });
 }
 
@@ -58,6 +69,20 @@ export async function runMediaJob(job: { name: string; data: MediaJobData }, dep
   }
 
   const scanOutcome = deps.scan ? await deps.scan({ storageKey: job.data.storageKey }) : skippedOutcome('no-scanner');
+
+  if (scanOutcome.scanStatus === 'INFECTED' && deps.onInfected) {
+    await deps.onInfected({
+      attachmentId: job.data.attachmentId,
+      tenantId: job.data.tenantId,
+      storageKey: job.data.storageKey,
+      scanProvider: scanOutcome.scanProvider,
+      threat: scanOutcome.threat,
+      scannedAt: scanOutcome.scannedAt,
+    }).catch((error) => {
+      console.error('[media] quarantine hook failed', error instanceof Error ? error.message : error);
+    });
+  }
+
   if (deps.updateAttachment) {
     await deps.updateAttachment({
       attachmentId: job.data.attachmentId,
@@ -164,6 +189,33 @@ function mapClamavResult(result: ClamavScanResult): ScanOutcome {
     return { scanStatus: 'INFECTED', scanProvider: 'clamav', threat: result.threat, raw: result.raw, scannedAt: new Date().toISOString() };
   }
   return { scanStatus: 'ERROR', scanProvider: 'clamav', reason: result.reason, raw: result.raw, scannedAt: new Date().toISOString() };
+}
+
+async function defaultQuarantineHook(input: Parameters<QuarantineHook>[0]) {
+  const prisma = getPrismaClient();
+  const attachment = await prisma.attachment.findUnique({
+    where: { id: input.attachmentId },
+    select: { ticketId: true, fileName: true, mimeType: true, sizeBytes: true, messageId: true },
+  });
+  await prisma.auditLog.create({
+    data: {
+      tenantId: input.tenantId,
+      ticketId: attachment?.ticketId ?? null,
+      actorType: 'SYSTEM',
+      action: 'attachment.scan_quarantined',
+      after: {
+        attachmentId: input.attachmentId,
+        scanProvider: input.scanProvider,
+        threat: input.threat ?? null,
+        scannedAt: input.scannedAt ?? null,
+        fileName: attachment?.fileName ?? null,
+        mimeType: attachment?.mimeType ?? null,
+        sizeBytes: attachment?.sizeBytes ?? null,
+        messageId: attachment?.messageId ?? null,
+        storageKey: input.storageKey,
+      },
+    },
+  });
 }
 
 async function defaultAttachmentUpdater(input: Parameters<AttachmentUpdater>[0]) {

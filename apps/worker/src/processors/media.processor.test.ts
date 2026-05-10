@@ -69,6 +69,41 @@ test('runMediaJob persists INFECTED scan with threat name', async () => {
   assert.equal(updates[0].status, 'INFECTED');
 });
 
+test('runMediaJob calls onInfected quarantine hook only on INFECTED scans', async () => {
+  const quarantineCalls: Array<Record<string, unknown>> = [];
+  await runMediaJob({ name: 'process-attachment', data: baseJob }, {
+    readObjectMetadata: async () => ({ contentLength: 12, contentType: 'text/plain' }),
+    scan: async () => ({ scanStatus: 'CLEAN', scanProvider: 'clamav', scannedAt: '2026-05-10T00:00:00.000Z' }),
+    updateAttachment: async () => {},
+    onInfected: async (input) => { quarantineCalls.push(input); },
+  });
+  assert.equal(quarantineCalls.length, 0);
+
+  await runMediaJob({ name: 'process-attachment', data: baseJob }, {
+    readObjectMetadata: async () => ({ contentLength: 12, contentType: 'text/plain' }),
+    scan: async () => ({ scanStatus: 'INFECTED', scanProvider: 'clamav', threat: 'Eicar', scannedAt: '2026-05-10T00:00:00.000Z' }),
+    updateAttachment: async () => {},
+    onInfected: async (input) => { quarantineCalls.push(input); },
+  });
+  assert.equal(quarantineCalls.length, 1);
+  assert.equal(quarantineCalls[0].attachmentId, 'att-1');
+  assert.equal(quarantineCalls[0].tenantId, 'tenant-1');
+  assert.equal(quarantineCalls[0].threat, 'Eicar');
+  assert.equal(quarantineCalls[0].scanProvider, 'clamav');
+});
+
+test('runMediaJob does not throw when quarantine hook fails', async () => {
+  const result = await runMediaJob({ name: 'process-attachment', data: baseJob }, {
+    readObjectMetadata: async () => ({ contentLength: 12, contentType: 'text/plain' }),
+    scan: async () => ({ scanStatus: 'INFECTED', scanProvider: 'clamav', threat: 'Eicar', scannedAt: '2026-05-10T00:00:00.000Z' }),
+    updateAttachment: async () => {},
+    onInfected: async () => { throw new Error('audit-log-down'); },
+  });
+  assert.equal(result.status, 'accepted');
+  if (result.status !== 'accepted') return;
+  assert.equal(result.scan.status, 'INFECTED');
+});
+
 test('runMediaJob skips scanner when payload validation fails (does not call updateAttachment)', async () => {
   const updates: Array<Record<string, unknown>> = [];
   let scanCalls = 0;
