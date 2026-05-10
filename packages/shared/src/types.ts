@@ -191,3 +191,32 @@ export type PublicTicketAiIntakeResult = {
   requestedAt: string;
   completedAt: string;
 };
+
+export const RETENTION_SCOPES = [
+  'channel-events',
+  'audit-logs',
+  'outbound-deliveries',
+  'conversations',
+  'attachments',
+] as const;
+
+export type RetentionScope = (typeof RETENTION_SCOPES)[number];
+
+export type TenantRetentionOverrides = Partial<Record<RetentionScope, number>>;
+
+export type TenantRetentionSettings = {
+  tenantSlug: string;
+  defaults: Record<RetentionScope, number>;
+  overrides: TenantRetentionOverrides;
+};
+
+export const DEFAULT_RETENTION_DAYS: Record<RetentionScope, number> = {
+  'channel-events': 60,
+  'audit-logs': 365,
+  'outbound-deliveries': 90,
+  'conversations': 180,
+  'attachments': 365,
+};
+
+export const MIN_RETENTION_DAYS = 1;
+export const MAX_RETENTION_DAYS = 3650;

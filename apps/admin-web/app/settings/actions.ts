@@ -180,3 +180,26 @@ export async function updateWidgetSettingsAction(formData: FormData) {
     }),
   }));
 }
+
+export async function updateRetentionSettingsAction(formData: FormData) {
+  const scopes = ['channel-events', 'audit-logs', 'outbound-deliveries', 'conversations', 'attachments'] as const;
+  const payload: Record<string, number | null> = {};
+  for (const scope of scopes) {
+    const raw = String(formData.get(scope) ?? '').trim();
+    if (raw === '') {
+      payload[scope] = null;
+      continue;
+    }
+    const numeric = Number(raw);
+    if (!Number.isInteger(numeric) || numeric < 1 || numeric > 3650) {
+      throw new Error('update-retention');
+    }
+    payload[scope] = numeric;
+  }
+
+  await runSettingsMutation(formData, 'retention-updated', (token) => apiFetch('/retention-settings', {
+    method: 'PATCH',
+    token,
+    body: JSON.stringify(payload),
+  }));
+}

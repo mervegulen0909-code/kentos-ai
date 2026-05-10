@@ -63,7 +63,7 @@
 
 - [ ] Retention worker (`kentos.retention`) is scheduled (or invoked manually per release) for each scope: `channel-events`, `outbound-deliveries`, `audit-logs`, `conversations`, `attachments`, or `all`.
 - [x] Attachment retention is included in the retention processor scope with dry-run default; real DB/object deletion requires explicit job/env flags and separate production approval.
-- [ ] Per-tenant retention overrides are documented; default retention windows recorded in run-log.
+- [x] Per-tenant retention overrides are configurable via `PATCH /retention-settings` (SUPER_ADMIN/TENANT_ADMIN) and the admin settings panel; out-of-range values are rejected, every change writes a `tenant.retention_settings_updated` audit log, and live deletion remains gated by worker `RETENTION_DRY_RUN`/`RETENTION_DELETE_ATTACHMENT_OBJECTS` flags. Default retention windows are sourced from `@kentos/shared` `DEFAULT_RETENTION_DAYS`.
 - [ ] Citizen identity merges/imports keep the audit trail and do not silently drop prior identifiers.
 
 ## Attachment personal data handling

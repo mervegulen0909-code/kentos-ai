@@ -1,4 +1,4 @@
-import { adminApi, type WidgetEmbedConfig, type WidgetSettings } from '../../lib/api';
+import { adminApi, type RetentionSettings, type WidgetEmbedConfig, type WidgetSettings } from '../../lib/api';
 import { canManageSettings, resolveAdminSession } from '../../lib/session';
 import { AdminShell } from '../components/admin-shell';
 import { PendingFieldset, PendingSubmitButton } from '../components/form-controls';
@@ -9,6 +9,7 @@ import {
   createSlaPolicyAction,
   updateCategoryAction,
   updateDepartmentAction,
+  updateRetentionSettingsAction,
   updateSlaPolicyAction,
   updateTemplateAction,
   updateWidgetSettingsAction,
@@ -25,6 +26,15 @@ const successCopy: Record<string, FeedbackCopy> = {
   'sla-updated': { title: 'SLA politikasi kaydedildi.', detail: 'Sure ve aktiflik degisiklikleri sonraki SLA degerlendirmelerinde kullanilacak.' },
   'template-updated': { title: 'Mesaj sablonu kaydedildi.', detail: 'Vatandasla paylasilan standart metin guncel haliyle kullanilacak.' },
   'widget-updated': { title: 'Widget ayarlari kaydedildi.', detail: 'Baslik, karsilama metni ve origin izin listesi yeni widget isteklerinde kullanilacak.' },
+  'retention-updated': { title: 'Saklama suresi ayarlari kaydedildi.', detail: 'Yeni degerler bir sonraki retention worker dongusunde uygulanir; bos birakilan kapsamlar varsayilana doner.' },
+};
+
+const retentionScopeCopy: Record<string, { title: string; detail: string }> = {
+  'channel-events': { title: 'Kanal olaylari', detail: 'WhatsApp/Instagram/SMS gibi kanallarin ham webhook olaylari.' },
+  'audit-logs': { title: 'Denetim kayitlari', detail: 'Yonetici aksiyonlari, durum gecisleri ve KVKK gerektirdigi izleme kayitlari.' },
+  'outbound-deliveries': { title: 'Disa giden teslimatlar', detail: 'Vatandasa gonderilen mesajlarin teslim/basarisiz/atlandi durumdaki kayitlari.' },
+  'conversations': { title: 'Konusmalar', detail: 'Ticket olusturulmus veya kapanmis konusmalar; aktif konusmalar yine korunur.' },
+  'attachments': { title: 'Ekler', detail: 'Vatandasin yukledigi dosyalarin kaydi ve depolama anahtarlari.' },
 };
 
 function buildWidgetEmbedConfig(settings: WidgetSettings): WidgetEmbedConfig {
@@ -48,6 +58,7 @@ const errorCopy: Record<string, FeedbackCopy> = {
   'update-sla': { title: 'SLA politikasi kaydedilemedi.', detail: 'Sure degerlerini ve aktiflik durumunu kontrol edip tekrar deneyin.' },
   'update-template': { title: 'Sablon kaydedilemedi.', detail: 'Vatandas mesaji bos olmamali; metni sade ve islem odakli tutun.' },
   'update-widget': { title: 'Widget ayarlari kaydedilemedi.', detail: 'Baslik, karsilama metni ve origin satirlarini kontrol edip tekrar deneyin.' },
+  'update-retention': { title: 'Saklama ayarlari kaydedilemedi.', detail: 'Her kapsam icin 1 ile 3650 gun arasi tam sayi girin ya da bos birakarak varsayilana donmesini saglayin.' },
   forbidden: { title: 'Ayar degisikligi bu rol icin kapali.', detail: 'Frontend ayar mutasyonlarini yonetici rolleriyle sinirlandiriyor; son yetki kontrolu yine backend tarafinda.' },
   general: { title: 'Ayar kaydedilemedi.', detail: 'Baglanti, yetki veya kayit durumunu kontrol edip islemi tekrar deneyin.' },
 };
@@ -67,16 +78,29 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
     widgetWelcome: 'Merhaba, belediyeye iletmek istediğiniz konuyu yazın.',
     widgetAllowedOrigins: [],
   };
-  const [departments, categories, slaPolicies, templates, widgetSettings] = token
+  const fallbackRetentionSettings: RetentionSettings = {
+    tenantSlug: session?.user.tenantSlug ?? 'demo-belediye',
+    defaults: {
+      'channel-events': 60,
+      'audit-logs': 365,
+      'outbound-deliveries': 90,
+      'conversations': 180,
+      'attachments': 365,
+    },
+    overrides: {},
+  };
+  const [departments, categories, slaPolicies, templates, widgetSettings, retentionSettings] = token
     ? await Promise.all([
         adminApi.departments(token).catch(() => []),
         adminApi.categories(token).catch(() => []),
         adminApi.slaPolicies(token).catch(() => []),
         adminApi.messageTemplates(token).catch(() => []),
         adminApi.widgetSettings(token).catch(() => fallbackWidgetSettings),
+        adminApi.retentionSettings(token).catch(() => fallbackRetentionSettings),
       ])
-    : [[], [], [], [], fallbackWidgetSettings];
+    : [[], [], [], [], fallbackWidgetSettings, fallbackRetentionSettings];
   const widgetEmbed = buildWidgetEmbedConfig(widgetSettings);
+  const retentionScopes = Object.keys(retentionSettings.defaults) as Array<keyof typeof retentionSettings.defaults>;
 
   return (
     <AdminShell hasSession={hasSession} role={role}>
@@ -153,6 +177,46 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
           <p>Origin izin listesi tenant ayari olarak saklanir; env allowlist sadece operasyonel ek izin katmani olarak kalir.</p>
         </div>
         <WidgetStatusProbe tenantSlug={widgetEmbed.tenantSlug} />
+      </section>
+      <section className="card">
+        <p className="badge">KVKK / Saklama suresi</p>
+        <h2>Tenant bazli retention ayarlari</h2>
+        <p style={{ color: 'var(--muted)', maxWidth: 820 }}>
+          Bos birakilan kapsamlar varsayilan degeri kullanir. Degerler gun olarak girilir; aralik 1 - 3650.
+          Yeni degerler bir sonraki retention worker dongusunde uygulanir. Ayar degistigi an worker hemen calismaz; canli silme hala <code>RETENTION_DRY_RUN=false</code> ile <code>RETENTION_DELETE_ATTACHMENT_OBJECTS=true</code> bayraklarina baglidir.
+        </p>
+        <form action={updateRetentionSettingsAction} style={{ display: 'grid', gap: 12, marginTop: 12 }}>
+          <PendingFieldset style={{ display: 'grid', gap: 12 }}>
+            <input type="hidden" name="intent" value="update-retention" />
+            {retentionScopes.map((scope) => {
+              const copy = retentionScopeCopy[scope] ?? { title: scope, detail: '' };
+              const override = retentionSettings.overrides[scope];
+              const fallback = retentionSettings.defaults[scope];
+              return (
+                <label key={scope} style={{ display: 'grid', gap: 4 }}>
+                  <span><strong>{copy.title}</strong> <span style={{ color: 'var(--muted)' }}>(varsayilan {fallback} gun)</span></span>
+                  <span style={{ color: 'var(--muted)', fontSize: 12 }}>{copy.detail}</span>
+                  <input
+                    name={scope}
+                    type="number"
+                    min={1}
+                    max={3650}
+                    step={1}
+                    inputMode="numeric"
+                    placeholder={String(fallback)}
+                    defaultValue={typeof override === 'number' ? override : ''}
+                    disabled={controlsDisabled}
+                  />
+                </label>
+              );
+            })}
+            <PendingSubmitButton type="submit" disabled={controlsDisabled} idleLabel="Saklama suresi ayarlarini kaydet" pendingLabel="Kaydediliyor..." />
+          </PendingFieldset>
+        </form>
+        <div className="notice muted" role="note">
+          <strong>KVKK notu</strong>
+          <p>Tenant bazli kisaltmalar daha kati saklama sureleri saglayabilir. Belirlenen pencere sonunda silme hala worker tarafindaki dry-run/canli bayraklarina baglidir; bu ekran yalniz kapsam basina pencereyi belirler.</p>
+        </div>
       </section>
       <div className="grid">
         <section className="card">

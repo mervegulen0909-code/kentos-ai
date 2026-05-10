@@ -90,6 +90,21 @@ export type WidgetSettings = {
   widgetAllowedOrigins: string[];
 };
 
+export type RetentionScopeKey =
+  | 'channel-events'
+  | 'audit-logs'
+  | 'outbound-deliveries'
+  | 'conversations'
+  | 'attachments';
+
+export type RetentionSettings = {
+  tenantSlug: string;
+  defaults: Record<RetentionScopeKey, number>;
+  overrides: Partial<Record<RetentionScopeKey, number>>;
+};
+
+export type UpdateRetentionInput = Partial<Record<RetentionScopeKey, number | null>>;
+
 export type WidgetEmbedConfig = WidgetSettings & {
   scriptPath: string;
   previewPath: string;
@@ -241,4 +256,7 @@ export const adminApi = {
   widgetSettings: (token: string) => apiFetch<WidgetSettings>('/widget-settings', { token }),
   updateWidgetSettings: (token: string, input: Omit<WidgetSettings, 'tenantSlug'>) =>
     apiFetch<WidgetSettings>('/widget-settings', { method: 'PATCH', token, body: JSON.stringify(input) }),
+  retentionSettings: (token: string) => apiFetch<RetentionSettings>('/retention-settings', { token }),
+  updateRetentionSettings: (token: string, input: UpdateRetentionInput) =>
+    apiFetch<RetentionSettings>('/retention-settings', { method: 'PATCH', token, body: JSON.stringify(input) }),
 };

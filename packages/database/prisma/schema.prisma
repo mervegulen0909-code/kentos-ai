@@ -96,6 +96,7 @@ model Tenant {
   widgetTitle          String   @default("Belediye asistanı")
   widgetWelcome        String   @default("Merhaba, belediyeye iletmek istediğiniz konuyu yazın.")
   widgetAllowedOrigins Json?
+  retentionOverrides   Json?
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
 

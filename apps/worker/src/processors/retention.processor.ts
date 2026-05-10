@@ -1,27 +1,27 @@
 import { OutboundDeliveryState } from '@kentos/database';
 import { DeleteObjectsCommand, S3Client } from '@aws-sdk/client-s3';
+import {
+  DEFAULT_RETENTION_DAYS,
+  MAX_RETENTION_DAYS,
+  MIN_RETENTION_DAYS,
+  RETENTION_SCOPES,
+  type RetentionScope,
+  type TenantRetentionOverrides,
+} from '@kentos/shared';
 import { getPrismaClient } from '../prisma-client.js';
 
-type RetentionScope = 'channel-events' | 'audit-logs' | 'outbound-deliveries' | 'conversations' | 'attachments' | 'all';
+type RetentionJobScope = RetentionScope | 'all';
 
 type RetentionJobData = {
   tenantId?: string;
   retentionDays?: number;
-  scope?: RetentionScope;
+  scope?: RetentionJobScope;
   dryRun?: boolean;
   deleteAttachmentObjects?: boolean;
 };
 
-const DEFAULT_RETENTION_DAYS: Record<RetentionScope, number> = {
-  'channel-events': 60,
-  'audit-logs': 365,
-  'outbound-deliveries': 90,
-  'conversations': 180,
-  'attachments': 365,
-  'all': 90,
-};
-
 type RetentionPrisma = {
+  tenant: { findUnique(input: unknown): Promise<{ retentionOverrides: unknown } | null> };
   channelEvent: { count(input: unknown): Promise<number>; deleteMany(input: unknown): Promise<{ count: number }> };
   outboundDelivery: { count(input: unknown): Promise<number>; deleteMany(input: unknown): Promise<{ count: number }> };
   auditLog: { count(input: unknown): Promise<number>; deleteMany(input: unknown): Promise<{ count: number }> };
@@ -50,84 +50,135 @@ export async function processRetentionJob(job: { name: string; data: RetentionJo
 export async function runRetentionJob(job: { name: string; data: RetentionJobData }, deps: RetentionDependencies) {
   const startedAt = new Date().toISOString();
   const { tenantId, scope = 'all' } = job.data ?? {};
-  const retentionDays = job.data?.retentionDays ?? DEFAULT_RETENTION_DAYS[scope] ?? 90;
-  const cutoff = new Date(Date.now() - retentionDays * 86_400_000);
+  const explicitDays = job.data?.retentionDays;
   const dryRun = job.data?.dryRun ?? process.env.RETENTION_DRY_RUN !== 'false';
-  const deleteAttachmentObjects = job.data?.deleteAttachmentObjects ?? process.env.RETENTION_DELETE_ATTACHMENT_OBJECTS === 'true';
+  const deleteAttachmentObjectsFlag = job.data?.deleteAttachmentObjects ?? process.env.RETENTION_DELETE_ATTACHMENT_OBJECTS === 'true';
   const prisma = deps.prisma;
 
+  const overrides = tenantId ? await loadTenantOverrides(prisma, tenantId) : {};
+
+  const scopesToRun: RetentionScope[] = scope === 'all' ? [...RETENTION_SCOPES] : [scope];
   const tenantFilter = tenantId ? { tenantId } : {};
   const totals: Record<string, number> = {};
+  const effectiveRetentionDays: Partial<Record<RetentionScope, number>> = {};
   const attachmentStorageKeys: string[] = [];
   const objectDeleteErrors: string[] = [];
 
-  if (scope === 'channel-events' || scope === 'all') {
-    const where = { ...tenantFilter, createdAt: { lt: cutoff } };
-    totals.channelEvents = await countOrDelete(prisma.channelEvent, where, dryRun);
-  }
+  for (const target of scopesToRun) {
+    const days = resolveScopeDays(target, explicitDays, overrides);
+    effectiveRetentionDays[target] = days;
+    const cutoff = new Date(Date.now() - days * 86_400_000);
 
-  if (scope === 'outbound-deliveries' || scope === 'all') {
-    const where = {
-      ...tenantFilter,
-      createdAt: { lt: cutoff },
-      state: { in: [OutboundDeliveryState.DELIVERED, OutboundDeliveryState.FAILED, OutboundDeliveryState.SKIPPED] },
-    };
-    totals.outboundDeliveries = await countOrDelete(prisma.outboundDelivery, where, dryRun);
-  }
-
-  if (scope === 'audit-logs' || scope === 'all') {
-    const where = { ...tenantFilter, createdAt: { lt: cutoff } };
-    totals.auditLogs = await countOrDelete(prisma.auditLog, where, dryRun);
-  }
-
-  if (scope === 'conversations' || scope === 'all') {
-    const where = {
-      ...tenantFilter,
-      updatedAt: { lt: cutoff },
-      state: { in: ['TICKET_CREATED', 'CLOSED'] },
-    };
-    totals.conversations = await countOrDelete(prisma.conversation, where, dryRun);
-  }
-
-  if (scope === 'attachments' || scope === 'all') {
-    const where = { ...tenantFilter, createdAt: { lt: cutoff } };
-    const attachments = await prisma.attachment.findMany({
-      where,
-      select: { id: true, storageKey: true },
-      orderBy: { createdAt: 'asc' },
-    });
-    attachmentStorageKeys.push(...attachments.map((attachment) => attachment.storageKey).filter(Boolean));
-    totals.attachments = attachments.length;
-
-    if (!dryRun && attachments.length) {
-      const result = await prisma.attachment.deleteMany({ where });
-      totals.attachments = result.count;
+    if (target === 'channel-events') {
+      const where = { ...tenantFilter, createdAt: { lt: cutoff } };
+      totals.channelEvents = await countOrDelete(prisma.channelEvent, where, dryRun);
     }
 
-    if (!dryRun && deleteAttachmentObjects && attachmentStorageKeys.length) {
-      const objectResult = await deps.deleteAttachmentObjects?.(attachmentStorageKeys);
-      totals.attachmentObjectsDeleted = objectResult?.deleted ?? 0;
-      objectDeleteErrors.push(...(objectResult?.errors ?? []));
-    } else {
-      totals.attachmentObjectsDeleted = 0;
+    if (target === 'outbound-deliveries') {
+      const where = {
+        ...tenantFilter,
+        createdAt: { lt: cutoff },
+        state: { in: [OutboundDeliveryState.DELIVERED, OutboundDeliveryState.FAILED, OutboundDeliveryState.SKIPPED] },
+      };
+      totals.outboundDeliveries = await countOrDelete(prisma.outboundDelivery, where, dryRun);
+    }
+
+    if (target === 'audit-logs') {
+      const where = { ...tenantFilter, createdAt: { lt: cutoff } };
+      totals.auditLogs = await countOrDelete(prisma.auditLog, where, dryRun);
+    }
+
+    if (target === 'conversations') {
+      const where = {
+        ...tenantFilter,
+        updatedAt: { lt: cutoff },
+        state: { in: ['TICKET_CREATED', 'CLOSED'] },
+      };
+      totals.conversations = await countOrDelete(prisma.conversation, where, dryRun);
+    }
+
+    if (target === 'attachments') {
+      const where = { ...tenantFilter, createdAt: { lt: cutoff } };
+      const attachments = await prisma.attachment.findMany({
+        where,
+        select: { id: true, storageKey: true },
+        orderBy: { createdAt: 'asc' },
+      });
+      attachmentStorageKeys.push(...attachments.map((attachment) => attachment.storageKey).filter(Boolean));
+      totals.attachments = attachments.length;
+
+      if (!dryRun && attachments.length) {
+        const result = await prisma.attachment.deleteMany({ where });
+        totals.attachments = result.count;
+      }
+
+      if (!dryRun && deleteAttachmentObjectsFlag && attachmentStorageKeys.length) {
+        const objectResult = await deps.deleteAttachmentObjects?.(attachmentStorageKeys);
+        totals.attachmentObjectsDeleted = objectResult?.deleted ?? 0;
+        objectDeleteErrors.push(...(objectResult?.errors ?? []));
+      } else {
+        totals.attachmentObjectsDeleted = totals.attachmentObjectsDeleted ?? 0;
+      }
     }
   }
+
+  const reportedRetentionDays =
+    scope === 'all'
+      ? null
+      : explicitDays ?? overrides[scope] ?? DEFAULT_RETENTION_DAYS[scope];
 
   return {
     processor: 'retention',
     job: job.name,
     tenantId: tenantId ?? null,
     scope,
-    retentionDays,
+    retentionDays: reportedRetentionDays,
+    effectiveRetentionDays,
+    appliedOverrides: overrides,
     dryRun,
-    deleteAttachmentObjects,
-    cutoff: cutoff.toISOString(),
+    deleteAttachmentObjects: deleteAttachmentObjectsFlag,
     totals,
     attachmentStorageKeys,
     objectDeleteErrors,
     startedAt,
     completedAt: new Date().toISOString(),
   };
+}
+
+async function loadTenantOverrides(prisma: RetentionPrisma, tenantId: string): Promise<TenantRetentionOverrides> {
+  try {
+    const tenant = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { retentionOverrides: true } });
+    return normalizeOverrides(tenant?.retentionOverrides);
+  } catch {
+    return {};
+  }
+}
+
+export function normalizeOverrides(value: unknown): TenantRetentionOverrides {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  const result: TenantRetentionOverrides = {};
+  for (const scope of RETENTION_SCOPES) {
+    const raw = (value as Record<string, unknown>)[scope];
+    if (raw === undefined || raw === null) continue;
+    const numeric = typeof raw === 'number' ? raw : Number(raw);
+    if (!Number.isInteger(numeric)) continue;
+    if (numeric < MIN_RETENTION_DAYS || numeric > MAX_RETENTION_DAYS) continue;
+    result[scope] = numeric;
+  }
+  return result;
+}
+
+function resolveScopeDays(
+  scope: RetentionScope,
+  explicitDays: number | undefined,
+  overrides: TenantRetentionOverrides,
+): number {
+  if (typeof explicitDays === 'number' && Number.isFinite(explicitDays) && explicitDays >= MIN_RETENTION_DAYS) {
+    return explicitDays;
+  }
+  const override = overrides[scope];
+  if (typeof override === 'number') return override;
+  return DEFAULT_RETENTION_DAYS[scope];
 }
 
 async function countOrDelete(

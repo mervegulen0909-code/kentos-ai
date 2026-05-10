@@ -6,6 +6,7 @@ import type { AuthenticatedUser } from '../../common/decorators/current-user.dec
 import { CreateCategoryDto, UpdateCategoryDto } from './dto/category.dto.js';
 import { CreateDepartmentDto, UpdateDepartmentDto } from './dto/department.dto.js';
 import { UpdateMessageTemplateDto } from './dto/message-template.dto.js';
+import { UpdateRetentionSettingsDto } from './dto/retention-settings.dto.js';
 import { CreateSlaPolicyDto, UpdateSlaPolicyDto } from './dto/sla-policy.dto.js';
 import { UpdateWidgetSettingsDto } from './dto/widget-settings.dto.js';
 import { RolesGuard } from '../../common/guards/roles.guard.js';
@@ -55,6 +56,17 @@ export class TenantsController {
   @Patch('widget-settings')
   updateWidgetSettings(@CurrentUser() user: AuthenticatedUser, @Body() dto: UpdateWidgetSettingsDto) {
     return this.tenants.updateWidgetSettings(user, dto);
+  }
+
+  @Get('retention-settings')
+  retentionSettings(@CurrentUser() user: AuthenticatedUser) {
+    return this.tenants.retentionSettings(user.tenantId);
+  }
+
+  @Roles('SUPER_ADMIN', 'TENANT_ADMIN')
+  @Patch('retention-settings')
+  updateRetentionSettings(@CurrentUser() user: AuthenticatedUser, @Body() dto: UpdateRetentionSettingsDto) {
+    return this.tenants.updateRetentionSettings(user, dto);
   }
 
   @Roles('SUPER_ADMIN', 'TENANT_ADMIN')

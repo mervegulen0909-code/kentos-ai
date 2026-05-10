@@ -1,5 +1,34 @@
 # Release Notes
 
+## Next — Per-tenant retention overrides (W3.1) — 2026-05-10
+
+### Summary
+
+- Added a `Tenant.retentionOverrides Json?` column with a forward-only migration so each tenant can store per-scope retention day overrides without re-deploying or restarting the worker.
+- Centralized retention vocabulary in `@kentos/shared`: `RETENTION_SCOPES`, `RetentionScope`, `TenantRetentionOverrides`, `TenantRetentionSettings`, `DEFAULT_RETENTION_DAYS`, and `MIN/MAX_RETENTION_DAYS` (1-3650 days). Both API and worker import the same source of truth.
+- Worker `retention.processor` now resolves effective retention days per scope as: explicit job `retentionDays` → tenant override → shared default. The `all` scope expands into per-scope passes so each scope uses its own cutoff. Result envelope now exposes `effectiveRetentionDays` and `appliedOverrides` for evidence/log review.
+- New API endpoints: `GET /retention-settings` (any authenticated tenant member) and `PATCH /retention-settings` (SUPER_ADMIN/TENANT_ADMIN). DTO uses class-validator with `Min(1) Max(3650)` per scope and writes a `tenant.retention_settings_updated` audit log.
+- Admin settings panel exposes per-scope number inputs; blank fields revert to defaults. Inline notice text explains that tenant overrides only set the *window*; live DB deletion still depends on `RETENTION_DRY_RUN=false` and `RETENTION_DELETE_ATTACHMENT_OBJECTS=true` worker flags.
+
+### Safety / KVKK posture
+
+- Tenant-level overrides can shorten retention (stricter KVKK posture), not bypass dry-run safety. Live deletion still requires the explicit worker flags.
+- Out-of-range or non-integer override values are silently ignored both in the API DTO (rejects with 400) and in the worker `normalizeOverrides()` defense layer (falls back to default).
+- A new audit log entry is written on every retention override change with before/after diffs.
+
+### Evidence snapshot
+
+- `PRISMA_GENERATE_NO_ENGINE=true pnpm db:generate=passed` (Windows DLL workaround).
+- `pnpm typecheck=passed` for all 8 workspace projects.
+- `pnpm --filter @kentos/worker test=passed` 11/11, including 6 new tests covering tenant override precedence, explicit-arg override of tenant override, out-of-range fallback, and defensive `normalizeOverrides` parsing.
+- `pnpm --filter @kentos/api test=passed` (citizen identity reconciliation + attachments suites).
+- `pnpm build=passed` for api/admin-web/citizen-web/whatsapp-gateway/worker.
+
+### Risk and rollback
+
+- Risk level: `low` — additive schema change (nullable JSON column), additive endpoints, additive UI panel. Existing retention flows continue to work with `tenantId` unset (no override fetch, defaults apply).
+- Rollback policy: revert the W3.1 commit; the `retentionOverrides` column remains in the DB schema (forward-only migration) but is unused. No data loss because no values are read until the worker is updated again.
+
 ## Next — Self-hosted production infra scaffold — 2026-05-10
 
 ### Summary

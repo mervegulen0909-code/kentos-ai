@@ -1,10 +1,20 @@
 import { AuditActorType, type Prisma } from '@kentos/database';
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  DEFAULT_RETENTION_DAYS,
+  MAX_RETENTION_DAYS,
+  MIN_RETENTION_DAYS,
+  RETENTION_SCOPES,
+  type RetentionScope,
+  type TenantRetentionOverrides,
+  type TenantRetentionSettings,
+} from '@kentos/shared';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { CreateCategoryDto, UpdateCategoryDto } from './dto/category.dto.js';
 import { CreateDepartmentDto, UpdateDepartmentDto } from './dto/department.dto.js';
 import { UpdateMessageTemplateDto } from './dto/message-template.dto.js';
+import { UpdateRetentionSettingsDto } from './dto/retention-settings.dto.js';
 import { CreateSlaPolicyDto, UpdateSlaPolicyDto } from './dto/sla-policy.dto.js';
 import { UpdateWidgetSettingsDto } from './dto/widget-settings.dto.js';
 
@@ -76,6 +86,44 @@ export class TenantsService {
       widgetWelcome: tenant.widgetWelcome,
       widgetAllowedOrigins: this.readOriginList(tenant.widgetAllowedOrigins),
     };
+  }
+
+  async retentionSettings(tenantId: string): Promise<TenantRetentionSettings> {
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: { slug: true, retentionOverrides: true },
+    });
+    if (!tenant) throw new NotFoundException('Belediye bulunamadi.');
+    return {
+      tenantSlug: tenant.slug,
+      defaults: { ...DEFAULT_RETENTION_DAYS },
+      overrides: this.normalizeRetentionOverrides(tenant.retentionOverrides),
+    };
+  }
+
+  async updateRetentionSettings(user: AuthenticatedUser, dto: UpdateRetentionSettingsDto): Promise<TenantRetentionSettings> {
+    const before = await this.retentionSettings(user.tenantId);
+    const incoming: TenantRetentionOverrides = {};
+    for (const scope of RETENTION_SCOPES) {
+      const value = (dto as Record<string, unknown>)[scope];
+      if (value === undefined || value === null) continue;
+      const numeric = Number(value);
+      if (!Number.isInteger(numeric)) continue;
+      if (numeric < MIN_RETENTION_DAYS || numeric > MAX_RETENTION_DAYS) continue;
+      incoming[scope as RetentionScope] = numeric;
+    }
+    const tenant = await this.prisma.tenant.update({
+      where: { id: user.tenantId },
+      data: { retentionOverrides: incoming as Prisma.InputJsonValue },
+      select: { slug: true, retentionOverrides: true },
+    });
+    const after: TenantRetentionSettings = {
+      tenantSlug: tenant.slug,
+      defaults: { ...DEFAULT_RETENTION_DAYS },
+      overrides: this.normalizeRetentionOverrides(tenant.retentionOverrides),
+    };
+    await this.audit(user, 'tenant.retention_settings_updated', before, after);
+    return after;
   }
 
   async updateWidgetSettings(user: AuthenticatedUser, dto: UpdateWidgetSettingsDto) {
@@ -313,6 +361,20 @@ export class TenantsService {
 
   private readOriginList(value: unknown) {
     return Array.isArray(value) ? value.map((origin) => String(origin)).filter(Boolean) : [];
+  }
+
+  private normalizeRetentionOverrides(value: unknown): TenantRetentionOverrides {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+    const result: TenantRetentionOverrides = {};
+    for (const scope of RETENTION_SCOPES) {
+      const raw = (value as Record<string, unknown>)[scope];
+      if (raw === undefined || raw === null) continue;
+      const numeric = typeof raw === 'number' ? raw : Number(raw);
+      if (!Number.isInteger(numeric)) continue;
+      if (numeric < MIN_RETENTION_DAYS || numeric > MAX_RETENTION_DAYS) continue;
+      result[scope] = numeric;
+    }
+    return result;
   }
 
   private async requireDepartment(tenantId: string, id: string) {
