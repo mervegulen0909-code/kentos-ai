@@ -21,10 +21,12 @@ Run locally first:
 
 ```bash
 pnpm infra:prod:bootstrap -- \
+  --municipality-domain www.example.com \
   --api-domain api.example.com \
   --admin-domain admin.example.com \
   --citizen-domain citizen.example.com \
   --gateway-domain gateway.example.com \
+  --default-tenant-slug demo-belediye \
   --acme-email ops@example.com
 ```
 
@@ -33,6 +35,7 @@ This writes `.env.production.local`, which is ignored by git. The script generat
 Edit the generated file before server use:
 
 - Replace all `example.com` domains with real DNS names.
+- Set `MUNICIPALITY_DOMAIN` to the Natro/demo municipality homepage domain. This route serves a static demo municipality homepage with the KentOS widget embedded.
 - Set `WIDGET_ORIGIN_ALLOWLIST` to the real citizen/widget origins.
 - Keep `RETENTION_DRY_RUN=true` until a data cleanup window is explicitly approved.
 - Keep all `*_OUTBOUND_LIVE=false` until provider credentials and operator approval are recorded.
@@ -90,6 +93,31 @@ Runtime probes:
 curl -fsS "https://$API_DOMAIN/api/v1/health"
 curl -fsS "https://$API_DOMAIN/api/v1/health/ready"
 ```
+
+External-system preflight:
+
+```bash
+pnpm ops:external -- --env-file .env.production.local --expected-server-ip 203.0.113.10
+pnpm ops:external -- --env-file .env.production.local --compose --skip-network
+```
+
+The first command checks env completeness, DNS, HTTPS health endpoints, provider readiness, and safety gates. The second command is intended for the VPS and also validates Docker Compose state. Reports are written under `output/ops-external-systems/`.
+
+If production deploy approval has been recorded, the same script can run the deploy sequence on the VPS:
+
+```bash
+pnpm ops:external -- --env-file .env.production.local --compose --apply-deploy --i-accept-production-deploy
+```
+
+This performs `docker compose build`, starts core services, runs `pnpm db:deploy`, then starts the full stack. It will still block when live outbound or retention delete flags are enabled unless the matching approval flags are supplied.
+
+Provider setup references:
+
+- Anthropic: set `AI_PROVIDER=anthropic`, `ANTHROPIC_API_KEY`, and at least one daily budget guard (`AI_DAILY_TOKEN_BUDGET` or `AI_DAILY_COST_BUDGET_MICROS`).
+- Email outbound: set `EMAIL_FROM_ADDRESS`; for Postmark set `EMAIL_PROVIDER=postmark` and `POSTMARK_SERVER_TOKEN`; for SMTP set `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, and `SMTP_PASSWORD`.
+- Postmark inbound webhook URL: `https://$GATEWAY_DOMAIN/webhooks/email`; Basic Auth must match `POSTMARK_INBOUND_BASIC_USER` and `POSTMARK_INBOUND_BASIC_PASS`.
+- Meta/Twilio live channels: keep live flags false until provider credentials and webhook signatures are validated. The compose file now passes `*_OUTBOUND_LIVE` from `.env.production.local` instead of hardcoding dry-run mode.
+- ClamAV: set `ATTACHMENT_SCAN_PROVIDER=clamav` after the `clamav` compose service is healthy.
 
 ## Safety Rules
 

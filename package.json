@@ -17,6 +17,7 @@
     "smoke:api": "node scripts/smoke-api.mjs",
     "smoke:gateway": "node scripts/smoke-gateway.mjs",
     "ops:preflight": "node scripts/ops-preflight.mjs",
+    "ops:external": "node scripts/ops-external-systems.mjs",
     "infra:prod:bootstrap": "node scripts/bootstrap-prod-env.mjs",
     "verify": "node scripts/verify-env.mjs",
     "e2e": "playwright test",

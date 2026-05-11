@@ -1,5 +1,37 @@
 # Release Notes
 
+## Next - External systems preflight + municipality widget domain - 2026-05-11
+
+### Summary
+
+- Added `pnpm ops:external`, a production external-system preflight helper that loads `.env.production.local`, checks required production env, provider readiness, safety gates, DNS/HTTPS probes, and optional Docker Compose state. Default mode is read-only and writes Markdown reports under `output/ops-external-systems/`.
+- Added explicit deployment flags to the helper: `--apply-deploy --i-accept-production-deploy` are required before it runs the documented production compose build/up/migrate sequence. Live outbound and retention delete modes remain blocked unless their own approval flags are supplied.
+- Extended production bootstrap/env docs with `MUNICIPALITY_DOMAIN`, `DEFAULT_TENANT_SLUG`, `PUBLIC_CITIZEN_BASE_URL`, and `PUBLIC_GATEWAY_BASE_URL`.
+- Added a simple Caddy-served demo municipality homepage on `MUNICIPALITY_DOMAIN` with the KentOS widget script embedded from the citizen domain.
+- Admin Settings widget install code now emits an absolute citizen-web script URL when `NEXT_PUBLIC_CITIZEN_WEB_BASE_URL` / `PUBLIC_CITIZEN_BASE_URL` is configured, so copy-pasted install snippets work on external municipality sites.
+
+### Safety posture
+
+- No production deploy is performed automatically. The new deploy path fails closed on existing blocked checks and requires the explicit production acceptance flag.
+- The external preflight never prints secret values; env checks are presence-only.
+- Live channel sends, paid AI, retention delete, and provider setup remain separate operator-gated actions.
+
+### Evidence snapshot
+
+- `node --check scripts/ops-external-systems.mjs=passed`.
+- `node --check scripts/bootstrap-prod-env.mjs=passed`.
+- `pnpm ops:external -- --env-file .env.production.local --skip-network --json=passed` with only expected warnings for skipped network probes, placeholder attachment scanning, and incomplete optional email inbound values.
+- `pnpm ops:external -- --env-file .env.production.local --compose --skip-network --json=passed` with elevated local permission: compose config passed; `compose ps` warned because Docker Desktop daemon is not running.
+- `docker compose --env-file .env.production.local -f infra/docker-compose.prod.yml config --quiet=passed`.
+- `pnpm typecheck=passed`.
+- `pnpm build=passed`.
+- `git diff --check=passed`.
+
+### Risk and rollback
+
+- Risk level: `low`. The change is additive tooling/docs plus a Caddy demo site and admin snippet URL correction. It does not touch local dev runtime paths or perform external side effects.
+- Rollback policy: revert this slice; the existing production scaffold remains usable without the extra external preflight helper or municipality demo domain.
+
 ## Next — AI provider live wiring + cost cap + telemetry (W3.4) — 2026-05-10
 
 ### Summary

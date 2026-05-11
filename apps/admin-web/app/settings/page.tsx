@@ -42,14 +42,34 @@ const retentionScopeCopy: Record<string, { title: string; detail: string }> = {
 };
 
 function buildWidgetEmbedConfig(settings: WidgetSettings): WidgetEmbedConfig {
-  const scriptPath = '/widget.js';
-  const previewPath = `/widget/${settings.tenantSlug}`;
+  const citizenBaseUrl = resolveCitizenBaseUrl();
+  const scriptPath = `${citizenBaseUrl}/widget.js`;
+  const previewPath = `${citizenBaseUrl}/widget/${settings.tenantSlug}`;
+  const escapedTenant = escapeHtmlAttribute(settings.tenantSlug);
+  const escapedTitle = escapeHtmlAttribute(settings.widgetTitle);
   return {
     ...settings,
     scriptPath,
     previewPath,
-    scriptSnippet: `<script src="${scriptPath}" data-tenant="${settings.tenantSlug}" data-label="${settings.widgetTitle}" async></script>`,
+    scriptSnippet: `<script src="${scriptPath}" data-tenant="${escapedTenant}" data-label="${escapedTitle}" async></script>`,
   };
+}
+
+function resolveCitizenBaseUrl() {
+  const configured =
+    process.env.NEXT_PUBLIC_CITIZEN_WEB_BASE_URL ??
+    process.env.PUBLIC_CITIZEN_BASE_URL ??
+    process.env.CITIZEN_WEB_BASE_URL ??
+    '';
+  return configured.trim().replace(/\/+$/, '') || '';
+}
+
+function escapeHtmlAttribute(value: string) {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
 }
 
 const errorCopy: Record<string, FeedbackCopy> = {
@@ -150,7 +170,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
             <strong>Kurulum kontrolu</strong>
             <ul>
               <li>Tenant: <code>{widgetEmbed.tenantSlug}</code></li>
-              <li>Script: <code>{widgetEmbed.scriptPath}</code></li>
+              <li>Script: <code>{widgetEmbed.scriptPath || '/widget.js'}</code></li>
               <li>Onizleme: <a href={widgetEmbed.previewPath}>{widgetEmbed.previewPath}</a></li>
               <li>Beklenen kanal: <code>WEB_CHAT</code></li>
               <li>Durum: <code>{widgetEmbed.widgetEnabled ? 'Aktif' : 'Pasif'}</code></li>

@@ -17,7 +17,14 @@ services:
   redis:
     image: redis:7-alpine
     restart: unless-stopped
-    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD:?REDIS_PASSWORD is required}"]
+    command:
+      [
+        "redis-server",
+        "--appendonly",
+        "yes",
+        "--requirepass",
+        "${REDIS_PASSWORD:?REDIS_PASSWORD is required}",
+      ]
     volumes:
       - redis-prod-data:/data
     healthcheck:
@@ -56,7 +63,13 @@ services:
     volumes:
       - clamav-prod-data:/var/lib/clamav
     healthcheck:
-      test: ["CMD", "/bin/sh", "-c", "echo PING | nc -w 5 127.0.0.1 3310 | grep -q PONG"]
+      test:
+        [
+          "CMD",
+          "/bin/sh",
+          "-c",
+          "echo PING | nc -w 5 127.0.0.1 3310 | grep -q PONG",
+        ]
       interval: 30s
       timeout: 10s
       retries: 10
@@ -69,6 +82,7 @@ services:
       args:
         NEXT_PUBLIC_API_BASE_URL: ${PUBLIC_API_BASE_URL}
         NEXT_PUBLIC_PUBLIC_API_BASE_URL: ${PUBLIC_API_BASE_URL}
+        NEXT_PUBLIC_CITIZEN_WEB_BASE_URL: ${PUBLIC_CITIZEN_BASE_URL}
     restart: unless-stopped
     env_file:
       - ../.env.production.local
@@ -87,7 +101,11 @@ services:
       minio-init:
         condition: service_completed_successfully
     healthcheck:
-      test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:3100/api/v1/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      test:
+        [
+          "CMD-SHELL",
+          'node -e "fetch(''http://127.0.0.1:3100/api/v1/health'').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"',
+        ]
       interval: 20s
       timeout: 5s
       retries: 10
@@ -99,6 +117,7 @@ services:
       args:
         NEXT_PUBLIC_API_BASE_URL: ${PUBLIC_API_BASE_URL}
         NEXT_PUBLIC_PUBLIC_API_BASE_URL: ${PUBLIC_API_BASE_URL}
+        NEXT_PUBLIC_CITIZEN_WEB_BASE_URL: ${PUBLIC_CITIZEN_BASE_URL}
     restart: unless-stopped
     env_file:
       - ../.env.production.local
@@ -123,12 +142,26 @@ services:
       args:
         NEXT_PUBLIC_API_BASE_URL: ${PUBLIC_API_BASE_URL}
         NEXT_PUBLIC_PUBLIC_API_BASE_URL: ${PUBLIC_API_BASE_URL}
+        NEXT_PUBLIC_CITIZEN_WEB_BASE_URL: ${PUBLIC_CITIZEN_BASE_URL}
     restart: unless-stopped
     env_file:
       - ../.env.production.local
     environment:
       NEXT_PUBLIC_API_BASE_URL: ${PUBLIC_API_BASE_URL}
-    command: ["pnpm", "--filter", "@kentos/admin-web", "exec", "next", "start", "-H", "0.0.0.0", "-p", "3101"]
+      NEXT_PUBLIC_CITIZEN_WEB_BASE_URL: ${PUBLIC_CITIZEN_BASE_URL}
+    command:
+      [
+        "pnpm",
+        "--filter",
+        "@kentos/admin-web",
+        "exec",
+        "next",
+        "start",
+        "-H",
+        "0.0.0.0",
+        "-p",
+        "3101",
+      ]
     depends_on:
       api:
         condition: service_healthy
@@ -140,12 +173,26 @@ services:
       args:
         NEXT_PUBLIC_API_BASE_URL: ${PUBLIC_API_BASE_URL}
         NEXT_PUBLIC_PUBLIC_API_BASE_URL: ${PUBLIC_API_BASE_URL}
+        NEXT_PUBLIC_CITIZEN_WEB_BASE_URL: ${PUBLIC_CITIZEN_BASE_URL}
     restart: unless-stopped
     env_file:
       - ../.env.production.local
     environment:
       NEXT_PUBLIC_API_BASE_URL: ${PUBLIC_API_BASE_URL}
-    command: ["pnpm", "--filter", "@kentos/citizen-web", "exec", "next", "start", "-H", "0.0.0.0", "-p", "3102"]
+      NEXT_PUBLIC_CITIZEN_WEB_BASE_URL: ${PUBLIC_CITIZEN_BASE_URL}
+    command:
+      [
+        "pnpm",
+        "--filter",
+        "@kentos/citizen-web",
+        "exec",
+        "next",
+        "start",
+        "-H",
+        "0.0.0.0",
+        "-p",
+        "3102",
+      ]
     depends_on:
       api:
         condition: service_healthy
@@ -157,16 +204,19 @@ services:
       args:
         NEXT_PUBLIC_API_BASE_URL: ${PUBLIC_API_BASE_URL}
         NEXT_PUBLIC_PUBLIC_API_BASE_URL: ${PUBLIC_API_BASE_URL}
+        NEXT_PUBLIC_CITIZEN_WEB_BASE_URL: ${PUBLIC_CITIZEN_BASE_URL}
     restart: unless-stopped
     env_file:
       - ../.env.production.local
     environment:
       PORT: 3120
       KENTOS_API_BASE_URL: http://api:3100/api/v1
-      WHATSAPP_OUTBOUND_LIVE: "false"
-      INSTAGRAM_OUTBOUND_LIVE: "false"
-      FACEBOOK_OUTBOUND_LIVE: "false"
-      SMS_OUTBOUND_LIVE: "false"
+      PUBLIC_GATEWAY_BASE_URL: ${PUBLIC_GATEWAY_BASE_URL}
+      WHATSAPP_OUTBOUND_LIVE: ${WHATSAPP_OUTBOUND_LIVE:-false}
+      INSTAGRAM_OUTBOUND_LIVE: ${INSTAGRAM_OUTBOUND_LIVE:-false}
+      FACEBOOK_OUTBOUND_LIVE: ${FACEBOOK_OUTBOUND_LIVE:-false}
+      SMS_OUTBOUND_LIVE: ${SMS_OUTBOUND_LIVE:-false}
+      EMAIL_OUTBOUND_LIVE: ${EMAIL_OUTBOUND_LIVE:-false}
     command: ["pnpm", "--filter", "@kentos/whatsapp-gateway", "start"]
     depends_on:
       api:
