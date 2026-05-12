@@ -1,5 +1,36 @@
 # Release Notes
 
+## Next - Production VPS deploy closure - 2026-05-12
+
+### Summary
+
+- Deployed the self-hosted KentOS stack to the Hetzner VPS at `46.224.217.16` with DNS served through the Natro-managed domains.
+- Fixed production runtime packaging issues found during the first deploy: API and worker start paths now point at their built package entrypoints, workspace package `main` fields point at built outputs, and Prisma Client is generated with the normal query engine instead of no-engine/Data Proxy mode.
+- Installed OpenSSL in the production Node image so Prisma can detect the runtime SSL library reliably.
+- Enabled production attachment scanning by switching `ATTACHMENT_SCAN_PROVIDER=clamav` after the in-stack ClamAV daemon was healthy, then recreated the worker with `CLAMAV_HOST=clamav` and `CLAMAV_PORT=3310`.
+- Created a repo-local in-app-browser smoke path for production read-only checks; the separate Chrome profile remains ignored and is not required for current verification.
+
+### Production evidence snapshot
+
+- DNS records for `xn--izmirusul-y9a.com`, `api.xn--izmirusul-y9a.com`, `admin.xn--izmirusul-y9a.com`, `vatandas.xn--izmirusul-y9a.com`, and `gateway.xn--izmirusul-y9a.com` resolve to `46.224.217.16`.
+- `docker compose --env-file .env.production.local -f infra/docker-compose.prod.yml ps` on the VPS shows API, Caddy, Postgres, Redis, MinIO, ClamAV, worker, admin-web, citizen-web, and whatsapp-gateway running; API and ClamAV are healthy.
+- `pnpm ops:external -- --env-file .env.production.local --expected-server-ip 46.224.217.16 --compose --json` reports `passed=22`, `warning=2`, `blocked=0`, `failed=0`. Remaining warnings are optional Postmark inbound values and local Docker Desktop being unavailable for local compose ps; VPS compose state was verified over SSH.
+- HTTPS probes pass: API health/ready, gateway health, admin web, citizen web, and municipality web all return expected 200 responses.
+- In-app browser read-only smoke opened the municipality homepage, citizen widget preview, and admin login page on production domains without raw errors.
+
+### Safety posture
+
+- No live outbound flags are enabled.
+- Retention remains in dry-run/safe mode.
+- AI provider remains `stub`; no paid model call was made.
+- Production data mutation smoke was not run in this closure pass; ticket creation and other write-path checks remain approval-gated.
+- Email inbound setup remains an operator follow-up until Postmark Basic Auth values and default tenant mapping are configured.
+
+### Risk and rollback
+
+- Risk level: `low` for current live state: core services are healthy, HTTPS is serving, migrations are applied, and write-heavy/live external paths remain gated.
+- Rollback policy: revert the production runtime commits and redeploy the previous archive if runtime packaging regresses; to stop attachment scanning without code rollback, set `ATTACHMENT_SCAN_PROVIDER=placeholder` and recreate the worker.
+
 ## Next - External systems preflight + municipality widget domain - 2026-05-11
 
 ### Summary

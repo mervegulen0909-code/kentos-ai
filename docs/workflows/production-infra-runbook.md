@@ -117,14 +117,14 @@ Provider setup references:
 - Email outbound: set `EMAIL_FROM_ADDRESS`; for Postmark set `EMAIL_PROVIDER=postmark` and `POSTMARK_SERVER_TOKEN`; for SMTP set `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, and `SMTP_PASSWORD`.
 - Postmark inbound webhook URL: `https://$GATEWAY_DOMAIN/webhooks/email`; Basic Auth must match `POSTMARK_INBOUND_BASIC_USER` and `POSTMARK_INBOUND_BASIC_PASS`.
 - Meta/Twilio live channels: keep live flags false until provider credentials and webhook signatures are validated. The compose file now passes `*_OUTBOUND_LIVE` from `.env.production.local` instead of hardcoding dry-run mode.
-- ClamAV: set `ATTACHMENT_SCAN_PROVIDER=clamav` after the `clamav` compose service is healthy.
+- ClamAV: set `ATTACHMENT_SCAN_PROVIDER=clamav` after the `clamav` compose service is healthy, and keep `CLAMAV_HOST=clamav` plus `CLAMAV_PORT=3310` in `.env.production.local` so preflight and worker runtime agree.
 
 ## Safety Rules
 
 - Production deploy remains a manual operator action.
 - Live WhatsApp/email/social outbound remains disabled until explicit approval.
 - Real attachment retention delete remains disabled until explicit approval.
-- Virus scanning remains a placeholder until a provider is selected.
+- Virus scanning remains a placeholder until a provider is selected. When ClamAV is selected, verify the daemon is healthy and recreate the worker so it reads the updated env.
 - Do not run `prisma migrate reset` or delete Docker volumes in production.
 
 ## Backups
