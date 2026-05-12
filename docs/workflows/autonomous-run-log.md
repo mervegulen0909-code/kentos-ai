@@ -982,3 +982,24 @@ Eksik schema ile yazılan checkpoint release kanıtı sayılmaz.
 - **Result:** Passed. API restarted healthy with Netiva env present. External preflight reports `AI_PROVIDER=netiva` readiness satisfied, `passed=23`, `warning=1`, `blocked=0`, `failed=0`; the remaining warning is local Docker Desktop compose ps only.
 - **Next action:** Configure live EMAIL outbound credentials before enabling `EMAIL_OUTBOUND_LIVE=true`. Retention delete remains disabled unless explicitly approved as a destructive production cleanup.
 - **Blocker:** EMAIL outbound still needs provider credentials and sender address.
+
+## 2026-05-12 - Live provider account setup checkpoint
+
+- **Owner:** `1 - Ana Kontrol`
+- **Status:** in progress
+- **Action taken:** Continued app-browser setup for remaining external providers without enabling live outbound or printing secrets. Meta Developers registration reached app creation for `KentOS AI`; a Meta business portfolio was created as `Kentos AI` / `Kentos Yapay Zeka` and selected for the app. Twilio signup email verification was already complete, but phone/MFA verification rejected the previous SMS code; a fresh SMS code was requested. Postmark signup remains blocked because Postmark does not accept a public Gmail address for account registration.
+- **Verification run:** VPS `/opt/kentos-ai/infra/healthcheck-prod.sh`; `pnpm ops:external -- --env-file .env.production.local --expected-server-ip 46.224.217.16 --compose --json`.
+- **Result:** Production remains healthy. VPS compose shows API healthy, gateway reachable, and all expected services up. External preflight reports `passed=23`, `warning=1`, `blocked=0`, `failed=0`; the only warning is local Docker Desktop compose state, while VPS compose state was verified separately over SSH.
+- **Next action:** Complete Meta's security re-auth prompt in the browser, then finish app creation and collect non-secret app IDs. Enter a fresh Twilio SMS/voice code when received. Use a domain/business email before retrying Postmark signup, or switch EMAIL outbound to the already configured SMTP path.
+- **Blocker:** Meta is waiting for user password re-auth in the browser; Twilio is waiting for a fresh phone verification code; Postmark needs a domain/business email address.
+
+## 2026-05-12 - Meta WhatsApp webhook production verification checkpoint
+
+- **Owner:** `1 - Ana Kontrol`
+- **Status:** passed
+- **Action taken:** Added the missing Meta webhook verification handshake to the channel gateway so `GET /webhooks/{whatsapp|instagram|facebook}` validates `hub.mode=subscribe`, `hub.verify_token`, and returns the plain-text `hub.challenge`. Added `META_WEBHOOK_VERIFY_TOKEN` to env templates/bootstrap and gateway smoke coverage. Deployed the gateway patch to the Hetzner production stack, added the verify token to local and VPS production env files without printing secret values, recreated `whatsapp-gateway`, and verified Meta's challenge URL over HTTPS. The Meta app `KentOS Yapay Zeka` now exists with App ID recorded in the browser URL, WhatsApp test number assets are visible, and the webhook verify/save flow advanced to the use-case permissions screen.
+- **Files changed:** `apps/whatsapp-gateway/src/server.ts`, `.env.example`, `scripts/bootstrap-prod-env.mjs`, `scripts/smoke-gateway.mjs`, `docs/workflows/production-infra-runbook.md`, `docs/workflows/autonomous-run-log.md`.
+- **Verification run:** `pnpm --filter @kentos/whatsapp-gateway test`; `pnpm --filter @kentos/whatsapp-gateway typecheck`; `node --check scripts/smoke-gateway.mjs`; `node --check scripts/bootstrap-prod-env.mjs`; production Docker rebuild/recreate for `whatsapp-gateway`; HTTPS challenge probe against `https://gateway.xn--izmirusul-y9a.com/webhooks/whatsapp`; VPS `/opt/kentos-ai/infra/healthcheck-prod.sh`.
+- **Result:** Passed. Gateway unit tests passed 20/20, gateway typecheck and script syntax checks passed, the production challenge endpoint returned HTTP 200 with the expected plain-text challenge, and VPS healthcheck reports API, gateway, and ClamAV healthy after recreating ClamAV to clear a stale Docker health flag. Live WhatsApp outbound remains disabled.
+- **Next action:** Finish Twilio MFA with a fresh SMS/voice code. For Meta production messaging, register a real WhatsApp phone number, add payment only with explicit approval, complete business verification when operator has legal/business documents ready, then retrieve app secret/permanent token and enable signatures before any live outbound flag is changed.
+- **Blocker:** Twilio still needs a fresh phone verification code. Meta production phone registration/payment/business verification remain operator-controlled external steps.

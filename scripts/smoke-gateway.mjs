@@ -74,6 +74,17 @@ for (const channel of ['whatsapp', 'instagram', 'facebook', 'sms', 'email']) {
 }
 
 section('webhook signatures');
+const metaVerifyToken = process.env.META_WEBHOOK_VERIFY_TOKEN;
+if (metaVerifyToken) {
+  const challenge = `challenge-${unique}`;
+  const verifyOk = await expectStatus(`/webhooks/whatsapp?hub.mode=subscribe&hub.verify_token=${encodeURIComponent(metaVerifyToken)}&hub.challenge=${challenge}`, 200);
+  assert(verifyOk.text === challenge, 'WhatsApp webhook verification challenge mismatch.');
+
+  const verifyWrong = await expectStatus(`/webhooks/whatsapp?hub.mode=subscribe&hub.verify_token=wrong-token&hub.challenge=${challenge}`, 403);
+  assert(verifyWrong.body?.error === 'meta-webhook-verification-failed', 'WhatsApp webhook wrong verify token reason mismatch.');
+  console.log('meta_webhook_verify', verifyOk.status, verifyWrong.status);
+}
+
 for (const channel of ['instagram', 'facebook']) {
   const missingSignature = await expectStatus(`/webhooks/${channel}`, 401, {
     method: 'POST',

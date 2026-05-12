@@ -5,9 +5,11 @@ import { verifyMetaWebhookSignature, verifyPostmarkBasicAuth, verifyTwilioWebhoo
 
 const PORT = Number(process.env.PORT ?? 3120);
 const META_APP_SECRET = process.env.META_APP_SECRET ?? '';
+const META_WEBHOOK_VERIFY_TOKEN = process.env.META_WEBHOOK_VERIFY_TOKEN ?? '';
 const TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN ?? '';
 
-type RouteHandler = (req: http.IncomingMessage, body: string, url: URL) => Promise<{ status: number; body: unknown }>;
+type RouteResult = { status: number; body: unknown; contentType?: string };
+type RouteHandler = (req: http.IncomingMessage, body: string, url: URL) => Promise<RouteResult>;
 
 function readHeader(req: http.IncomingMessage, name: string): string | undefined {
   const value = req.headers[name.toLowerCase()];
@@ -16,6 +18,9 @@ function readHeader(req: http.IncomingMessage, name: string): string | undefined
 }
 
 const routes: Record<string, RouteHandler> = {
+  'GET /webhooks/whatsapp': async (_req, _body, url) => verifyMetaWebhookChallenge(url),
+  'GET /webhooks/instagram': async (_req, _body, url) => verifyMetaWebhookChallenge(url),
+  'GET /webhooks/facebook': async (_req, _body, url) => verifyMetaWebhookChallenge(url),
   'POST /webhooks/whatsapp': async (req, body) => {
     if (META_APP_SECRET && !verifyMetaWebhookSignature(body, readHeader(req, 'x-hub-signature-256'), META_APP_SECRET)) {
       return { status: 401, body: { error: 'meta-signature-invalid' } };
@@ -105,6 +110,20 @@ const routes: Record<string, RouteHandler> = {
   'GET /health': async () => ({ status: 200, body: { ok: true, ts: new Date().toISOString() } }),
 };
 
+function verifyMetaWebhookChallenge(url: URL): RouteResult {
+  const mode = url.searchParams.get('hub.mode');
+  const token = url.searchParams.get('hub.verify_token');
+  const challenge = url.searchParams.get('hub.challenge');
+
+  if (!META_WEBHOOK_VERIFY_TOKEN) {
+    return { status: 503, body: { error: 'meta-webhook-verify-token-not-configured' } };
+  }
+  if (mode === 'subscribe' && token === META_WEBHOOK_VERIFY_TOKEN && challenge) {
+    return { status: 200, body: challenge, contentType: 'text/plain' };
+  }
+  return { status: 403, body: { error: 'meta-webhook-verification-failed' } };
+}
+
 function parseFormBody(body: string): Record<string, string> {
   const params: Record<string, string> = {};
   for (const part of body.split('&')) {
@@ -135,8 +154,9 @@ const server = http.createServer(async (req, res) => {
     }
     const body = await readBody(req);
     const result = await handler(req, body, url);
-    res.writeHead(result.status, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify(result.body));
+    const contentType = result.contentType ?? 'application/json';
+    res.writeHead(result.status, { 'Content-Type': contentType });
+    res.end(contentType === 'application/json' ? JSON.stringify(result.body) : String(result.body));
   } catch (error) {
     const message = error instanceof Error ? error.message : 'unknown-error';
     console.error(`[Gateway] istek hatasi: ${message}`);

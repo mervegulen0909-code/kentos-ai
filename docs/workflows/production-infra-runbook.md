@@ -116,6 +116,7 @@ Provider setup references:
 - Anthropic: set `AI_PROVIDER=anthropic`, `ANTHROPIC_API_KEY`, and at least one daily budget guard (`AI_DAILY_TOKEN_BUDGET` or `AI_DAILY_COST_BUDGET_MICROS`).
 - Email outbound: set `EMAIL_FROM_ADDRESS`; for Postmark set `EMAIL_PROVIDER=postmark` and `POSTMARK_SERVER_TOKEN`; for SMTP set `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, and `SMTP_PASSWORD`.
 - Postmark inbound webhook URL: `https://$GATEWAY_DOMAIN/webhooks/email`; Basic Auth must match `POSTMARK_INBOUND_BASIC_USER` and `POSTMARK_INBOUND_BASIC_PASS`.
+- Meta WhatsApp webhook callback URL: `https://$GATEWAY_DOMAIN/webhooks/whatsapp`; verify token must match `META_WEBHOOK_VERIFY_TOKEN`.
 - Meta/Twilio live channels: keep live flags false until provider credentials and webhook signatures are validated. The compose file now passes `*_OUTBOUND_LIVE` from `.env.production.local` instead of hardcoding dry-run mode.
 - ClamAV: set `ATTACHMENT_SCAN_PROVIDER=clamav` after the `clamav` compose service is healthy, and keep `CLAMAV_HOST=clamav` plus `CLAMAV_PORT=3310` in `.env.production.local` so preflight and worker runtime agree.
 
