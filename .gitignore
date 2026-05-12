@@ -46,6 +46,7 @@ Thumbs.db
 .claude/settings.local.json
 .claude/worktrees/
 .codex/
+.codex-chrome-kentos/
 .playwright-mcp/
 .roo/
 .roomodes
@@ -58,6 +59,7 @@ test-results/
 
 # Local release evidence artifacts
 /output/
+/kentos-ai-deploy.tar
 /apps/api/output/
 /admin-home-*.png
 /citizen-home-*.png
