@@ -135,9 +135,24 @@ Minimum daily backup targets:
 - MinIO volume/object backup.
 - `.env.production.local` in a secure password manager, not git.
 
-Example PostgreSQL backup:
+The repo includes a VPS-local backup helper that writes timestamped backups under `/opt/kentos-backups` by default:
 
 ```bash
-docker compose --env-file .env.production.local -f infra/docker-compose.prod.yml exec -T postgres \
-  pg_dump -U kentos kentos_ai > "backup-kentos-ai-$(date +%F).sql"
+chmod +x infra/backup-prod.sh infra/healthcheck-prod.sh
+KENTOS_BACKUP_RETENTION_DAYS=14 infra/backup-prod.sh
 ```
+
+It creates:
+
+- `postgres.sql.gz`
+- `minio-prod-data.tar.gz` when the MinIO Docker volume exists
+- `SHA256SUMS`
+
+Suggested root cron entries:
+
+```cron
+15 2 * * * /opt/kentos-ai/infra/backup-prod.sh >> /var/log/kentos-backup.log 2>&1
+*/5 * * * * /opt/kentos-ai/infra/healthcheck-prod.sh >> /var/log/kentos-healthcheck.log 2>&1
+```
+
+Restore is intentionally manual: stop the stack, restore the PostgreSQL dump into a fresh database, restore the MinIO archive into the Docker volume, then start services and run the health checks. Never overwrite a live volume/database without taking a fresh backup first.
