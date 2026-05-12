@@ -971,3 +971,14 @@ Eksik schema ile yazılan checkpoint release kanıtı sayılmaz.
 - **Result:** Passed. Healthcheck reports all production services up, API healthy, ClamAV healthy, and gateway reachable. First backup directory `/opt/kentos-backups/20260512T101319Z` contains `postgres.sql.gz`, `minio-prod-data.tar.gz`, and `SHA256SUMS`. Cron contains the daily backup and 5-minute healthcheck entries.
 - **Next action:** Populate real provider credentials before enabling EMAIL outbound or paid AI. Retention live delete still requires a specific destructive-operation approval before setting `RETENTION_DRY_RUN=false` and `RETENTION_DELETE_ATTACHMENT_OBJECTS=true`.
 - **Blocker:** Live EMAIL outbound needs `EMAIL_FROM_ADDRESS` plus Postmark or SMTP credentials. Paid AI needs `ANTHROPIC_API_KEY` or Netiva credentials plus budget settings. Retention delete is intentionally still disabled because it deletes production records/objects.
+
+## 2026-05-12 - Netiva production AI provider activation checkpoint
+
+- **Owner:** `1 - Ana Kontrol`
+- **Status:** passed
+- **Action taken:** Applied the operator-provided Netiva API key to local and VPS production env files without committing or printing the secret. Production env now uses `AI_PROVIDER=netiva`, sets both Netiva-specific and generic AI key env names for compatibility, and includes daily token/cost budget guards. Recreated the API container so it reads the new env. No live AI intake request was triggered in this step.
+- **Files changed:** `docs/workflows/autonomous-run-log.md`.
+- **Verification run:** VPS env presence check with values masked; `docker compose --env-file .env.production.local -f infra/docker-compose.prod.yml up -d --no-deps --force-recreate api`; `/opt/kentos-ai/infra/healthcheck-prod.sh`; `pnpm ops:external -- --env-file .env.production.local --expected-server-ip 46.224.217.16 --compose --json`.
+- **Result:** Passed. API restarted healthy with Netiva env present. External preflight reports `AI_PROVIDER=netiva` readiness satisfied, `passed=23`, `warning=1`, `blocked=0`, `failed=0`; the remaining warning is local Docker Desktop compose ps only.
+- **Next action:** Configure live EMAIL outbound credentials before enabling `EMAIL_OUTBOUND_LIVE=true`. Retention delete remains disabled unless explicitly approved as a destructive production cleanup.
+- **Blocker:** EMAIL outbound still needs provider credentials and sender address.
