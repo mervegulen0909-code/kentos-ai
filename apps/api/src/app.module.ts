@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { AnalyticsModule } from './modules/analytics/analytics.module.js';
 import { AttachmentsModule } from './modules/attachments/attachments.module.js';
 import { AuthModule } from './modules/auth/auth.module.js';
+import { CitizensModule } from './modules/citizens/citizens.module.js';
 import { HealthModule } from './modules/health/health.module.js';
 import { PrismaModule } from './modules/prisma/prisma.module.js';
 import { PublicTicketModule } from './modules/public/public-ticket.module.js';
@@ -18,6 +19,7 @@ import { RootController } from './root.controller.js';
     AnalyticsModule,
     AttachmentsModule,
     AuthModule,
+    CitizensModule,
     TenantsModule,
     TicketsModule,
     PublicTicketModule,

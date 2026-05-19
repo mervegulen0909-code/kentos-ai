@@ -1012,4 +1012,45 @@ await expectStatus('/tickets', 403, {
 });
 console.log('ticket_tenant_validation', true);
 
+section('citizen merge');
+const mergeSource = await prisma.citizen.create({
+  data: { tenantId: login.body.user.tenantId, displayName: `Merge Source ${unique}`, phone: `+9055500${unique}` },
+});
+const mergeTarget = await prisma.citizen.create({
+  data: { tenantId: login.body.user.tenantId, displayName: `Merge Target ${unique}`, email: `merge-target-${unique}@example.test` },
+});
+// TENANT_ADMIN token'ı kullanıyoruz (login)
+await expectStatus(`/citizens/${mergeSource.id}/merge`, 201, {
+  method: 'POST',
+  token,
+  body: JSON.stringify({ mergeIntoId: mergeTarget.id }),
+});
+// Aynı kaydı tekrar birleştirmeye çalışmak hata vermeli
+await expectStatus(`/citizens/${mergeSource.id}/merge`, 400, {
+  method: 'POST',
+  token,
+  body: JSON.stringify({ mergeIntoId: mergeTarget.id }),
+});
+// Yanlış tenant citizen'ı birleştirmeye çalışmak 404 vermeli
+await expectStatus(`/citizens/cm0000000000000000000000/merge`, 404, {
+  method: 'POST',
+  token,
+  body: JSON.stringify({ mergeIntoId: mergeTarget.id }),
+});
+// Kendisiyle birleştirme 400 vermeli
+await expectStatus(`/citizens/${mergeTarget.id}/merge`, 400, {
+  method: 'POST',
+  token,
+  body: JSON.stringify({ mergeIntoId: mergeTarget.id }),
+});
+// Yetkisiz rol (STAFF token varsa) — bu smoke'da sadece admin token var, unauthorized (401) kontrolü
+await expectStatus(`/citizens/${mergeTarget.id}/merge`, 401, {
+  method: 'POST',
+  body: JSON.stringify({ mergeIntoId: mergeSource.id }),
+});
+const mergedRecord = await prisma.citizen.findUnique({ where: { id: mergeSource.id } });
+assert(mergedRecord?.mergedIntoCitizenId === mergeTarget.id, 'Merge did not set mergedIntoCitizenId');
+assert(mergedRecord?.mergedAt !== null, 'Merge did not set mergedAt');
+console.log('citizen_merge', true);
+
 await prisma.$disconnect();
