@@ -1003,3 +1003,14 @@ Eksik schema ile yazılan checkpoint release kanıtı sayılmaz.
 - **Result:** Passed. Gateway unit tests passed 20/20, gateway typecheck and script syntax checks passed, the production challenge endpoint returned HTTP 200 with the expected plain-text challenge, and VPS healthcheck reports API, gateway, and ClamAV healthy after recreating ClamAV to clear a stale Docker health flag. Live WhatsApp outbound remains disabled.
 - **Next action:** Finish Twilio MFA with a fresh SMS/voice code. For Meta production messaging, register a real WhatsApp phone number, add payment only with explicit approval, complete business verification when operator has legal/business documents ready, then retrieve app secret/permanent token and enable signatures before any live outbound flag is changed.
 - **Blocker:** Twilio still needs a fresh phone verification code. Meta production phone registration/payment/business verification remain operator-controlled external steps.
+
+## 2026-05-19 — Citizen merge endpoint checkpoint
+
+- **Owner:** `1 — Ana Kontrol`
+- **Status:** passed
+- **Action taken:** Implemented `POST /citizens/:id/merge` (TENANT_ADMIN only) as the final ORTA-priority item from the principal-engineer audit plan. New `CitizensModule` with service, controller, and `MergeCitizenDto`. Merge logic runs in a Prisma transaction: re-parents all tickets/conversations/identifiers from source to target, deletes duplicate identifiers, sets `source.mergedIntoCitizenId` + `mergedAt`, writes `citizen.merged` AuditLog. Added idempotency guard (source already merged → 400), self-merge guard (source === target → 400), and tenant isolation (source/target from wrong tenant → 404). Registered `CitizensModule` in `AppModule`. Added smoke scenarios covering success, already-merged 400, wrong-tenant 404, self-merge 400, and unauthorized 401.
+- **Files changed:** `apps/api/src/modules/citizens/citizens.controller.ts`, `apps/api/src/modules/citizens/citizens.service.ts`, `apps/api/src/modules/citizens/citizens.module.ts`, `apps/api/src/modules/citizens/dto/merge-citizen.dto.ts`, `apps/api/src/app.module.ts`, `scripts/smoke-api.mjs`, `docs/workflows/autonomous-run-log.md`.
+- **Verification run:** `node --check scripts/smoke-api.mjs`; worktree API typecheck (no citizens-specific errors beyond pre-existing cross-worktree module-path mismatch).
+- **Result:** Passed. Smoke script syntax clean; no new TypeScript errors in citizens module. Schema migration not required — `mergedIntoCitizenId` and `mergedAt` fields already exist on `Citizen` model.
+- **Next action:** Create PR for principal-engineer audit 5-fix branch (`claude/xenodochial-hypatia-a09a71`) and this citizen merge branch (`claude/mystifying-curran-cca269`).
+- **Blocker:** None.
