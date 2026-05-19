@@ -153,6 +153,43 @@ try {
   await prisma.user.update({ where: { id: readOnlyLogin.body.user.id }, data: { role: readOnlyLogin.body.user.role } });
 }
 
+section('user management');
+const userList = await request('/users', { token });
+assert(Array.isArray(userList.body), 'GET /users should return an array.');
+assert(userList.body.length > 0, 'GET /users should return at least the seeded admin user.');
+assert(userList.body.every((u) => u.id && u.email && u.fullName && u.role), 'User list items missing required fields.');
+console.log('user_list', userList.status, `${userList.body.length} kullanici`);
+
+const createdUser = await request('/users', {
+  method: 'POST',
+  token,
+  body: JSON.stringify({
+    email: `smoke-${unique}@demo.local`,
+    fullName: `Smoke Personel ${unique}`,
+    password: 'SmokePassword1!',
+    role: 'OPERATOR',
+  }),
+});
+assert(createdUser.body.id, 'Created user should have an id.');
+assert(createdUser.body.role === 'OPERATOR', 'Created user should have OPERATOR role.');
+console.log('user_create', createdUser.status, createdUser.body.email);
+
+const updatedUser = await request(`/users/${createdUser.body.id}`, {
+  method: 'PATCH',
+  token,
+  body: JSON.stringify({ fullName: `Smoke Personel Guncellendi ${unique}`, isActive: false }),
+});
+assert(updatedUser.body.isActive === false, 'Updated user should be inactive.');
+console.log('user_update', updatedUser.status, updatedUser.body.isActive);
+
+// READ_ONLY must not create users
+await expectStatus('/users', 403, {
+  method: 'POST',
+  token: readOnlyToken,
+  body: JSON.stringify({ email: `readonly-${unique}@demo.local`, fullName: 'RO', password: 'SomePass1!' }),
+});
+console.log('user_rbac_readonly_create_denied', true);
+
 section('settings RBAC');
 const departments = await request('/departments', { token });
 console.log('departments', departments.body.length);

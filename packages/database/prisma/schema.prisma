@@ -109,7 +109,6 @@ model Tenant {
   citizens             Citizen[]
   conversations        Conversation[]
   departments          Department[]
-  managerReports       ManagerReport[]
   messageTemplates     MessageTemplate[]
   outboundDeliveries   OutboundDelivery[]
   neighborhoods        Neighborhood[]
@@ -502,17 +501,3 @@ model AiRun {
   @@index([tenantId, createdAt])
 }
 
-model ManagerReport {
-  id          String   @id @default(cuid())
-  tenantId    String
-  type        String
-  periodStart DateTime
-  periodEnd   DateTime
-  summary     String
-  metrics     Json
-  createdAt   DateTime @default(now())
-
-  tenant      Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-
-  @@index([tenantId, type, periodStart])
-}

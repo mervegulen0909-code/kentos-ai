@@ -211,6 +211,21 @@ export async function updateAiBudgetSettingsAction(formData: FormData) {
   }));
 }
 
+export async function updateUserAction(formData: FormData) {
+  const id = requireNonEmpty(formData.get('id'), 'update-user');
+
+  await runSettingsMutation(formData, 'user-updated', (token) => {
+    const payload: Record<string, unknown> = {};
+    const fullName = String(formData.get('fullName') ?? '').trim();
+    const role = String(formData.get('role') ?? '').trim();
+    const isActive = formData.get('isActive');
+    if (fullName) payload.fullName = fullName;
+    if (role) payload.role = role;
+    if (isActive !== null) payload.isActive = isActive === 'true';
+    return apiFetch(`/users/${id}`, { method: 'PATCH', token, body: JSON.stringify(payload) });
+  });
+}
+
 export async function updateRetentionSettingsAction(formData: FormData) {
   const scopes = ['channel-events', 'audit-logs', 'outbound-deliveries', 'conversations', 'attachments'] as const;
   const payload: Record<string, number | null> = {};

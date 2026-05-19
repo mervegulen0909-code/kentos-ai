@@ -1,7 +1,6 @@
 export const queueNames = {
   sla: 'kentos.sla',
   notifications: 'kentos.notifications',
-  reports: 'kentos.reports',
   media: 'kentos.media',
   retention: 'kentos.retention',
   outbound: 'kentos.outbound',
