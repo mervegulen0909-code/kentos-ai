@@ -83,11 +83,12 @@ export async function updateStatusAction(formData: FormData) {
 
 export async function assignTicketAction(formData: FormData) {
   const departmentId = requireNonEmpty(formData, 'departmentId', 'assignment');
+  const assignedToId = String(formData.get('assignedToId') ?? '').trim() || undefined;
 
   await runTicketMutation(formData, 'assigned', (token, ticketId) => apiFetch(`/tickets/${ticketId}/assign`, {
     method: 'POST',
     token,
-    body: JSON.stringify({ departmentId }),
+    body: JSON.stringify({ departmentId, assignedToId }),
   }));
 }
 

@@ -1,17 +1,10 @@
-import { PrismaClient } from '@kentos/database';
+import { OutboundDeliveryState } from '@kentos/database';
 import type { NotificationJobData } from '@kentos/shared';
+import { Queue } from 'bullmq';
+import { getPrismaClient } from '../prisma-client.js';
 
-const prisma = new PrismaClient();
-
-function providerName() {
-  return process.env.WHATSAPP_PROVIDER === 'meta-cloud' ? 'meta-cloud' : 'baileys';
-}
-
-function externalMessageId(to: string) {
-  const provider = providerName();
-  const prefix = provider === 'meta-cloud' ? 'meta-pending' : 'demo';
-  return `${prefix}-${Date.now()}-${to}`;
-}
+const OUTBOUND_QUEUE = 'kentos.outbound';
+const TICKET_MSG_IDEMPOTENCY_PREFIX = 'ticket-msg:';
 
 export function getNotificationSkipReason(message: {
   senderType: string;
@@ -26,13 +19,13 @@ export function getNotificationSkipReason(message: {
 }
 
 export async function processNotificationJob(job: { name: string; data: NotificationJobData }) {
+  const prisma = getPrismaClient();
+
   const message = await prisma.ticketMessage.findFirst({
     where: { id: job.data.messageId },
     include: {
       ticket: {
-        include: {
-          citizen: true,
-        },
+        include: { citizen: true },
       },
     },
   });
@@ -47,80 +40,53 @@ export async function processNotificationJob(job: { name: string; data: Notifica
     return { processor: 'notifications', job: job.name, skipped: skipReason ?? 'not_deliverable' };
   }
 
-  const provider = providerName();
-  const sentExternalMessageId = message.externalMessageId ?? externalMessageId(to);
-  if (!message.externalMessageId) {
-    await prisma.ticketMessage.update({
-      where: { id: message.id },
-      data: { externalMessageId: sentExternalMessageId },
-    });
+  // Idempotency: check if an outbound delivery was already created for this ticket message
+  const idempotencyKey = `${TICKET_MSG_IDEMPOTENCY_PREFIX}${message.id}`;
+  const existing = await prisma.outboundDelivery.findFirst({
+    where: { tenantId: message.tenantId, externalConversationId: idempotencyKey },
+    select: { id: true, state: true },
+  });
+  if (existing) {
+    return { processor: 'notifications', job: job.name, skipped: 'already_dispatched', deliveryId: existing.id };
   }
 
-  const existingDeliveryEvent = await prisma.channelEvent.findFirst({
-    where: {
+  const delivery = await prisma.outboundDelivery.create({
+    data: {
       tenantId: message.tenantId,
       channel: 'WHATSAPP',
-      provider,
-      externalEventId: sentExternalMessageId,
+      state: OutboundDeliveryState.PENDING,
+      recipientPhone: to,
+      // Use externalConversationId as idempotency key so replayed jobs are deduplicated
+      externalConversationId: idempotencyKey,
+      body: message.body,
     },
-    select: { id: true },
   });
 
-  if (existingDeliveryEvent) {
-    return {
-      processor: 'notifications',
-      job: job.name,
-      delivered: true,
-      idempotent: true,
-      provider,
-      externalMessageId: sentExternalMessageId,
-    };
-  }
-
+  const queue = new Queue(OUTBOUND_QUEUE, {
+    connection: { url: process.env.REDIS_URL ?? 'redis://localhost:6379' },
+  });
   try {
-    await prisma.channelEvent.create({
-      data: {
-        tenantId: message.tenantId,
-        channel: 'WHATSAPP',
-        provider,
-        externalEventId: sentExternalMessageId,
-        payload: {
-          direction: 'OUTBOUND',
-          messageId: message.id,
-          ticketId: message.ticketId,
-          to,
-          body: message.body,
-        },
-        processedAt: new Date(),
+    await queue.add(
+      'channel-outbound',
+      { deliveryId: delivery.id },
+      {
+        jobId: `outbound-${delivery.id}`,
+        attempts: 3,
+        backoff: { type: 'exponential', delay: 5_000 },
+        removeOnComplete: 100,
+        removeOnFail: 500,
       },
-    });
-  } catch (error) {
-    const existingEventAfterRace = await prisma.channelEvent.findFirst({
-      where: {
-        tenantId: message.tenantId,
-        channel: 'WHATSAPP',
-        provider,
-        externalEventId: sentExternalMessageId,
-      },
-      select: { id: true },
-    });
-
-    if (!existingEventAfterRace) throw error;
-    return {
-      processor: 'notifications',
-      job: job.name,
-      delivered: true,
-      idempotent: true,
-      provider,
-      externalMessageId: sentExternalMessageId,
-    };
+    );
+  } finally {
+    await queue.close();
   }
 
   return {
     processor: 'notifications',
     job: job.name,
-    delivered: true,
-    provider,
-    externalMessageId: sentExternalMessageId,
+    dispatched: true,
+    deliveryId: delivery.id,
+    channel: 'WHATSAPP',
+    recipientPhone: to,
   };
 }

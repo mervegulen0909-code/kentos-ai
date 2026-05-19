@@ -45,12 +45,6 @@ importers:
         specifier: ^19.0.0
         version: 19.2.5(react@19.2.5)
 
-  apps/ai-service:
-    dependencies:
-      '@kentos/shared':
-        specifier: workspace:*
-        version: link:../../packages/shared
-
   apps/api:
     dependencies:
       '@aws-sdk/client-s3':

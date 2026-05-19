@@ -8,6 +8,7 @@ import { PrismaModule } from './modules/prisma/prisma.module.js';
 import { PublicTicketModule } from './modules/public/public-ticket.module.js';
 import { TenantsModule } from './modules/tenants/tenants.module.js';
 import { TicketsModule } from './modules/tickets/tickets.module.js';
+import { UsersModule } from './modules/users/users.module.js';
 import { RootController } from './root.controller.js';
 
 @Module({
@@ -21,6 +22,7 @@ import { RootController } from './root.controller.js';
     TenantsModule,
     TicketsModule,
     PublicTicketModule,
+    UsersModule,
   ],
   controllers: [RootController],
 })

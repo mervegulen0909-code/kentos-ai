@@ -220,6 +220,7 @@ export type Category = { id: string; name: string; code: string; departmentId?: 
 export type MessageTemplate = { id: string; key: string; body: string; locale: string; isActive: boolean; channel?: string | null };
 export type SlaPolicy = { id: string; priority: string; responseMinutes: number; resolutionMinutes: number; isActive: boolean; department?: Department | null; category?: Category | null };
 export type AuditLogItem = { id: string; action: string; createdAt: string; before?: unknown; after?: unknown };
+export type UserSummary = { id: string; email: string; fullName: string; role: string; isActive: boolean; createdAt: string };
 export type HandoffSummary = {
   id: string;
   channel: string;
@@ -328,4 +329,12 @@ export const adminApi = {
     apiFetch<AiBudgetSettings>('/ai-budget-settings', { method: 'PATCH', token, body: JSON.stringify(input) }),
   runRetentionNow: (token: string) =>
     apiFetch<{ enqueued: boolean; tenantId: string }>('/retention-settings/run-now', { method: 'POST', token }),
+  users: (token: string, isActive?: boolean) => {
+    const query = isActive !== undefined ? `?isActive=${isActive}` : '';
+    return apiFetch<UserSummary[]>(`/users${query}`, { token });
+  },
+  createUser: (token: string, input: { email: string; fullName: string; password: string; role?: string }) =>
+    apiFetch<UserSummary>('/users', { method: 'POST', token, body: JSON.stringify(input) }),
+  updateUser: (token: string, id: string, input: { fullName?: string; role?: string; isActive?: boolean; password?: string }) =>
+    apiFetch<UserSummary>(`/users/${id}`, { method: 'PATCH', token, body: JSON.stringify(input) }),
 };
