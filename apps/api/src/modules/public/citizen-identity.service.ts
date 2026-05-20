@@ -330,6 +330,22 @@ export class CitizenIdentityService {
     };
   }
 
+  private async detectMergeCycle(citizenId: string, targetId: string, db: DbClient): Promise<boolean> {
+    let current: string | null = targetId;
+    const visited = new Set<string>();
+    while (current) {
+      if (current === citizenId) return true; // cycle detected
+      if (visited.has(current)) break; // already-merged chain — no new cycle
+      visited.add(current);
+      const record: { mergedIntoCitizenId: string | null } | null = await db.citizen.findUnique({
+        where: { id: current },
+        select: { mergedIntoCitizenId: true },
+      });
+      current = record?.mergedIntoCitizenId ?? null;
+    }
+    return false;
+  }
+
   private async reconcileCitizenCluster(
     db: DbClient,
     input: {
@@ -387,6 +403,17 @@ export class CitizenIdentityService {
     }
 
     const duplicateIds = duplicates.map((duplicate) => duplicate.id);
+
+    // Cycle detection: make sure survivor is not already pointing back to one of the duplicates
+    for (const duplicate of duplicates) {
+      const hasCycle = await this.detectMergeCycle(duplicate.id, survivor.id, db);
+      if (hasCycle) {
+        throw new InternalServerErrorException(
+          `Merge cycle detected: merging citizen ${duplicate.id} into ${survivor.id} would create a circular reference.`,
+        );
+      }
+    }
+
     const mergedAt = new Date();
 
     await db.ticket.updateMany({

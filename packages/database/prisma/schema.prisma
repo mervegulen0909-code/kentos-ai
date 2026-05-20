@@ -310,6 +310,7 @@ model Ticket {
   locationAccuracyMeters Int?
   firstResponseDueAt     DateTime?
   resolutionDueAt        DateTime?
+  slaBreachedAt          DateTime?
   firstRespondedAt       DateTime?
   resolvedAt             DateTime?
   closedAt               DateTime?
@@ -444,6 +445,7 @@ model OutboundDelivery {
   templateKey            String?
   body                   String
   attempts               Int                   @default(0)
+  lastAttemptAt          DateTime?
   lastError              String?
   dispatchedAt           DateTime?
   deliveredAt            DateTime?

@@ -1,3 +1,4 @@
+import { createServer } from 'node:http';
 import { logger } from './logger.js';
 import { processMediaJob } from './processors/media.processor.js';
 import { processNotificationJob } from './processors/notifications.processor.js';
@@ -31,8 +32,28 @@ for (const worker of workers) {
   });
 }
 
+// ── Health check HTTP server ──────────────────────────────────────────────────
+const healthPort = Number(process.env.WORKER_HEALTH_PORT ?? 3130);
+const healthServer = createServer((req, res) => {
+  if (req.url === '/health') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({
+      ok: true,
+      workers: workers.map((w) => w.name),
+      ts: new Date().toISOString(),
+    }));
+  } else {
+    res.writeHead(404);
+    res.end();
+  }
+});
+healthServer.listen(healthPort, () => {
+  logger.info('Worker health endpoint listening', { port: healthPort, path: '/health' });
+});
+
 async function shutdown(signal: string) {
   logger.info(`Shutting down worker`, { signal });
+  healthServer.close();
   await Promise.all(workers.map((worker) => worker.close()));
   process.exit(0);
 }

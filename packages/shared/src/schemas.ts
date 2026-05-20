@@ -60,7 +60,7 @@ export const intakeChannelSchema = z.enum([
 ]);
 
 export const intakeCitizenContactSchema = z.object({
-  phone: z.string().nullable().optional(),
+  phone: z.string().regex(/^\+?[1-9]\d{6,14}$/, 'Geçersiz telefon formatı').nullable().optional(),
   email: z.string().email().nullable().optional(),
   displayName: z.string().nullable().optional(),
 });
@@ -106,7 +106,7 @@ export const channelOutboundEnvelopeSchema = z.object({
   recipient: z.object({
     phone: z.string().min(1).optional(),
     email: z.string().email().optional(),
-  }),
+  }).refine((r) => r.phone || r.email, { message: 'recipient.phone veya recipient.email gerekli' }),
   text: z.string().min(1),
   templateKey: z.string().optional(),
   scheduledAt: z.string().datetime().optional(),

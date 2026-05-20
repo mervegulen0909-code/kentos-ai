@@ -86,6 +86,7 @@ export async function runOutboundJob(job: { name: string; data: OutboundJobData 
       data: {
         state: OutboundDeliveryState.FAILED,
         attempts: { increment: 1 },
+        lastAttemptAt: new Date(),
         lastError: 'gateway-or-key-missing',
       },
     });
@@ -126,6 +127,7 @@ export async function runOutboundJob(job: { name: string; data: OutboundJobData 
       data: {
         state: OutboundDeliveryState.DISPATCHED,
         attempts: { increment: 1 },
+        lastAttemptAt: new Date(),
         dispatchedAt: new Date(),
         externalMessageId: payload.result?.externalMessageId ?? null,
         lastError: null,
@@ -139,6 +141,7 @@ export async function runOutboundJob(job: { name: string; data: OutboundJobData 
       data: {
         state: OutboundDeliveryState.FAILED,
         attempts: { increment: 1 },
+        lastAttemptAt: new Date(),
         lastError: message.slice(0, 200),
       },
     });

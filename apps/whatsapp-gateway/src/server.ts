@@ -81,9 +81,15 @@ const routes: Record<string, RouteHandler> = {
   },
   'POST /webhooks/sms': async (req, body, url) => {
     const params = parseFormBody(body);
-    // TWILIO_AUTH_TOKEN yoksa imza doğrulaması atlanır — sadece geliştirme/alternatif SMS sağlayıcısı için kabul edilebilir.
-    // Prodüksiyon Twilio kullanımında TWILIO_AUTH_TOKEN mutlaka set edilmelidir.
-    if (TWILIO_AUTH_TOKEN) {
+    const isProduction = process.env.NODE_ENV === 'production';
+    if (!TWILIO_AUTH_TOKEN) {
+      if (isProduction) {
+        logger.warn('[SMS] TWILIO_AUTH_TOKEN not set in production — inbound SMS request rejected');
+        return { status: 503, body: { error: 'gateway-misconfigured' } };
+      }
+      // Development: log warning but allow through
+      logger.warn('[SMS] TWILIO_AUTH_TOKEN not set — skipping signature verification (development only)');
+    } else {
       const fullUrl = `${process.env.PUBLIC_GATEWAY_BASE_URL?.replace(/\/$/, '') ?? `http://localhost:${PORT}`}${url.pathname}`;
       if (!verifyTwilioWebhookSignature({
         fullUrl,

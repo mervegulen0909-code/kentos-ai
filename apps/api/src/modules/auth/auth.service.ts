@@ -78,8 +78,15 @@ export class AuthService {
     return { ok: true };
   }
 
-  private refreshSecret() {
-    const accessSecret = this.config.get<string>('JWT_ACCESS_SECRET') ?? 'development-only-secret';
-    return this.config.get<string>('JWT_REFRESH_SECRET') ?? `${accessSecret}:refresh`;
+  private refreshSecret(): string {
+    const refresh = this.config.get<string>('JWT_REFRESH_SECRET');
+    if (!refresh) {
+      throw new Error('JWT_REFRESH_SECRET must be set in environment variables');
+    }
+    const access = this.config.get<string>('JWT_ACCESS_SECRET');
+    if (refresh === access) {
+      throw new Error('JWT_REFRESH_SECRET must be different from JWT_ACCESS_SECRET');
+    }
+    return refresh;
   }
 }
