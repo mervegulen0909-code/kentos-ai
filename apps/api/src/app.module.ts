@@ -2,14 +2,17 @@ import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { AdminModule } from './modules/admin/admin.module.js';
 import { AnalyticsModule } from './modules/analytics/analytics.module.js';
 import { AttachmentsModule } from './modules/attachments/attachments.module.js';
 import { AuthModule } from './modules/auth/auth.module.js';
 import { HealthModule } from './modules/health/health.module.js';
 import { PrismaModule } from './modules/prisma/prisma.module.js';
 import { PublicTicketModule } from './modules/public/public-ticket.module.js';
+import { ReportsModule } from './modules/reports/reports.module.js';
 import { TenantsModule } from './modules/tenants/tenants.module.js';
 import { TicketsModule } from './modules/tickets/tickets.module.js';
+import { UsersModule } from './modules/users/users.module.js';
 import { RootController } from './root.controller.js';
 
 @Module({
@@ -32,6 +35,9 @@ import { RootController } from './root.controller.js';
     TenantsModule,
     TicketsModule,
     PublicTicketModule,
+    UsersModule,
+    ReportsModule,
+    AdminModule,
   ],
   controllers: [RootController],
   providers: [

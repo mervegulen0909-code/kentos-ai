@@ -1,4 +1,4 @@
-import { PrismaClient, TicketStatus } from '@kentos/database';
+import { Prisma, PrismaClient, TicketStatus } from '@kentos/database';
 
 const prisma = new PrismaClient();
 
@@ -7,6 +7,7 @@ const closedStatuses = ['RESOLVED', 'CLOSED'] satisfies TicketStatus[];
 
 type ReportJobData = {
   tenantId?: string;
+  type?: string;
 };
 
 export async function processReportJob(job: { name: string; data: ReportJobData | unknown }) {
@@ -128,12 +129,39 @@ export async function processReportJob(job: { name: string; data: ReportJobData 
     })),
   };
 
-  return {
-    processor: 'reports',
-    job: job.name,
-    tenantId: tenantId ?? null,
-    generatedAt,
-    generatedReport,
-    accepted: true,
-  };
+  // Persist the report to the database
+  const reportType = data?.type ?? 'weekly_summary';
+  try {
+    const report = await prisma.managerReport.create({
+      data: {
+        tenantId: tenantId ?? 'system',
+        type: reportType,
+        periodStart: sevenDaysAgo,
+        periodEnd: now,
+        summary: `${reportType} — ${openedCount} açılan, ${closedCount} kapanan, ${currentlyOpenCount} bekleyen ticket`,
+        metrics: generatedReport as unknown as Prisma.InputJsonValue,
+      },
+    });
+    return {
+      processor: 'reports',
+      job: job.name,
+      tenantId: tenantId ?? null,
+      reportId: report.id,
+      generatedAt,
+      generatedReport,
+      accepted: true,
+    };
+  } catch (err) {
+    // Non-fatal: log the error but still return success
+    console.error('[reports] Failed to persist report to DB', err instanceof Error ? err.message : String(err));
+    return {
+      processor: 'reports',
+      job: job.name,
+      tenantId: tenantId ?? null,
+      generatedAt,
+      generatedReport,
+      accepted: true,
+      persisted: false,
+    };
+  }
 }
