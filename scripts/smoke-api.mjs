@@ -403,6 +403,15 @@ for (const key of ['aiCompleted', 'operatorHandoff', 'awaitingInfo', 'automation
     `Analytics conversation segments missing numeric ${key}.`,
   );
 }
+const analyticsOutboundDeliveries = await request('/analytics/outbound-deliveries', { token });
+for (const key of ['total', 'pending', 'dispatched', 'delivered', 'failed', 'skipped']) {
+  assert(
+    typeof analyticsOutboundDeliveries.body[key] === 'number',
+    `Analytics outbound deliveries missing numeric ${key}.`,
+  );
+}
+assert(Array.isArray(analyticsOutboundDeliveries.body.byChannel), 'Analytics outbound deliveries byChannel is not an array.');
+assert(Array.isArray(analyticsOutboundDeliveries.body.recentFailures), 'Analytics outbound deliveries recentFailures is not an array.');
 for (const channel of ['WEB_CHAT', 'WHATSAPP', 'INSTAGRAM', 'FACEBOOK', 'SMS']) {
   assert(
     analyticsChannels.body.some((row) => row.channel === channel),
@@ -419,10 +428,12 @@ await expectStatus('/analytics/overview', 403, { token: operatorToken });
 await expectStatus('/analytics/departments', 403, { token: operatorToken });
 await expectStatus('/analytics/channels', 403, { token: operatorToken });
 await expectStatus('/analytics/conversation-segments', 403, { token: operatorToken });
+await expectStatus('/analytics/outbound-deliveries', 403, { token: operatorToken });
 await expectStatus('/analytics/overview', 403, { token: departmentStaffToken });
 await expectStatus('/analytics/channels', 403, { token: departmentStaffToken });
 await expectStatus('/analytics/overview', 403, { token: readOnlyToken });
 await expectStatus('/analytics/conversation-segments', 403, { token: readOnlyToken });
+await expectStatus('/analytics/outbound-deliveries', 403, { token: readOnlyToken });
 
 const aiUsage = await request('/analytics/ai-usage', { token });
 for (const window of ['last24h', 'last7d', 'last30d']) {
@@ -436,7 +447,7 @@ await expectStatus('/analytics/ai-usage', 403, { token: readOnlyToken });
 console.log('ai_usage_read', true);
 
 const forbiddenAnalyticsKeys = ['citizen', 'citizens', 'citizenId', 'phone', 'email', 'auditLogs', 'messages', 'internalNotes', 'aiRuns', 'aiClassification'];
-const analyticsPayload = JSON.stringify([analyticsOverview.body, analyticsDepartments.body, analyticsCategories.body, analyticsNeighborhoods.body, analyticsChannels.body, analyticsConversationSegments.body, managerAnalyticsOverview.body, managerAnalyticsDepartments.body, managerAnalyticsChannels.body]);
+const analyticsPayload = JSON.stringify([analyticsOverview.body, analyticsDepartments.body, analyticsCategories.body, analyticsNeighborhoods.body, analyticsChannels.body, analyticsConversationSegments.body, analyticsOutboundDeliveries.body, managerAnalyticsOverview.body, managerAnalyticsDepartments.body, managerAnalyticsChannels.body]);
 for (const key of forbiddenAnalyticsKeys) {
   assert(!analyticsPayload.includes(`"${key}"`), `Analytics response leaked ${key}.`);
 }

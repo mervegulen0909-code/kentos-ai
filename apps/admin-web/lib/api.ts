@@ -97,6 +97,31 @@ export type AnalyticsAiUsage = {
   byProvider: AnalyticsAiUsageProviderSummary[];
 };
 
+export type AnalyticsOutboundDeliveries = {
+  total: number;
+  pending: number;
+  dispatched: number;
+  delivered: number;
+  failed: number;
+  skipped: number;
+  byChannel: Array<{
+    channel: string;
+    total: number;
+    pending: number;
+    dispatched: number;
+    delivered: number;
+    failed: number;
+    skipped: number;
+  }>;
+  recentFailures: Array<{
+    id: string;
+    channel: string;
+    attempts: number;
+    lastError: string | null;
+    updatedAt: string;
+  }>;
+};
+
 export type AnalyticsDepartmentSummary = {
   id: string;
   name: string;
@@ -280,6 +305,7 @@ export const adminApi = {
   conversationSegments: (token: string) =>
     apiFetch<AnalyticsConversationSegments>('/analytics/conversation-segments', { token }),
   aiUsage: (token: string) => apiFetch<AnalyticsAiUsage>('/analytics/ai-usage', { token }),
+  outboundDeliveries: (token: string) => apiFetch<AnalyticsOutboundDeliveries>('/analytics/outbound-deliveries', { token }),
   rescanAttachment: (token: string, attachmentId: string) =>
     apiFetch<{ attachmentId: string; scanStatus: 'PENDING' }>(`/attachments/${attachmentId}/rescan`, { method: 'POST', token }),
   quarantinedAttachments: (token: string) =>

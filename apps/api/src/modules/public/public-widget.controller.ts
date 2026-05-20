@@ -1,7 +1,9 @@
 import { Controller, Get, Headers, Inject, NotFoundException, Param } from '@nestjs/common';
+import { SkipThrottle } from '@nestjs/throttler';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { PublicConversationService } from './public-conversation.service.js';
 
+@SkipThrottle()
 @Controller('public/:tenantSlug')
 export class PublicWidgetController {
   constructor(

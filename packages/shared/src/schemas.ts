@@ -15,8 +15,9 @@ export const intakeClassificationSchema = z.object({
   neighborhoodName: z.string().nullable(),
   location: z
     .object({
-      latitude: z.number(),
-      longitude: z.number(),
+      // Prisma Decimal(10,7) ile uyumlu: -90..90 / -180..180, max 7 ondalık basamak
+      latitude: z.number().min(-90).max(90),
+      longitude: z.number().min(-180).max(180),
       accuracyMeters: z.number().int().nonnegative().nullable(),
     })
     .nullable(),

@@ -75,6 +75,18 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
+      - name: Unit tests (API)
+        run: pnpm --filter @kentos/api test
+
+      - name: Unit tests (Worker)
+        run: pnpm --filter @kentos/worker test
+
+      - name: Unit tests (Gateway)
+        run: pnpm --filter @kentos/whatsapp-gateway test
+
+      - name: Unit tests (Admin Web)
+        run: pnpm --filter @kentos/admin-web test
+
       - name: Build
         run: pnpm build
 

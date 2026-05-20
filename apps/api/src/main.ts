@@ -12,7 +12,13 @@ async function bootstrap() {
 
   app.setGlobalPrefix('api/v1', { exclude: [{ path: '/', method: RequestMethod.GET }] });
   app.use(helmet());
-  app.enableCors({ origin: config.get<string>('CORS_ORIGIN')?.split(',') ?? true });
+
+  const corsOrigin = config.get<string>('CORS_ORIGIN');
+  const isProduction = config.get<string>('NODE_ENV') === 'production';
+  if (isProduction && !corsOrigin) {
+    throw new Error('CORS_ORIGIN env var is required in production. Set it to a comma-separated list of allowed origins.');
+  }
+  app.enableCors({ origin: corsOrigin?.split(',') ?? true });
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }));
 
   const swaggerConfig = new DocumentBuilder()

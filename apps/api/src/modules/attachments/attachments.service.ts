@@ -209,28 +209,41 @@ export class AttachmentsService {
     return { attachmentId: attachment.id, scanStatus: 'PENDING' as const };
   }
 
-  async listQuarantined(user: AuthenticatedUser) {
-    const rows = await this.prisma.attachment.findMany({
-      where: { tenantId: user.tenantId, scanStatus: 'INFECTED' },
-      orderBy: { scannedAt: 'desc' },
-      take: 200,
-      include: {
-        ticket: { select: { id: true, ticketNo: true, title: true } },
-        message: { select: { id: true, ticketId: true } },
-      },
-    });
-    return rows.map((row) => ({
-      attachmentId: row.id,
-      fileName: row.fileName,
-      mimeType: row.mimeType,
-      sizeBytes: row.sizeBytes,
-      scanStatus: row.scanStatus,
-      scanThreat: row.scanThreat,
-      scannedAt: row.scannedAt,
-      ticketId: row.ticketId ?? row.message?.ticketId ?? null,
-      ticketNo: row.ticket?.ticketNo ?? null,
-      ticketTitle: row.ticket?.title ?? null,
-    }));
+  async listQuarantined(user: AuthenticatedUser, opts: { page?: number; limit?: number } = {}) {
+    const page = Math.max(1, opts.page ?? 1);
+    const limit = Math.min(100, Math.max(1, opts.limit ?? 50));
+    const skip = (page - 1) * limit;
+    const where = { tenantId: user.tenantId, scanStatus: 'INFECTED' as const };
+
+    const [rows, total] = await Promise.all([
+      this.prisma.attachment.findMany({
+        where,
+        orderBy: { scannedAt: 'desc' },
+        skip,
+        take: limit,
+        include: {
+          ticket: { select: { id: true, ticketNo: true, title: true } },
+          message: { select: { id: true, ticketId: true } },
+        },
+      }),
+      this.prisma.attachment.count({ where }),
+    ]);
+
+    return {
+      data: rows.map((row) => ({
+        attachmentId: row.id,
+        fileName: row.fileName,
+        mimeType: row.mimeType,
+        sizeBytes: row.sizeBytes,
+        scanStatus: row.scanStatus,
+        scanThreat: row.scanThreat,
+        scannedAt: row.scannedAt,
+        ticketId: row.ticketId ?? row.message?.ticketId ?? null,
+        ticketNo: row.ticket?.ticketNo ?? null,
+        ticketTitle: row.ticket?.title ?? null,
+      })),
+      meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
+    };
   }
 
   async attachAdminToTicket(user: AuthenticatedUser, ticketId: string, attachmentIds?: string[]) {

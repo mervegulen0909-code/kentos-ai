@@ -2,23 +2,41 @@
 	email {$ACME_EMAIL}
 }
 
+# Ortak güvenlik başlıkları — tüm site bloklarında (import security_headers) ile kullanılır
+(security_headers) {
+	header {
+		X-Frame-Options "DENY"
+		X-Content-Type-Options "nosniff"
+		X-XSS-Protection "1; mode=block"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "geolocation=(), microphone=(), camera=(), payment=()"
+		Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
+		-Server
+	}
+}
+
 {$API_DOMAIN} {
+	import security_headers
 	reverse_proxy api:3100
 }
 
 {$ADMIN_DOMAIN} {
+	import security_headers
 	reverse_proxy admin-web:3101
 }
 
 {$CITIZEN_DOMAIN} {
+	import security_headers
 	reverse_proxy citizen-web:3102
 }
 
 {$GATEWAY_DOMAIN} {
+	import security_headers
 	reverse_proxy whatsapp-gateway:3120
 }
 
 {$MUNICIPALITY_DOMAIN} {
+	import security_headers
 	header Content-Type "text/html; charset=utf-8"
 	respond `<!doctype html>
 <html lang="tr">

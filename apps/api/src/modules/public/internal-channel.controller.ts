@@ -1,9 +1,11 @@
 import { BadRequestException, Body, Controller, ForbiddenException, Headers, Inject, Post } from '@nestjs/common';
+import { SkipThrottle } from '@nestjs/throttler';
 import { ConfigService } from '@nestjs/config';
 import { channelIntakeEnvelopeSchema } from '@kentos/shared';
 import { IngestChannelEnvelopeDto } from './dto/ingest-channel-envelope.dto.js';
 import { PublicConversationService } from './public-conversation.service.js';
 
+@SkipThrottle() // Servis-içi iletişim — kendi auth'u (x-kentos-internal-key) var
 @Controller('internal/channel-ingest')
 export class InternalChannelController {
   constructor(

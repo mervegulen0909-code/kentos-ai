@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import { ForbiddenException, Inject, Injectable, NotFoundException, Optional } from '@nestjs/common';
+import { ForbiddenException, Inject, Injectable, InternalServerErrorException, NotFoundException, Optional, ServiceUnavailableException } from '@nestjs/common';
 import { AuditActorType, ChannelType, MessageVisibility, TicketStatus, type Prisma } from '@kentos/database';
 import {
   buildDeterministicIntakeClassification,
@@ -245,7 +245,7 @@ export class PublicTicketAiService {
     });
 
     if (!response.ok) {
-      throw new Error(`Anthropic AI request failed with ${response.status}`);
+      throw new ServiceUnavailableException(`Anthropic AI request failed with ${response.status}`);
     }
 
     const payload = await response.json() as {
@@ -253,7 +253,7 @@ export class PublicTicketAiService {
       usage?: { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number; cache_creation_input_tokens?: number };
     };
     const content = payload.content?.find((part) => part.type === 'text')?.text;
-    if (!content) throw new Error('Anthropic AI response did not include text content');
+    if (!content) throw new ServiceUnavailableException('Anthropic AI response did not include text content');
 
     const result = publicTicketAiIntakeResultSchema.parse({
       provider: 'anthropic',
@@ -341,7 +341,7 @@ export class PublicTicketAiService {
     });
 
     if (!response.ok) {
-      throw new Error(`Netiva AI request failed with ${response.status}`);
+      throw new ServiceUnavailableException(`Netiva AI request failed with ${response.status}`);
     }
 
     const payload = await response.json() as {
@@ -349,7 +349,7 @@ export class PublicTicketAiService {
       usage?: unknown;
     };
     const content = payload.choices?.[0]?.message?.content ?? payload.choices?.[0]?.text;
-    if (!content) throw new Error('Netiva AI response did not include content');
+    if (!content) throw new ServiceUnavailableException('Netiva AI response did not include content');
 
     const result = publicTicketAiIntakeResultSchema.parse({
       provider: 'netiva',
@@ -651,7 +651,7 @@ export class PublicTicketService {
       if (!existing) return token;
     }
 
-    throw new Error('Tracking token uretilemedi.');
+    throw new InternalServerErrorException('Tracking token uretilemedi: 5 denemede benzersiz token uretilmedi.');
   }
 
   private async listTenantDepartments(tenantId: string) {

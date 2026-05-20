@@ -1,0 +1,244 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: kentos
+      POSTGRES_PASSWORD: kentos
+      POSTGRES_DB: kentos_ai
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-dev-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kentos -d kentos_ai"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-dev-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  minio:
+    image: minio/minio:latest
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio-dev-data:/data
+
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+      until mc alias set local http://minio:9000 minioadmin minioadmin; do sleep 2; done &&
+      mc mb --ignore-existing local/kentos-dev &&
+      mc anonymous set none local/kentos-dev
+      "
+    restart: "no"
+
+  clamav:
+    image: clamav/clamav:1.4
+    restart: unless-stopped
+    environment:
+      CLAMAV_NO_FRESHCLAMD: "false"
+    ports:
+      - "3310:3310"
+    volumes:
+      - clamav-dev-data:/var/lib/clamav
+    healthcheck:
+      test: ["CMD", "/bin/sh", "-c", "echo PING | nc -w 5 127.0.0.1 3310 | grep -q PONG"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 120s
+
+  migrate:
+    profiles: ["app"]
+    build:
+      context: ..
+      dockerfile: infra/Dockerfile.dev
+    restart: "no"
+    working_dir: /app
+    command: ["sh", "-lc", "pnpm db:generate && pnpm db:deploy && pnpm db:seed"]
+    environment:
+      DATABASE_URL: postgresql://kentos:kentos@postgres:5432/kentos_ai?schema=public
+    volumes:
+      - ..:/app
+      - node-modules:/app/node_modules
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  api:
+    profiles: ["app"]
+    build:
+      context: ..
+      dockerfile: infra/Dockerfile.dev
+    restart: unless-stopped
+    working_dir: /app
+    command: ["pnpm", "--filter", "@kentos/api", "dev"]
+    environment:
+      PORT: "3100"
+      DATABASE_URL: postgresql://kentos:kentos@postgres:5432/kentos_ai?schema=public
+      REDIS_URL: redis://redis:6379
+      JWT_ACCESS_SECRET: dev-access-secret-change-me
+      JWT_REFRESH_SECRET: dev-refresh-secret-change-me
+      INTERNAL_API_KEY: change-me-internal
+      WIDGET_ORIGIN_ALLOWLIST: http://localhost:3102,http://127.0.0.1:3102,http://localhost:3101,http://127.0.0.1:3101
+      S3_ENDPOINT: http://minio:9000
+      S3_ACCESS_KEY: minioadmin
+      S3_SECRET_KEY: minioadmin
+      S3_BUCKET: kentos-dev
+      S3_REGION: us-east-1
+      S3_FORCE_PATH_STYLE: "true"
+      S3_PRESIGN_EXPIRES_SECONDS: "900"
+      S3_DOWNLOAD_EXPIRES_SECONDS: "300"
+      ATTACHMENT_SCAN_PROVIDER: clamav
+      CLAMAV_HOST: clamav
+      CLAMAV_PORT: "3310"
+      CLAMAV_TIMEOUT_MS: "15000"
+      AI_PROVIDER: stub
+    ports:
+      - "3100:3100"
+    volumes:
+      - ..:/app
+      - node-modules:/app/node_modules
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+      clamav:
+        condition: service_healthy
+
+  worker:
+    profiles: ["app"]
+    build:
+      context: ..
+      dockerfile: infra/Dockerfile.dev
+    restart: unless-stopped
+    working_dir: /app
+    command: ["pnpm", "--filter", "@kentos/worker", "dev"]
+    environment:
+      DATABASE_URL: postgresql://kentos:kentos@postgres:5432/kentos_ai?schema=public
+      REDIS_URL: redis://redis:6379
+      INTERNAL_API_KEY: change-me-internal
+      CHANNEL_GATEWAY_BASE_URL: http://whatsapp-gateway:3120
+      S3_ENDPOINT: http://minio:9000
+      S3_ACCESS_KEY: minioadmin
+      S3_SECRET_KEY: minioadmin
+      S3_BUCKET: kentos-dev
+      S3_REGION: us-east-1
+      S3_FORCE_PATH_STYLE: "true"
+      ATTACHMENT_SCAN_PROVIDER: clamav
+      CLAMAV_HOST: clamav
+      CLAMAV_PORT: "3310"
+      CLAMAV_TIMEOUT_MS: "15000"
+    volumes:
+      - ..:/app
+      - node-modules:/app/node_modules
+    depends_on:
+      api:
+        condition: service_started
+      redis:
+        condition: service_healthy
+      clamav:
+        condition: service_healthy
+
+  admin-web:
+    profiles: ["app"]
+    build:
+      context: ..
+      dockerfile: infra/Dockerfile.dev
+    restart: unless-stopped
+    working_dir: /app
+    command: ["pnpm", "--filter", "@kentos/admin-web", "exec", "next", "dev", "-H", "0.0.0.0", "-p", "3101"]
+    environment:
+      NEXT_PUBLIC_API_BASE_URL: http://api:3100/api/v1
+      NEXT_PUBLIC_PUBLIC_API_BASE_URL: http://localhost:3100/api/v1
+      NEXT_PUBLIC_CITIZEN_WEB_BASE_URL: http://localhost:3102
+    ports:
+      - "3101:3101"
+    volumes:
+      - ..:/app
+      - node-modules:/app/node_modules
+    depends_on:
+      api:
+        condition: service_started
+
+  citizen-web:
+    profiles: ["app"]
+    build:
+      context: ..
+      dockerfile: infra/Dockerfile.dev
+    restart: unless-stopped
+    working_dir: /app
+    command: ["pnpm", "--filter", "@kentos/citizen-web", "exec", "next", "dev", "-H", "0.0.0.0", "-p", "3102"]
+    environment:
+      NEXT_PUBLIC_API_BASE_URL: http://api:3100/api/v1
+      NEXT_PUBLIC_PUBLIC_API_BASE_URL: http://localhost:3100/api/v1
+    ports:
+      - "3102:3102"
+    volumes:
+      - ..:/app
+      - node-modules:/app/node_modules
+    depends_on:
+      api:
+        condition: service_started
+
+  whatsapp-gateway:
+    profiles: ["app"]
+    build:
+      context: ..
+      dockerfile: infra/Dockerfile.dev
+    restart: unless-stopped
+    working_dir: /app
+    command: ["pnpm", "--filter", "@kentos/whatsapp-gateway", "dev"]
+    environment:
+      PORT: "3120"
+      KENTOS_API_BASE_URL: http://api:3100/api/v1
+      PUBLIC_GATEWAY_BASE_URL: http://localhost:3120
+      INTERNAL_API_KEY: change-me-internal
+      META_WEBHOOK_VERIFY_TOKEN: dev-verify-token
+      META_APP_SECRET: dev-app-secret
+      TWILIO_AUTH_TOKEN: dev-auth-token
+      WHATSAPP_OUTBOUND_LIVE: "false"
+      INSTAGRAM_OUTBOUND_LIVE: "false"
+      FACEBOOK_OUTBOUND_LIVE: "false"
+      SMS_OUTBOUND_LIVE: "false"
+      EMAIL_OUTBOUND_LIVE: "false"
+    ports:
+      - "3120:3120"
+    volumes:
+      - ..:/app
+      - node-modules:/app/node_modules
+    depends_on:
+      api:
+        condition: service_started
+
+volumes:
+  postgres-dev-data:
+  redis-dev-data:
+  minio-dev-data:
+  clamav-dev-data:
+  node-modules:

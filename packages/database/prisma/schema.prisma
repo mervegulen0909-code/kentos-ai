@@ -336,6 +336,8 @@ model Ticket {
   @@unique([tenantId, publicTrackingToken])
   @@index([tenantId, status, priority])
   @@index([tenantId, departmentId, status])
+  @@index([tenantId, categoryId, status])
+  @@index([tenantId, assignedToId, status])
   @@index([tenantId, resolutionDueAt])
   @@index([tenantId, createdAt])
 }
@@ -473,6 +475,7 @@ model AuditLog {
 
   @@index([tenantId, ticketId, createdAt])
   @@index([tenantId, action, createdAt])
+  @@index([tenantId, actorUserId, createdAt])
 }
 
 model AiRun {

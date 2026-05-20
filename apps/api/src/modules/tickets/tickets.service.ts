@@ -1,6 +1,7 @@
 import { ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { AuditActorType, ChannelType, MessageVisibility, TicketStatus, UserRole } from '@kentos/database';
 import type { Prisma } from '@kentos/database';
+import { intakeClassificationSchema } from '@kentos/shared';
 import type { IntakeClassification } from '@kentos/shared';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import { AttachmentsService } from '../attachments/attachments.service.js';
@@ -33,32 +34,47 @@ export class TicketsService {
       categoryId?: string;
       assignedToId?: string;
       q?: string;
+      page?: number;
+      limit?: number;
     } = {},
   ) {
-    const departmentScope = await this.departmentScope(user);
-    const tickets = await this.prisma.ticket.findMany({
-      where: {
-        tenantId: user.tenantId,
-        status: filters.status,
-        departmentId: this.scopedDepartmentFilter(departmentScope, filters.departmentId),
-        categoryId: filters.categoryId,
-        assignedToId: filters.assignedToId,
-        OR: filters.q
-          ? [
-              { ticketNo: { contains: filters.q, mode: 'insensitive' } },
-              { publicTrackingToken: { contains: filters.q, mode: 'insensitive' } },
-              { title: { contains: filters.q, mode: 'insensitive' } },
-              { description: { contains: filters.q, mode: 'insensitive' } },
-              { addressText: { contains: filters.q, mode: 'insensitive' } },
-            ]
-          : undefined,
-      },
-      include: { department: true, category: true, assignedTo: true, citizen: true },
-      orderBy: [{ createdAt: 'desc' }, { resolutionDueAt: 'asc' }],
-      take: 100,
-    });
+    const page = Math.max(1, filters.page ?? 1);
+    const limit = Math.min(200, Math.max(1, filters.limit ?? 50));
+    const skip = (page - 1) * limit;
 
-    return tickets.map((ticket) => ({ ...ticket, slaState: this.slaState(ticket.resolutionDueAt) }));
+    const departmentScope = await this.departmentScope(user);
+    const where = {
+      tenantId: user.tenantId,
+      status: filters.status,
+      departmentId: this.scopedDepartmentFilter(departmentScope, filters.departmentId),
+      categoryId: filters.categoryId,
+      assignedToId: filters.assignedToId,
+      OR: filters.q
+        ? [
+            { ticketNo: { contains: filters.q, mode: 'insensitive' as const } },
+            { publicTrackingToken: { contains: filters.q, mode: 'insensitive' as const } },
+            { title: { contains: filters.q, mode: 'insensitive' as const } },
+            { description: { contains: filters.q, mode: 'insensitive' as const } },
+            { addressText: { contains: filters.q, mode: 'insensitive' as const } },
+          ]
+        : undefined,
+    };
+
+    const [tickets, total] = await Promise.all([
+      this.prisma.ticket.findMany({
+        where,
+        include: { department: true, category: true, assignedTo: true, citizen: true },
+        orderBy: [{ createdAt: 'desc' }, { resolutionDueAt: 'asc' }],
+        skip,
+        take: limit,
+      }),
+      this.prisma.ticket.count({ where }),
+    ]);
+
+    return {
+      data: tickets.map((ticket) => ({ ...ticket, slaState: this.slaState(ticket.resolutionDueAt) })),
+      meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
+    };
   }
 
   async create(user: AuthenticatedUser, dto: CreateTicketDto) {
@@ -132,7 +148,8 @@ export class TicketsService {
       ...ticket,
       aiSummary: {
         confidence: ticket.aiConfidence ? Number(ticket.aiConfidence) : null,
-        classification: (ticket.aiClassification as IntakeClassification | null) ?? null,
+        // safeParse ile DB'den gelen JSON'ı doğrula — geçersiz veri null döner
+        classification: intakeClassificationSchema.safeParse(ticket.aiClassification).data ?? null,
         contactSignals: contactSignals
           ? {
               hasPhone: Boolean(contactSignals.hasPhone),

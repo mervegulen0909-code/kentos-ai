@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, InternalServerErrorException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import {
   buildCitizenIdentifierInputs,
@@ -237,7 +237,7 @@ export class CitizenIdentityService {
 
         const survivor = clusterCitizens.find((entry) => entry.id === decision.survivorCitizenId) ?? clusterCitizens[0];
         if (!survivor) {
-          throw new Error('Backfill survivor could not be resolved.');
+          throw new InternalServerErrorException('Backfill survivor could not be resolved.');
         }
 
         const duplicateCitizens = clusterCitizens.filter((entry) => decision.duplicateCitizenIds.includes(entry.id));
@@ -371,7 +371,7 @@ export class CitizenIdentityService {
     });
 
     const survivor = weightedCitizens[0]?.citizen;
-    if (!survivor) throw new Error('Canonical citizen could not be selected.');
+    if (!survivor) throw new InternalServerErrorException('Canonical citizen could not be selected.');
 
     const duplicates = weightedCitizens.slice(1).map((entry) => entry.citizen);
     if (!duplicates.length) {

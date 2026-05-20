@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { APP_GUARD } from '@nestjs/core';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { AnalyticsModule } from './modules/analytics/analytics.module.js';
 import { AttachmentsModule } from './modules/attachments/attachments.module.js';
 import { AuthModule } from './modules/auth/auth.module.js';
@@ -13,6 +15,15 @@ import { RootController } from './root.controller.js';
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true, envFilePath: ['.env', '../../.env'] }),
+    ThrottlerModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => ([{
+        // Global varsayılan: dakikada 120 istek — admin panel ve normal API kullanımı için yeterli.
+        // Auth endpoint'leri kendi @Throttle decorator'larıyla daha katı limitlere sahip.
+        ttl: Number(config.get<string>('THROTTLE_TTL_MS') ?? 60_000),
+        limit: Number(config.get<string>('THROTTLE_LIMIT') ?? 120),
+      }]),
+    }),
     PrismaModule,
     HealthModule,
     AnalyticsModule,
@@ -23,5 +34,10 @@ import { RootController } from './root.controller.js';
     PublicTicketModule,
   ],
   controllers: [RootController],
+  providers: [
+    // Tüm route'lara global throttle guard uygula
+    // @SkipThrottle() ile belirli route'lardan çıkarılabilir
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
+  ],
 })
 export class AppModule {}

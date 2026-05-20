@@ -55,6 +55,7 @@ Run local API smoke when API, database, auth, RBAC, tenant settings, ticket work
 - [ ] Smoke verifies `/public/:tenantSlug/widget-status` returns `widgetReady`, `originAllowed`, and `allowedOriginCount` for the seeded tenant.
 - [ ] Smoke verifies `/analytics/conversation-segments` returns `aiCompleted / operatorHandoff / awaitingInfo / automationRate`.
 - [ ] Smoke verifies `/analytics/channels` returns rows for at least the seeded channels (WEB_CHAT, WHATSAPP, INSTAGRAM, FACEBOOK, SMS; EMAIL is accepted without requiring demo data) and includes attachment counts when media is linked.
+- [ ] Smoke verifies `/analytics/outbound-deliveries` returns delivery totals, channel breakdowns, and recent failure review rows without citizen contact fields.
 - [ ] Smoke verifies internal outbound endpoints (`/internal/<channel>/outbound`) on the gateway reject missing `x-kentos-internal-key`.
 - [ ] Smoke verifies multi-channel webhook intake (`/webhooks/instagram`, `/webhooks/facebook`, `/webhooks/sms`) rejects missing `META_APP_SECRET` / `TWILIO_AUTH_TOKEN` signatures when those env vars are configured.
 
@@ -81,7 +82,9 @@ Run browser smoke when admin or citizen UI routes, forms, auth/session, settings
 - [ ] Admin ticket detail supports internal/public message attachment upload and shows linked attachment metadata without storage keys.
 - [ ] Admin settings supports department/category/SLA/message-template create or update flows currently in scope.
 - [ ] Admin settings shows tenant-specific widget embed script, preview path, expected `WEB_CHAT` channel, and production origin/rate-limit caveat.
+- [ ] Admin reports shows outbound delivery totals, failed delivery count, and channel-level delivery breakdown.
 - [ ] Citizen widget preview opens at `/widget/[tenantSlug]`, submits via conversation flow, and returns either follow-up or TK tracking state without raw errors.
+- [ ] Citizen widget preview can continue the same `conversationId` after a follow-up question and complete to a TK tracking state.
 - [ ] Citizen widget preview supports public-safe attachment upload in the ticket-creation path without exposing storage internals.
 - [ ] Citizen report creates a ticket, can attach a file, and redirects to the public ticket page under the `ticket/[trackingToken]` route.
 - [ ] Citizen tracking finds the same public ticket by TK tracking code only under the `ticket/[trackingToken]` route and shows safe attachment metadata.
@@ -89,6 +92,7 @@ Run browser smoke when admin or citizen UI routes, forms, auth/session, settings
 - [ ] Citizen pages do not expose internal notes, audit logs, AI reasoning, stack traces, secrets, or tenant internals.
 - [ ] Browser console has no unexpected errors on the smoke path.
 - [ ] Narrow mobile viewport has no blocking layout breakage.
+- [ ] Automated mobile smoke covers admin settings/reports/ticket detail plus citizen report/track/ticket at 390px without horizontal overflow.
 
 ### Browser status rule (strict)
 
@@ -128,7 +132,7 @@ Run this scope when queue processors, notification delivery guardrails, or worke
 - [ ] Notification processor returns explicit skip reasons for non-deliverable public-message jobs.
 - [ ] SLA processor returns actionable `breached` and `dueSoon` counts with a timestamped summary.
 - [ ] Reports processor returns a timestamped acceptance summary suitable for QA/release evidence.
-- [ ] Outbound processor (`kentos.outbound`) honors retry/backoff and writes terminal `OutboundDelivery.state` (`DISPATCHED`, `FAILED`, `SKIPPED`).
+- [ ] Outbound processor (`kentos.outbound`) honors retry/backoff, increments attempts once per worker failure, records `lastError`, and writes terminal `OutboundDelivery.state` (`DISPATCHED`, `FAILED`, `SKIPPED`).
 - [ ] Retention processor (`kentos.retention`) accepts `tenantId / retentionDays / scope`, includes `attachments` in scope/all summaries, defaults to dry-run, and reports `attachmentStorageKeys`, `totals.attachments`, `totals.attachmentObjectsDeleted`, and `objectDeleteErrors`.
 - [ ] Media processor (`kentos.media`) accepts confirmed attachment payloads, verifies object metadata when S3 is configured, returns retry-safe skip/failure reasons, and documents virus scanning as a placeholder independent from retention.
 

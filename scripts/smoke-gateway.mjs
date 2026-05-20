@@ -25,7 +25,9 @@ async function request(path, options = {}) {
   };
   const response = await fetch(`${baseUrl}${path}`, { ...options, headers });
   const text = await response.text();
-  return { status: response.status, body: parseBody(text, path), text };
+  const contentType = response.headers.get('content-type') ?? '';
+  const body = contentType.includes('application/json') ? parseBody(text, path) : null;
+  return { status: response.status, body, text };
 }
 
 async function expectStatus(path, expectedStatus, options = {}) {

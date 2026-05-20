@@ -5,6 +5,7 @@ import {
   type AnalyticsChannelSummary,
   type AnalyticsConversationSegments,
   type AnalyticsDepartmentSummary,
+  type AnalyticsOutboundDeliveries,
 } from '../../lib/api';
 import { canViewAnalytics, resolveAdminSession } from '../../lib/session';
 import { AdminShell } from '../components/admin-shell';
@@ -39,6 +40,17 @@ const fallbackAiUsage: AnalyticsAiUsage = {
   byProvider: [],
 };
 
+const fallbackOutboundDeliveries: AnalyticsOutboundDeliveries = {
+  total: 0,
+  pending: 0,
+  dispatched: 0,
+  delivered: 0,
+  failed: 0,
+  skipped: 0,
+  byChannel: [],
+  recentFailures: [],
+};
+
 function formatCostMicrosAsTl(value: number) {
   // 1 micro = 1 / 1_000_000 USD; we display as USD cents-equivalent.
   // Operator can convert to TRY per their accounting; the dashboard remains denominated in USD micros.
@@ -54,6 +66,7 @@ const channelLabels: Record<string, string> = {
   INSTAGRAM: 'Instagram DM',
   FACEBOOK: 'Facebook DM',
   SMS: 'SMS',
+  EMAIL: 'E-posta',
 };
 
 function formatPercent(value: number) {
@@ -68,7 +81,7 @@ export default async function ReportsPage() {
   const analyticsVisible = canViewAnalytics(role);
   let dataUnavailable = false;
 
-  const [overview, channelSummary, departmentSummary, categorySummary, segments, aiUsage] = token && analyticsVisible
+  const [overview, channelSummary, departmentSummary, categorySummary, segments, aiUsage, outboundDeliveries] = token && analyticsVisible
     ? await Promise.all([
         adminApi.overview(token).catch(() => {
           dataUnavailable = true;
@@ -94,8 +107,12 @@ export default async function ReportsPage() {
           dataUnavailable = true;
           return fallbackAiUsage;
         }),
+        adminApi.outboundDeliveries(token).catch(() => {
+          dataUnavailable = true;
+          return fallbackOutboundDeliveries;
+        }),
       ])
-    : [fallbackOverview, fallbackChannels, fallbackDepartments, fallbackCategories, fallbackSegments, fallbackAiUsage];
+    : [fallbackOverview, fallbackChannels, fallbackDepartments, fallbackCategories, fallbackSegments, fallbackAiUsage, fallbackOutboundDeliveries];
 
   const noOperationalData = !overview.totalOpen && !overview.openedToday && !overview.resolvedToday && !overview.slaBreached && !overview.slaDueSoon;
   const statusRows = overview.byStatus
@@ -166,22 +183,22 @@ export default async function ReportsPage() {
                 Vatandasla baslayan her sohbetin nasil sonuclandigi: AI tamamladi mi, operatore mi dustu, yoksa eksik bilgi mi bekliyor.
               </p>
               <div className="grid" style={{ marginTop: 12 }}>
-                <article className="card">
+                <article className="subpanel">
                   <p>AI tamamladi</p>
                   <p className="kpi">{segments.aiCompleted}</p>
                   <p style={{ color: 'var(--muted)' }}>Asistan eksiksiz topladi, ticket otomatik acildi.</p>
                 </article>
-                <article className="card">
+                <article className="subpanel">
                   <p>Operatore dustu</p>
                   <p className="kpi" style={{ color: 'var(--accent)' }}>{segments.operatorHandoff}</p>
                   <p style={{ color: 'var(--muted)' }}>Vatandas insan destegi istedi veya AI handoff onerdi.</p>
                 </article>
-                <article className="card">
+                <article className="subpanel">
                   <p>Eksik bilgi bekliyor</p>
                   <p className="kpi">{segments.awaitingInfo}</p>
                   <p style={{ color: 'var(--muted)' }}>Sohbet acik; takip sorusu vatandas cevabi bekliyor.</p>
                 </article>
-                <article className="card">
+                <article className="subpanel">
                   <p>Otomasyon orani</p>
                   <p className="kpi" style={{ color: 'var(--accent)' }}>{formatPercent(segments.automationRate)}</p>
                   <p style={{ color: 'var(--muted)' }}>Toplam {segments.totalConversations} konusmanin AI ile sonuclanan orani.</p>
@@ -194,12 +211,12 @@ export default async function ReportsPage() {
                 Vatandas intake siniflandirmasi icin yapilan model cagrilarinin saglik metrikleri. Maliyet, modelin liste fiyatina gore mikro-dolar tahminidir; tenant anlasmasina gore yeniden hesaplayin.
               </p>
               <div className="grid" style={{ marginTop: 12 }}>
-                <article className="card">
+                <article className="subpanel">
                   <p>Son 24 saat - calisma</p>
                   <p className="kpi">{aiUsage.windows.last24h.runs}</p>
                   <p style={{ color: 'var(--muted)' }}>Basari orani: {formatPercent(aiUsage.windows.last24h.successRate)}</p>
                 </article>
-                <article className="card">
+                <article className="subpanel">
                   <p>Son 24 saat - tahmini maliyet</p>
                   <p className="kpi">{formatCostMicrosAsTl(aiUsage.windows.last24h.costMicros)}</p>
                   <p style={{ color: 'var(--muted)' }}>{aiUsage.windows.last24h.tokensTotal} token</p>
@@ -233,6 +250,58 @@ export default async function ReportsPage() {
                   <p>Stub fallback'a dustugunde de buraya kayit gelir; bos gorunmesi henuz hic intake yapilmadigi anlamina gelir.</p>
                 </div>
               )}
+            </section>
+            <section className="card" style={{ marginTop: 18 }}>
+              <h2>Disa giden teslimatlar</h2>
+              <p style={{ color: 'var(--muted)' }}>
+                WhatsApp, SMS, e-posta ve sosyal kanal yanitlarinin kuyruk ve gateway durumlari. Basarisiz teslimatlar son hata mesaji ve deneme sayisiyla operator incelemesine acilir.
+              </p>
+              <div className="grid" style={{ marginTop: 12 }}>
+                <article className="subpanel">
+                  <p>Toplam teslimat</p>
+                  <p className="kpi">{outboundDeliveries.total}</p>
+                  <p style={{ color: 'var(--muted)' }}>{outboundDeliveries.pending} kuyrukta / {outboundDeliveries.skipped} atlandi</p>
+                </article>
+                <article className="subpanel">
+                  <p>Gateway'e giden</p>
+                  <p className="kpi">{outboundDeliveries.dispatched}</p>
+                  <p style={{ color: 'var(--muted)' }}>{outboundDeliveries.delivered} teslim edildi olarak isaretli</p>
+                </article>
+                <article className="subpanel">
+                  <p>Basarisiz</p>
+                  <p className="kpi" style={{ color: outboundDeliveries.failed ? 'var(--danger)' : 'var(--accent)' }}>{outboundDeliveries.failed}</p>
+                  <p style={{ color: 'var(--muted)' }}>Son hata bilgisi review listesinde tutulur.</p>
+                </article>
+              </div>
+              {outboundDeliveries.byChannel.length ? (
+                <div className="responsive-list" style={{ marginTop: 12 }}>
+                  {outboundDeliveries.byChannel.map((row) => (
+                    <div className="queue-row" key={row.channel}>
+                      <strong>{channelLabels[row.channel] ?? row.channel}</strong>
+                      <span>{row.total} toplam</span>
+                      <span>{row.pending} bekliyor</span>
+                      <span>{row.dispatched + row.delivered} gitti</span>
+                      <span>{row.failed} basarisiz</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="empty-state" style={{ marginTop: 12 }}>
+                  <strong>Outbound teslimat kaydi yok.</strong>
+                  <p>Vatandas kanallarina otomatik yanitlar kuyruga alininca teslimat durumlari burada gorunur.</p>
+                </div>
+              )}
+              {outboundDeliveries.recentFailures.length ? (
+                <div className="responsive-list" style={{ marginTop: 12 }} aria-label="Son basarisiz outbound teslimatlar">
+                  {outboundDeliveries.recentFailures.map((failure) => (
+                    <div className="queue-row" key={failure.id}>
+                      <strong>{channelLabels[failure.channel] ?? failure.channel}</strong>
+                      <span>{failure.attempts} deneme</span>
+                      <span>{failure.lastError ?? 'Hata mesaji yok'}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
             </section>
             <section className="card" style={{ marginTop: 18 }}>
               <h2>Kanal performansi</h2>

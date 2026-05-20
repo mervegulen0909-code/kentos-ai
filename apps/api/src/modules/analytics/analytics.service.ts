@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { AuditActorType, MessageVisibility, TicketStatus } from '@kentos/database';
+import { AuditActorType, MessageVisibility, OutboundDeliveryState, TicketStatus } from '@kentos/database';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import {
@@ -242,5 +242,71 @@ export class AnalyticsService {
         automationRate: publicMessages ? Number((aiMessages / publicMessages).toFixed(3)) : 0,
       };
     });
+  }
+
+  async outboundDeliveries(user: AuthenticatedUser) {
+    const [byState, byChannelState, recentFailures] = await Promise.all([
+      this.prisma.outboundDelivery.groupBy({
+        by: ['state'],
+        where: { tenantId: user.tenantId },
+        _count: { _all: true },
+      }),
+      this.prisma.outboundDelivery.groupBy({
+        by: ['channel', 'state'],
+        where: { tenantId: user.tenantId },
+        _count: { _all: true },
+      }),
+      this.prisma.outboundDelivery.findMany({
+        where: { tenantId: user.tenantId, state: OutboundDeliveryState.FAILED },
+        orderBy: { updatedAt: 'desc' },
+        take: 5,
+        select: {
+          id: true,
+          channel: true,
+          attempts: true,
+          lastError: true,
+          updatedAt: true,
+        },
+      }),
+    ]);
+
+    const stateCount = (state: OutboundDeliveryState) =>
+      byState.find((row) => row.state === state)?._count._all ?? 0;
+    const channels = new Set(byChannelState.map((row) => row.channel));
+    const byChannel = [...channels].sort().map((channel) => {
+      const count = (state: OutboundDeliveryState) =>
+        byChannelState.find((row) => row.channel === channel && row.state === state)?._count._all ?? 0;
+      const pending = count(OutboundDeliveryState.PENDING);
+      const dispatched = count(OutboundDeliveryState.DISPATCHED);
+      const delivered = count(OutboundDeliveryState.DELIVERED);
+      const failed = count(OutboundDeliveryState.FAILED);
+      const skipped = count(OutboundDeliveryState.SKIPPED);
+      return {
+        channel,
+        total: pending + dispatched + delivered + failed + skipped,
+        pending,
+        dispatched,
+        delivered,
+        failed,
+        skipped,
+      };
+    });
+
+    return {
+      total: byState.reduce((sum, row) => sum + row._count._all, 0),
+      pending: stateCount(OutboundDeliveryState.PENDING),
+      dispatched: stateCount(OutboundDeliveryState.DISPATCHED),
+      delivered: stateCount(OutboundDeliveryState.DELIVERED),
+      failed: stateCount(OutboundDeliveryState.FAILED),
+      skipped: stateCount(OutboundDeliveryState.SKIPPED),
+      byChannel,
+      recentFailures: recentFailures.map((failure) => ({
+        id: failure.id,
+        channel: failure.channel,
+        attempts: failure.attempts,
+        lastError: failure.lastError,
+        updatedAt: failure.updatedAt,
+      })),
+    };
   }
 }

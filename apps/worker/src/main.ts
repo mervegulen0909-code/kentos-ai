@@ -1,3 +1,4 @@
+import { logger } from './logger.js';
 import { processMediaJob } from './processors/media.processor.js';
 import { processNotificationJob } from './processors/notifications.processor.js';
 import { processOutboundJob } from './processors/outbound.processor.js';
@@ -16,20 +17,22 @@ const workers = [
   createWorker(queueNames.outbound, processOutboundJob),
 ];
 
-console.log('KentOS worker ready for SLA, notification, reporting and media queues.');
-console.log(`Registered queues: ${workers.map((worker) => worker.name).join(', ')}`);
+logger.info('KentOS worker ready', { queues: workers.map((w) => w.name) });
 
 for (const worker of workers) {
   worker.on('completed', (job, result) => {
-    console.log(`[${worker.name}] completed`, job.id, result);
+    logger.info(`[${worker.name}] job completed`, { jobId: job.id, result });
   });
   worker.on('failed', (job, error) => {
-    console.error(`[${worker.name}] failed`, job?.id, error);
+    logger.error(`[${worker.name}] job failed`, {
+      jobId: job?.id,
+      error: error instanceof Error ? error.message : String(error),
+    });
   });
 }
 
 async function shutdown(signal: string) {
-  console.log(`Shutting down worker on ${signal}...`);
+  logger.info(`Shutting down worker`, { signal });
   await Promise.all(workers.map((worker) => worker.close()));
   process.exit(0);
 }

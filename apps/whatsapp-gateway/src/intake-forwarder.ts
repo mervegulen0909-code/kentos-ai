@@ -37,24 +37,36 @@ export async function forwardInboundMessages(messages: NormalizedInboundMessage[
   }
 
   let delivered = 0;
+  const errors: Array<{ externalMessageId: string | undefined; error: string }> = [];
+
   for (const envelope of envelopes) {
-    const response = await fetch(`${options.apiBaseUrl.replace(/\/$/, '')}/internal/channel-ingest`, {
-      method: 'POST',
-      headers: {
-        Accept: 'application/json',
-        'Content-Type': 'application/json',
-        'x-kentos-internal-key': options.internalApiKey,
-      },
-      body: JSON.stringify(envelope),
-    });
-    if (!response.ok) throw new Error(`Internal channel ingest failed: ${response.status} ${await response.text()}`);
-    delivered += 1;
+    try {
+      const response = await fetch(`${options.apiBaseUrl.replace(/\/$/, '')}/internal/channel-ingest`, {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+          'x-kentos-internal-key': options.internalApiKey,
+        },
+        body: JSON.stringify(envelope),
+      });
+      if (!response.ok) {
+        const detail = await response.text().catch(() => '');
+        errors.push({ externalMessageId: envelope.externalMessageId, error: `HTTP ${response.status}: ${detail.slice(0, 200)}` });
+        continue;
+      }
+      delivered += 1;
+    } catch (err) {
+      errors.push({ externalMessageId: envelope.externalMessageId, error: err instanceof Error ? err.message : 'unknown-error' });
+    }
   }
 
   return {
     accepted: envelopes.length,
     skipped: messages.length - envelopes.length,
     delivered,
+    failed: errors.length,
+    errors,
     envelopes,
   };
 }

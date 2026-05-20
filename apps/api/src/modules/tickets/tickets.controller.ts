@@ -1,5 +1,6 @@
 import { Body, Controller, Get, Inject, Param, Post, Query, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
+import { ApiBearerAuth, ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { TicketStatus } from '@kentos/database';
 import { CurrentUser } from '../../common/decorators/current-user.decorator.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
@@ -11,11 +12,23 @@ import { CreateTicketDto } from './dto/create-ticket.dto.js';
 import { UpdateTicketStatusDto } from './dto/update-ticket-status.dto.js';
 import { TicketsService } from './tickets.service.js';
 
+@ApiBearerAuth()
+@ApiTags('tickets')
 @UseGuards(AuthGuard('jwt'), RolesGuard)
 @Controller('tickets')
 export class TicketsController {
   constructor(@Inject(TicketsService) private readonly tickets: TicketsService) {}
 
+  @ApiOperation({ summary: 'Ticket listesi (sayfalı, filtrelenebilir)' })
+  @ApiQuery({ name: 'status', required: false, enum: TicketStatus })
+  @ApiQuery({ name: 'departmentId', required: false })
+  @ApiQuery({ name: 'categoryId', required: false })
+  @ApiQuery({ name: 'assignedToId', required: false })
+  @ApiQuery({ name: 'q', required: false, description: 'Serbest metin arama' })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiResponse({ status: 200, description: 'Ticket listesi ve sayfalama meta' })
+  @ApiResponse({ status: 401, description: 'Kimlik doğrulama gerekli' })
   @Get()
   list(
     @CurrentUser() user: AuthenticatedUser,
@@ -24,16 +37,25 @@ export class TicketsController {
     @Query('categoryId') categoryId?: string,
     @Query('assignedToId') assignedToId?: string,
     @Query('q') q?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
   ) {
-    return this.tickets.list(user, { status, departmentId, categoryId, assignedToId, q });
+    return this.tickets.list(user, {
+      status, departmentId, categoryId, assignedToId, q,
+      page: page ? Number(page) : undefined,
+      limit: limit ? Number(limit) : undefined,
+    });
   }
 
+  @ApiOperation({ summary: 'Yeni ticket oluştur' })
+  @ApiResponse({ status: 201, description: 'Ticket oluşturuldu' })
   @Roles('SUPER_ADMIN', 'TENANT_ADMIN', 'MANAGER', 'DEPARTMENT_STAFF', 'OPERATOR')
   @Post()
   create(@CurrentUser() user: AuthenticatedUser, @Body() dto: CreateTicketDto) {
     return this.tickets.create(user, dto);
   }
 
+  @ApiOperation({ summary: 'WhatsApp handoff listesi' })
   @Get('handoffs')
   listHandoffs(@CurrentUser() user: AuthenticatedUser) {
     return this.tickets.listHandoffs(user);
@@ -50,6 +72,8 @@ export class TicketsController {
     return this.tickets.createTicketFromHandoff(user, id);
   }
 
+  @ApiOperation({ summary: 'Ticket detayı' })
+  @ApiResponse({ status: 404, description: 'Ticket bulunamadı' })
   @Get(':id')
   get(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
     return this.tickets.get(user, id);

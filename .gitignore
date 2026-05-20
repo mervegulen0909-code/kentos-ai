@@ -47,7 +47,9 @@ Thumbs.db
 .claude/worktrees/
 .codex/
 .codex-chrome-kentos/
+.codex-chrome-kentos-visible/
 .playwright-mcp/
+.playwright-cli/
 .roo/
 .roomodes
 .tools/

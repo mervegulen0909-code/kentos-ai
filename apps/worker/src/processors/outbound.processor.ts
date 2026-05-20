@@ -6,6 +6,34 @@ type OutboundJobData = {
   deliveryId: string;
 };
 
+type OutboundDeliveryRecord = {
+  id: string;
+  tenantId: string;
+  conversationId: string | null;
+  channel: string;
+  state: OutboundDeliveryState;
+  recipientPhone: string | null;
+  recipientEmail: string | null;
+  externalConversationId: string | null;
+  templateKey: string | null;
+  body: string;
+  tenant: { slug: string } | null;
+};
+
+type OutboundPrisma = {
+  outboundDelivery: {
+    findUnique(input: unknown): Promise<OutboundDeliveryRecord | null>;
+    update(input: unknown): Promise<unknown>;
+  };
+};
+
+type OutboundDependencies = {
+  prisma: OutboundPrisma;
+  fetch: typeof fetch;
+  resolveGatewayUrl?: (channel: IntakeChannel) => string | null;
+  internalApiKey?: string;
+};
+
 const OUTBOUND_GATEWAY_PATHS: Partial<Record<IntakeChannel, string>> = {
   WHATSAPP: '/internal/whatsapp/outbound',
   INSTAGRAM: '/internal/instagram/outbound',
@@ -26,28 +54,42 @@ function resolveGatewayUrl(channel: IntakeChannel): string | null {
 }
 
 export async function processOutboundJob(job: { name: string; data: OutboundJobData }) {
-  const prisma = getPrismaClient();
+  return runOutboundJob(job, {
+    prisma: getPrismaClient() as unknown as OutboundPrisma,
+    fetch,
+    resolveGatewayUrl,
+    internalApiKey: process.env.INTERNAL_API_KEY,
+  });
+}
+
+export async function runOutboundJob(job: { name: string; data: OutboundJobData }, deps: OutboundDependencies) {
+  const prisma = deps.prisma;
   const delivery = await prisma.outboundDelivery.findUnique({
     where: { id: job.data.deliveryId },
     include: { tenant: { select: { slug: true } } },
   });
   if (!delivery) return { skipped: true, reason: 'delivery-not-found' };
-  if (delivery.state === OutboundDeliveryState.DELIVERED || delivery.state === OutboundDeliveryState.SKIPPED) {
+  if (
+    delivery.state === OutboundDeliveryState.DISPATCHED ||
+    delivery.state === OutboundDeliveryState.DELIVERED ||
+    delivery.state === OutboundDeliveryState.SKIPPED
+  ) {
     return { skipped: true, reason: `state-${delivery.state}` };
   }
 
   const channel = delivery.channel as IntakeChannel;
-  const gatewayUrl = resolveGatewayUrl(channel);
-  const internalKey = process.env.INTERNAL_API_KEY;
+  const gatewayUrl = (deps.resolveGatewayUrl ?? resolveGatewayUrl)(channel);
+  const internalKey = deps.internalApiKey;
   if (!gatewayUrl || !internalKey) {
     await prisma.outboundDelivery.update({
       where: { id: delivery.id },
       data: {
-        state: OutboundDeliveryState.PENDING,
+        state: OutboundDeliveryState.FAILED,
+        attempts: { increment: 1 },
         lastError: 'gateway-or-key-missing',
       },
     });
-    return { skipped: true, reason: 'gateway-config-missing' };
+    throw new Error('gateway-config-missing');
   }
 
   const envelope: ChannelOutboundEnvelope = {
@@ -65,7 +107,7 @@ export async function processOutboundJob(job: { name: string; data: OutboundJobD
   };
 
   try {
-    const response = await fetch(gatewayUrl, {
+    const response = await deps.fetch(gatewayUrl, {
       method: 'POST',
       headers: {
         Accept: 'application/json',
@@ -76,15 +118,7 @@ export async function processOutboundJob(job: { name: string; data: OutboundJobD
     });
     if (!response.ok) {
       const detail = await response.text().catch(() => '');
-      await prisma.outboundDelivery.update({
-        where: { id: delivery.id },
-        data: {
-          state: OutboundDeliveryState.FAILED,
-          attempts: { increment: 1 },
-          lastError: `gateway-${response.status}:${detail.slice(0, 160)}`,
-        },
-      });
-      throw new Error(`gateway-${response.status}`);
+      throw new Error(`gateway-${response.status}:${detail.slice(0, 160)}`);
     }
     const payload = (await response.json().catch(() => ({}))) as { result?: { externalMessageId?: string } };
     await prisma.outboundDelivery.update({

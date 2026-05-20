@@ -6,6 +6,7 @@ import {
   type GenericInboundMessage,
   type SendMessageResult,
 } from '@kentos/shared';
+import { logger } from './logger.js';
 import { EmailProvider } from './providers/email.provider.js';
 import { FacebookMessengerProvider } from './providers/facebook.provider.js';
 import { InstagramProvider } from './providers/instagram.provider.js';
@@ -71,7 +72,7 @@ export async function forwardGenericInbound(channel: GenericChannelKey, raw: unk
     });
     if (!response.ok) {
       const body = await response.text().catch(() => '');
-      console.error(`[${channel}] inbound forward hata ${response.status}: ${body.slice(0, 200)}`);
+      logger.error(`[${channel}] inbound forward failed`, { status: response.status, detail: body.slice(0, 200) });
       continue;
     }
     delivered += 1;
