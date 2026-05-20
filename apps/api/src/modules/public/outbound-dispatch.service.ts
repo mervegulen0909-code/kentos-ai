@@ -14,6 +14,7 @@ type DispatchInput = {
   recipient: { phone?: string | null; email?: string | null };
   text: string;
   templateKey?: string;
+  scheduledAt?: Date;
 };
 
 @Injectable()
@@ -72,6 +73,10 @@ export class OutboundDispatchService implements OnModuleDestroy {
       return delivery;
     }
 
+    const scheduledDelay = input.scheduledAt && input.scheduledAt.getTime() > Date.now()
+      ? input.scheduledAt.getTime() - Date.now()
+      : undefined;
+
     try {
       await this.getQueue().add(
         'channel-outbound',
@@ -82,6 +87,7 @@ export class OutboundDispatchService implements OnModuleDestroy {
           backoff: { type: 'exponential', delay: 5_000 },
           removeOnComplete: 200,
           removeOnFail: 1_000,
+          delay: scheduledDelay,
         },
       );
       await this.recordAudit(input, delivery.id, 'channel.outbound_enqueued');

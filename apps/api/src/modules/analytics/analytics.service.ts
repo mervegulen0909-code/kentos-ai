@@ -2,6 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { AuditActorType, MessageVisibility, OutboundDeliveryState, TicketStatus } from '@kentos/database';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { Redis } from 'ioredis';
 import {
   summarizeAiUsageByProvider,
   summarizeAiUsageWindow,
@@ -14,7 +15,17 @@ import {
 export class AnalyticsService {
   constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
 
+  private _redis?: Redis;
+  private redis() {
+    this._redis ??= new Redis(process.env.REDIS_URL ?? 'redis://localhost:6379', { lazyConnect: true, maxRetriesPerRequest: 1 });
+    return this._redis;
+  }
+
   async overview(user: AuthenticatedUser) {
+    const cacheKey = `analytics:overview:${user.tenantId}`;
+    const cached = await this.redis().get(cacheKey).catch(() => null);
+    if (cached) return JSON.parse(cached) as unknown;
+
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
@@ -37,7 +48,7 @@ export class AnalyticsService {
 
     const now = Date.now();
 
-    return {
+    const result = {
       totalOpen,
       openedToday,
       resolvedToday,
@@ -49,6 +60,9 @@ export class AnalyticsService {
       }).length,
       byStatus: byStatus.map((item) => ({ status: item.status, count: item._count._all })),
     };
+
+    await this.redis().setex(cacheKey, 60, JSON.stringify(result)).catch(() => null); // 60s TTL, swallow errors
+    return result;
   }
 
   async departments(user: AuthenticatedUser) {

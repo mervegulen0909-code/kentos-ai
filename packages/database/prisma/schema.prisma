@@ -116,6 +116,8 @@ model Tenant {
   slaPolicies          SlaPolicy[]
   tickets              Ticket[]
   users                User[]
+  webhooks             TenantWebhook[]
+  deviceTokens         CitizenDeviceToken[]
 }
 
 model Department {
@@ -205,9 +207,11 @@ model MessageTemplate {
   channel   ChannelType?
   locale    String       @default("tr-TR")
   body      String
-  isActive  Boolean      @default(true)
-  createdAt DateTime     @default(now())
-  updatedAt DateTime     @updatedAt
+  isActive             Boolean      @default(true)
+  whatsappTemplateId   String?
+  whatsappTemplateName String?
+  createdAt            DateTime     @default(now())
+  updatedAt            DateTime     @updatedAt
 
   tenant    Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
@@ -263,6 +267,7 @@ model Citizen {
   identifiers         CitizenIdentifier[]
   conversations       Conversation[]
   tickets             Ticket[]
+  deviceTokens        CitizenDeviceToken[]
 
   @@index([tenantId, phone])
   @@index([tenantId, email])
@@ -311,6 +316,8 @@ model Ticket {
   firstResponseDueAt     DateTime?
   resolutionDueAt        DateTime?
   slaBreachedAt          DateTime?
+  csatScore              Int?
+  csatRespondedAt        DateTime?
   firstRespondedAt       DateTime?
   resolvedAt             DateTime?
   closedAt               DateTime?
@@ -478,6 +485,38 @@ model AuditLog {
   @@index([tenantId, ticketId, createdAt])
   @@index([tenantId, action, createdAt])
   @@index([tenantId, actorUserId, createdAt])
+}
+
+model TenantWebhook {
+  id         String   @id @default(cuid())
+  tenantId   String
+  url        String
+  secret     String
+  events     Json     // string[] of event names
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, isActive])
+}
+
+model CitizenDeviceToken {
+  id         String   @id @default(cuid())
+  tenantId   String
+  citizenId  String
+  platform   String   // 'ios' | 'android'
+  token      String
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  citizen    Citizen  @relation(fields: [citizenId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, token])
+  @@index([tenantId, citizenId])
 }
 
 model AiRun {

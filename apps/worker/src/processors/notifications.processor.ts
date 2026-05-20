@@ -19,6 +19,14 @@ function resolveGatewayUrl(): string | null {
   return `${base.replace(/\/$/, '')}/internal/whatsapp/outbound`;
 }
 
+export function resolveEmailGatewayUrl(): string | null {
+  const direct = process.env.EMAIL_GATEWAY_OUTBOUND_URL;
+  if (direct) return direct;
+  const base = process.env.EMAIL_GATEWAY_BASE_URL ?? process.env.CHANNEL_GATEWAY_BASE_URL;
+  if (!base) return null;
+  return `${base.replace(/\/$/, '')}/internal/email/outbound`;
+}
+
 export function getNotificationSkipReason(message: {
   senderType: string;
   visibility: string;
@@ -50,6 +58,43 @@ export async function processNotificationJob(job: { name: string; data: Notifica
 
   const skipReason = getNotificationSkipReason(message as Parameters<typeof getNotificationSkipReason>[0]);
   const to = message.ticket.citizen?.phone?.trim();
+
+  // If no WhatsApp phone but there is an email — try email fallback
+  if (skipReason === 'missing_phone') {
+    const citizenEmail = message.ticket.citizen?.email?.trim();
+    if (citizenEmail) {
+      const emailGatewayUrl = resolveEmailGatewayUrl();
+      const internalKey = process.env.INTERNAL_API_KEY;
+      if (emailGatewayUrl && internalKey) {
+        const emailEnvelope = {
+          tenantId: message.tenantId,
+          tenantSlug: message.ticket.tenant?.slug ?? '',
+          channel: 'EMAIL',
+          conversationId: message.ticketId ?? message.id,
+          recipient: { email: citizenEmail },
+          text: message.body,
+        };
+        const resp = await fetch(emailGatewayUrl, {
+          method: 'POST',
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+            'x-kentos-internal-key': internalKey,
+          },
+          body: JSON.stringify(emailEnvelope),
+        });
+        if (resp.ok) {
+          const payload = (await resp.json().catch(() => ({}))) as { accepted?: boolean };
+          if (payload.accepted) {
+            return { processor: 'notifications', job: job.name, delivered: true, channel: 'email', to: citizenEmail };
+          }
+        }
+      }
+    }
+    // No email fallback available — skip
+    return { processor: 'notifications', job: job.name, skipped: 'missing_phone_and_email' };
+  }
+
   if (skipReason || !to) {
     return { processor: 'notifications', job: job.name, skipped: skipReason ?? 'not_deliverable' };
   }

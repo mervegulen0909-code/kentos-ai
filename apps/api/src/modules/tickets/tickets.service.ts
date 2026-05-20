@@ -1,10 +1,11 @@
 import { ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { AuditActorType, ChannelType, MessageVisibility, TicketStatus, UserRole } from '@kentos/database';
+import { AuditActorType, ChannelType, MessageVisibility, OutboundDeliveryState, TicketStatus, UserRole } from '@kentos/database';
 import type { Prisma } from '@kentos/database';
 import { intakeClassificationSchema } from '@kentos/shared';
 import type { IntakeClassification } from '@kentos/shared';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import { AttachmentsService } from '../attachments/attachments.service.js';
+import { CsatQueueService } from './csat-queue.service.js';
 import { NotificationQueueService } from './notification-queue.service.js';
 import { NotificationTemplateService } from './notification-template.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
@@ -24,6 +25,7 @@ export class TicketsService {
     @Inject(SlaService) private readonly sla: SlaService,
     @Inject(TicketNumberService) private readonly ticketNumbers: TicketNumberService,
     @Inject(AttachmentsService) private readonly attachments: AttachmentsService,
+    @Inject(CsatQueueService) private readonly csatQueue: CsatQueueService,
   ) {}
 
   async list(
@@ -306,6 +308,9 @@ export class TicketsService {
 
     const latestPublicMessageId = shouldCreatePublicMessage ? updated.messages?.[0]?.id : undefined;
     if (latestPublicMessageId) await this.notifications.enqueueMessage(latestPublicMessageId);
+    if (dto.status === TicketStatus.RESOLVED) {
+      void this.csatQueue.enqueueCsat(id, user.tenantId);
+    }
     return updated;
   }
 
@@ -707,5 +712,116 @@ export class TicketsService {
     };
 
     return templateKeys[status] ?? null;
+  }
+
+  async bulkAssign(user: AuthenticatedUser, dto: { ticketIds: string[]; assignedToId: string }) {
+    // Validate assignedToId belongs to same tenant
+    const assignee = await this.prisma.user.findFirst({
+      where: { id: dto.assignedToId, tenantId: user.tenantId, isActive: true },
+    });
+    if (!assignee) throw new NotFoundException(`User ${dto.assignedToId} not found in tenant`);
+
+    // Only operate on tickets belonging to this tenant
+    const tickets = await this.prisma.ticket.findMany({
+      where: { id: { in: dto.ticketIds }, tenantId: user.tenantId },
+      select: { id: true, assignedToId: true },
+    });
+
+    const ids = tickets.map((t) => t.id);
+    if (ids.length === 0) return { updated: 0, skipped: dto.ticketIds.length };
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.ticket.updateMany({
+        where: { id: { in: ids }, tenantId: user.tenantId },
+        data: { assignedToId: dto.assignedToId, status: 'ASSIGNED' as TicketStatus },
+      });
+      await tx.auditLog.createMany({
+        data: ids.map((ticketId) => ({
+          tenantId: user.tenantId,
+          ticketId,
+          actorType: AuditActorType.USER,
+          actorUserId: user.id,
+          action: 'ticket.bulk_assigned',
+          after: { assignedToId: dto.assignedToId },
+        })),
+      });
+    });
+
+    return { updated: ids.length, skipped: dto.ticketIds.length - ids.length };
+  }
+
+  async bulkUpdateStatus(user: AuthenticatedUser, dto: { ticketIds: string[]; status: TicketStatus }) {
+    const tickets = await this.prisma.ticket.findMany({
+      where: { id: { in: dto.ticketIds }, tenantId: user.tenantId },
+      select: { id: true, status: true },
+    });
+
+    const ids = tickets.map((t) => t.id);
+    if (ids.length === 0) return { updated: 0, skipped: dto.ticketIds.length };
+
+    const now = new Date();
+    const extraData: Record<string, unknown> = {};
+    if (dto.status === 'RESOLVED') extraData.resolvedAt = now;
+    if (dto.status === 'CLOSED') extraData.closedAt = now;
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.ticket.updateMany({
+        where: { id: { in: ids }, tenantId: user.tenantId },
+        data: { status: dto.status, ...extraData },
+      });
+      await tx.auditLog.createMany({
+        data: ids.map((ticketId) => ({
+          tenantId: user.tenantId,
+          ticketId,
+          actorType: AuditActorType.USER,
+          actorUserId: user.id,
+          action: 'ticket.bulk_status_changed',
+          after: { status: dto.status },
+        })),
+      });
+    });
+
+    return { updated: ids.length, skipped: dto.ticketIds.length - ids.length };
+  }
+
+  async scheduleMessage(user: AuthenticatedUser, ticketId: string, dto: { body: string; scheduledAt?: string }) {
+    const ticket = await this.prisma.ticket.findFirst({
+      where: { id: ticketId, tenantId: user.tenantId },
+      include: { citizen: true },
+    });
+    if (!ticket) throw new NotFoundException('Ticket bulunamadı');
+
+    const scheduledDate = dto.scheduledAt ? new Date(dto.scheduledAt) : undefined;
+    const delay = scheduledDate && scheduledDate.getTime() > Date.now()
+      ? scheduledDate.getTime() - Date.now()
+      : 0;
+
+    // Create an outbound delivery record
+    const delivery = await this.prisma.outboundDelivery.create({
+      data: {
+        tenantId: user.tenantId,
+        conversationId: ticketId,
+        channel: 'WHATSAPP',
+        state: OutboundDeliveryState.PENDING,
+        recipientPhone: ticket.citizen?.phone ?? null,
+        body: dto.body,
+      },
+    });
+
+    // Enqueue via notification queue with optional delay
+    await this.notifications.enqueueScheduledDelivery(delivery.id, delay);
+
+    await this.prisma.auditLog.create({
+      data: {
+        tenantId: user.tenantId,
+        ticketId,
+        actorType: AuditActorType.USER,
+        actorUserId: user.id,
+        action: 'ticket.message_scheduled',
+        after: { body: dto.body, scheduledAt: dto.scheduledAt ?? 'immediate', deliveryId: delivery.id },
+      },
+    });
+
+    return { deliveryId: delivery.id, scheduledAt: dto.scheduledAt ?? null, delay };
   }
 }

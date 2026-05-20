@@ -3,6 +3,7 @@ import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { AdminModule } from './modules/admin/admin.module.js';
+import { CitizensModule } from './modules/citizens/citizens.module.js';
 import { AnalyticsModule } from './modules/analytics/analytics.module.js';
 import { AttachmentsModule } from './modules/attachments/attachments.module.js';
 import { AuthModule } from './modules/auth/auth.module.js';
@@ -38,6 +39,7 @@ import { RootController } from './root.controller.js';
     UsersModule,
     ReportsModule,
     AdminModule,
+    CitizensModule,
   ],
   controllers: [RootController],
   providers: [

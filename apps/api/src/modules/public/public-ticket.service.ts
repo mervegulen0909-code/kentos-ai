@@ -690,6 +690,46 @@ export class PublicTicketService {
     return 'PUBLIC_WEB';
   }
 
+  async registerDeviceToken(tenantSlug: string, dto: { platform: string; token: string; citizenIdentifier: string }) {
+    const tenant = await this.prisma.tenant.findUnique({ where: { slug: tenantSlug }, select: { id: true } });
+    if (!tenant) throw new NotFoundException('Tenant bulunamadı');
+
+    // Find citizen by phone or email
+    const identifier = await this.prisma.citizenIdentifier.findFirst({
+      where: {
+        tenantId: tenant.id,
+        normalizedValue: dto.citizenIdentifier.trim().toLowerCase(),
+      },
+      select: { citizenId: true },
+    });
+
+    if (!identifier) throw new NotFoundException('Vatandaş bulunamadı');
+
+    // Upsert device token
+    await (this.prisma as unknown as {
+      citizenDeviceToken: {
+        upsert(args: unknown): Promise<unknown>;
+      };
+    }).citizenDeviceToken.upsert({
+      where: { tenantId_token: { tenantId: tenant.id, token: dto.token } },
+      create: {
+        tenantId: tenant.id,
+        citizenId: identifier.citizenId,
+        platform: dto.platform,
+        token: dto.token,
+        isActive: true,
+      },
+      update: {
+        citizenId: identifier.citizenId,
+        platform: dto.platform,
+        isActive: true,
+        updatedAt: new Date(),
+      },
+    });
+
+    return { registered: true };
+  }
+
   private toPublicTicket(ticket: {
     publicTrackingToken: string | null;
     title: string;
