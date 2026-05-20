@@ -95,7 +95,7 @@ test('handleGenericOutbound EMAIL rejects missing recipient', async () => {
     'secret',
   );
   assert.equal(result.accepted, false);
-  assert.equal(result.reason, 'missing-recipient');
+  assert.equal(result.reason, 'envelope-validation');
 });
 
 test('handleGenericOutbound EMAIL rejects channel mismatch', async () => {

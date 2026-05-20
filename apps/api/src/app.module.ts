@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { TenantThrottleGuard } from './common/guards/tenant-throttle.guard.js';
 import { AdminModule } from './modules/admin/admin.module.js';
 import { CitizensModule } from './modules/citizens/citizens.module.js';
 import { AnalyticsModule } from './modules/analytics/analytics.module.js';
@@ -43,9 +44,10 @@ import { RootController } from './root.controller.js';
   ],
   controllers: [RootController],
   providers: [
-    // Tüm route'lara global throttle guard uygula
-    // @SkipThrottle() ile belirli route'lardan çıkarılabilir
+    // Global throttle: 120 req/min per IP
     { provide: APP_GUARD, useClass: ThrottlerGuard },
+    // F8 — Tenant-based rate limit: 300 req/min per tenant (after auth)
+    { provide: APP_GUARD, useClass: TenantThrottleGuard },
   ],
 })
 export class AppModule {}

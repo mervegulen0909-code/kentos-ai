@@ -297,6 +297,83 @@ function buildQuery(filters: TicketListFilters = {}) {
   return query ? `?${query}` : '';
 }
 
+// ─── New types for D4 admin pages ────────────────────────────────────────────
+
+export type UserListItem = {
+  id: string;
+  email: string;
+  fullName: string;
+  role: string;
+  isActive: boolean;
+  createdAt: string;
+  departments: Array<{ id: string; name: string }>;
+};
+
+export type CreateUserInput = {
+  email: string;
+  fullName: string;
+  role: string;
+  password: string;
+  departmentIds?: string[];
+};
+
+export type UpdateUserInput = {
+  fullName?: string;
+  role?: string;
+  isActive?: boolean;
+  departmentIds?: string[];
+};
+
+export type CitizenListItem = {
+  id: string;
+  displayName: string | null;
+  phone: string | null;
+  email: string | null;
+  createdAt: string;
+  ticketCount: number;
+  isAnonymized?: boolean;
+};
+
+export type CitizenDetail = CitizenListItem & {
+  identifiers: Array<{ kind: string; normalizedValue: string; isPrimary: boolean }>;
+  tickets: Array<{ id: string; ticketNo: string; title: string; status: string; createdAt: string }>;
+};
+
+export type ReportListItem = {
+  id: string;
+  type: string;
+  requestedBy: string;
+  createdAt: string;
+  generatedAt: string | null;
+  status: string;
+};
+
+export type ReportDetail = ReportListItem & {
+  generatedReport: unknown;
+};
+
+export type CsatOverview = {
+  overall: { avg: number | null; responseCount: number };
+  byDepartment: Array<{ departmentId: string | null; departmentName: string | null; avg: number | null; responseCount: number }>;
+  trend: Array<{ score: number | null; respondedAt: string | null }>;
+  lowScoreTickets: Array<{ id: string; ticketNo: string; csatScore: number | null; csatRespondedAt: string | null; departmentId: string | null }>;
+};
+
+export type OperatorPerformanceItem = {
+  userId: string;
+  fullName: string;
+  email: string;
+  role: string;
+  assigned: number;
+  resolved: number;
+  resolutionRate: number;
+  avgResolutionHours: number | null;
+  csatAvg: number | null;
+  csatResponses: number;
+};
+
+// ─── adminApi ────────────────────────────────────────────────────────────────
+
 export const adminApi = {
   overview: (token: string) => apiFetch<AnalyticsOverview>('/analytics/overview', { token }),
   departmentSummary: (token: string) => apiFetch<AnalyticsDepartmentSummary[]>('/analytics/departments', { token }),
@@ -354,4 +431,50 @@ export const adminApi = {
     apiFetch<AiBudgetSettings>('/ai-budget-settings', { method: 'PATCH', token, body: JSON.stringify(input) }),
   runRetentionNow: (token: string) =>
     apiFetch<{ enqueued: boolean; tenantId: string }>('/retention-settings/run-now', { method: 'POST', token }),
+
+  // Users
+  users: (token: string, params?: { role?: string; q?: string; page?: number }) => {
+    const qs = new URLSearchParams();
+    if (params?.role) qs.set('role', params.role);
+    if (params?.q) qs.set('q', params.q);
+    if (params?.page) qs.set('page', String(params.page));
+    const query = qs.toString();
+    return apiFetch<{ data: UserListItem[]; meta: { total: number; page: number; limit: number } }>(`/users${query ? `?${query}` : ''}`, { token });
+  },
+  createUser: (token: string, input: CreateUserInput) =>
+    apiFetch<UserListItem>('/users', { method: 'POST', token, body: JSON.stringify(input) }),
+  updateUser: (token: string, id: string, input: UpdateUserInput) =>
+    apiFetch<UserListItem>(`/users/${id}`, { method: 'PATCH', token, body: JSON.stringify(input) }),
+  deleteUser: (token: string, id: string) =>
+    apiFetch<{ id: string; isActive: false }>(`/users/${id}`, { method: 'DELETE', token }),
+
+  // Citizens
+  citizens: (token: string, params?: { q?: string; page?: number }) => {
+    const qs = new URLSearchParams();
+    if (params?.q) qs.set('q', params.q);
+    if (params?.page) qs.set('page', String(params.page));
+    const query = qs.toString();
+    return apiFetch<{ data: CitizenListItem[]; meta: { total: number; page: number; limit: number } }>(`/citizens${query ? `?${query}` : ''}`, { token });
+  },
+  citizen: (token: string, id: string) => apiFetch<CitizenDetail>(`/citizens/${id}`, { token }),
+  anonymizeCitizen: (token: string, id: string) =>
+    apiFetch<{ id: string; anonymized: true }>(`/citizens/${id}/anonymize`, { method: 'POST', token }),
+  exportCitizen: (token: string, id: string) =>
+    apiFetch<unknown>(`/citizens/${id}/export`, { token }),
+
+  // Reports
+  reports: (token: string, params?: { type?: string; page?: number }) => {
+    const qs = new URLSearchParams();
+    if (params?.type) qs.set('type', params.type);
+    if (params?.page) qs.set('page', String(params.page));
+    const query = qs.toString();
+    return apiFetch<{ data: ReportListItem[]; meta: { total: number } }>(`/reports${query ? `?${query}` : ''}`, { token });
+  },
+  report: (token: string, id: string) => apiFetch<ReportDetail>(`/reports/${id}`, { token }),
+  generateReport: (token: string, type: string) =>
+    apiFetch<{ jobId: string | undefined }>('/reports/generate', { method: 'POST', token, body: JSON.stringify({ type }) }),
+
+  // Analytics extras
+  csat: (token: string) => apiFetch<CsatOverview>('/analytics/csat', { token }),
+  operators: (token: string) => apiFetch<OperatorPerformanceItem[]>('/analytics/operators', { token }),
 };

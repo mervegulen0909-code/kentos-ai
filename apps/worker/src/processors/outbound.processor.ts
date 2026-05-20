@@ -2,6 +2,38 @@ import { OutboundDeliveryState } from '@kentos/database';
 import type { ChannelOutboundEnvelope, IntakeChannel } from '@kentos/shared';
 import { getPrismaClient } from '../prisma-client.js';
 
+const WA_WINDOW_MS = 24 * 60 * 60 * 1000; // 24 hours in ms
+const WA_DEFAULT_TEMPLATE = process.env.WA_DEFAULT_NOTIFICATION_TEMPLATE ?? 'kentos_notification';
+
+/**
+ * F2 — WA HSM: Check whether the last inbound message from a phone number
+ * was within the Meta 24-hour conversation window.
+ * Returns null if within window (use free-form text), or a template name if outside.
+ */
+async function resolveWaTemplateKey(
+  tenantId: string,
+  recipientPhone: string,
+): Promise<string | null> {
+  const prismaRaw = getPrismaClient() as unknown as {
+    channelEvent: {
+      findFirst(input: unknown): Promise<{ createdAt: Date } | null>;
+    };
+  };
+
+  const lastInbound = await prismaRaw.channelEvent.findFirst({
+    where: {
+      tenantId,
+      channel: 'WHATSAPP',
+      externalConversationId: recipientPhone,
+    },
+    orderBy: { createdAt: 'desc' },
+  } as unknown);
+
+  if (!lastInbound) return WA_DEFAULT_TEMPLATE; // no prior contact — must use template
+  const age = Date.now() - lastInbound.createdAt.getTime();
+  return age > WA_WINDOW_MS ? WA_DEFAULT_TEMPLATE : null; // null = within window, use text
+}
+
 type OutboundJobData = {
   deliveryId: string;
 };
@@ -93,6 +125,17 @@ export async function runOutboundJob(job: { name: string; data: OutboundJobData 
     throw new Error('gateway-config-missing');
   }
 
+  // F2 — WA HSM: Resolve template key for WhatsApp messages
+  let resolvedTemplateKey = delivery.templateKey ?? undefined;
+  if (channel === 'WHATSAPP' && !resolvedTemplateKey && delivery.recipientPhone) {
+    try {
+      const templateKey = await resolveWaTemplateKey(delivery.tenantId, delivery.recipientPhone);
+      if (templateKey) resolvedTemplateKey = templateKey;
+    } catch {
+      // Non-fatal — fall back to text send (may fail at Meta if outside window)
+    }
+  }
+
   const envelope: ChannelOutboundEnvelope = {
     tenantId: delivery.tenantId,
     tenantSlug: delivery.tenant?.slug ?? '',
@@ -104,7 +147,7 @@ export async function runOutboundJob(job: { name: string; data: OutboundJobData 
       email: delivery.recipientEmail ?? undefined,
     },
     text: delivery.body,
-    templateKey: delivery.templateKey ?? undefined,
+    templateKey: resolvedTemplateKey,
   };
 
   try {

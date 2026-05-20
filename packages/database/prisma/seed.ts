@@ -278,5 +278,7 @@ main()
   .catch(async (error) => {
     console.error(error);
     await prisma.$disconnect();
-    process.exit(1);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (globalThis as any).process?.exit(1);
+    throw error;
   });

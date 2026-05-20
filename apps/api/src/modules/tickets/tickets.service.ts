@@ -6,6 +6,7 @@ import type { IntakeClassification } from '@kentos/shared';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import { AttachmentsService } from '../attachments/attachments.service.js';
 import { CsatQueueService } from './csat-queue.service.js';
+import { NeighborhoodRoutingService } from './neighborhood-routing.service.js';
 import { NotificationQueueService } from './notification-queue.service.js';
 import { NotificationTemplateService } from './notification-template.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
@@ -26,6 +27,7 @@ export class TicketsService {
     @Inject(TicketNumberService) private readonly ticketNumbers: TicketNumberService,
     @Inject(AttachmentsService) private readonly attachments: AttachmentsService,
     @Inject(CsatQueueService) private readonly csatQueue: CsatQueueService,
+    @Inject(NeighborhoodRoutingService) private readonly neighborhoodRouting: NeighborhoodRoutingService,
   ) {}
 
   async list(
@@ -81,13 +83,29 @@ export class TicketsService {
 
   async create(user: AuthenticatedUser, dto: CreateTicketDto) {
     const relations = await this.validateTicketRelations(user.tenantId, dto);
-    await this.requireDepartmentScope(user, relations.departmentId);
+
+    // F4: GIS routing — if lat/lon provided and no explicit departmentId, resolve via polygon
+    let resolvedDepartmentId = relations.departmentId;
+    let resolvedNeighborhoodId: string | undefined;
+    if (dto.latitude != null && dto.longitude != null && !relations.departmentId) {
+      const match = await this.neighborhoodRouting.resolveNeighborhood(
+        Number(dto.latitude),
+        Number(dto.longitude),
+        user.tenantId,
+      );
+      if (match) {
+        resolvedNeighborhoodId = match.id;
+        if (match.departmentId) resolvedDepartmentId = match.departmentId;
+      }
+    }
+
+    await this.requireDepartmentScope(user, resolvedDepartmentId);
 
     const priority = dto.priority ?? 'NORMAL';
     const deadlines = await this.sla.calculateDeadlines({
       tenantId: user.tenantId,
       priority,
-      departmentId: relations.departmentId,
+      departmentId: resolvedDepartmentId,
       categoryId: relations.categoryId,
     });
 
@@ -100,7 +118,8 @@ export class TicketsService {
         description: dto.description,
         priority,
         categoryId: relations.categoryId,
-        departmentId: relations.departmentId,
+        departmentId: resolvedDepartmentId,
+        neighborhoodId: resolvedNeighborhoodId,
         citizenId: relations.citizenId,
         addressText: dto.addressText,
         latitude: dto.latitude,
@@ -112,7 +131,7 @@ export class TicketsService {
             actorType: AuditActorType.USER,
             actorUserId: user.id,
             action: 'ticket.created',
-            after: { ...dto },
+            after: { ...dto, _gisRouted: !!resolvedNeighborhoodId },
           },
         },
       },
@@ -120,7 +139,42 @@ export class TicketsService {
     });
 
     await this.attachments.attachAdminToTicket(user, ticket.id, dto.attachmentIds);
+
+    // F9: Duplicate detection — link to an existing open ticket from the same citizen if similar title in last 48h
+    if (relations.citizenId) {
+      const since48h = new Date(Date.now() - 48 * 60 * 60 * 1000);
+      const duplicate = await this.prisma.ticket.findFirst({
+        where: {
+          tenantId: user.tenantId,
+          citizenId: relations.citizenId,
+          id: { not: ticket.id },
+          createdAt: { gte: since48h },
+          status: { notIn: [TicketStatus.CLOSED, TicketStatus.REJECTED] },
+        },
+        select: { id: true, title: true },
+        orderBy: { createdAt: 'desc' },
+      });
+      if (duplicate && this.isSimilarTitle(ticket.title, duplicate.title)) {
+        await this.prisma.ticket.update({
+          where: { id: ticket.id },
+          data: { duplicateOfTicketId: duplicate.id },
+        });
+      }
+    }
+
     return ticket;
+  }
+
+  private isSimilarTitle(a: string, b: string): boolean {
+    // Simple word-overlap similarity: > 60% shared words → probable duplicate
+    const words = (s: string) => new Set(s.toLowerCase().split(/\s+/).filter((w) => w.length > 2));
+    const wa = words(a);
+    const wb = words(b);
+    if (wa.size === 0 || wb.size === 0) return false;
+    let overlap = 0;
+    for (const w of wa) { if (wb.has(w)) overlap++; }
+    const similarity = overlap / Math.max(wa.size, wb.size);
+    return similarity >= 0.6;
   }
 
   async get(user: AuthenticatedUser, id: string) {

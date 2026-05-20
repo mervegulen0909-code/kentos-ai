@@ -289,7 +289,7 @@ await test('apiFetch — body verilince Content-Type: application/json eklenir',
   };
   try {
     await apiFetch('/test', { method: 'POST', body: '{"key":"value"}' });
-    const ct = (capturedHeaders as Headers).get('Content-Type');
+    const ct = (capturedHeaders as unknown as Headers).get('Content-Type');
     assert.equal(ct, 'application/json');
   } finally {
     restoreFetch();

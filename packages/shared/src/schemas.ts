@@ -110,6 +110,11 @@ export const channelOutboundEnvelopeSchema = z.object({
   text: z.string().min(1),
   templateKey: z.string().optional(),
   scheduledAt: z.string().datetime().optional(),
+  media: z.array(z.object({
+    url: z.string().url(),
+    mimeType: z.string().min(1),
+    filename: z.string().optional(),
+  })).optional(),
 });
 
 export const intakePromptEnvelopeSchema = z.object({

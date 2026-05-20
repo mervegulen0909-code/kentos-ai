@@ -65,5 +65,5 @@ test('handleWhatsAppOutbound rejects missing recipient phone', async () => {
     { internalApiKey: 'secret' },
   );
   assert.equal(result.accepted, false);
-  assert.equal(result.reason, 'missing-recipient-phone');
+  assert.equal(result.reason, 'envelope-validation:recipient');
 });

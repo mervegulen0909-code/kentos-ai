@@ -106,6 +106,37 @@ export class MetaCloudProvider implements WhatsAppProvider {
     };
   }
 
+  /**
+   * F2 — WA HSM: Send a pre-approved message template (for use outside the 24-hour window).
+   * templateName must match an approved template in the Meta Business Manager.
+   * components is an optional array of header/body/button parameter objects.
+   */
+  async sendTemplate(input: {
+    to: string;
+    templateName: string;
+    languageCode?: string;
+    components?: unknown[];
+  }): Promise<SendMessageResult> {
+    const { phoneNumberId, accessToken } = readMetaConfig();
+    const data = (await callMetaApi(phoneNumberId, accessToken, {
+      messaging_product: 'whatsapp',
+      recipient_type: 'individual',
+      to: input.to,
+      type: 'template',
+      template: {
+        name: input.templateName,
+        language: { code: input.languageCode ?? 'tr' },
+        components: input.components ?? [],
+      },
+    })) as { messages: Array<{ id: string }> };
+
+    return {
+      provider: this.providerName,
+      externalMessageId: data.messages[0].id,
+      sentAt: new Date().toISOString(),
+    };
+  }
+
   async markRead(input: { tenantId: string; externalMessageId: string }): Promise<void> {
     const { phoneNumberId, accessToken } = readMetaConfig();
     await callMetaApi(phoneNumberId, accessToken, {

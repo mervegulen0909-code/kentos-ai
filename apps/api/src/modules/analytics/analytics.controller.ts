@@ -63,4 +63,16 @@ export class AnalyticsController {
   outboundDeliveries(@CurrentUser() user: AuthenticatedUser) {
     return this.analytics.outboundDeliveries(user);
   }
+
+  @ApiOperation({ summary: 'CSAT memnuniyet skoru (genel, departman bazlı, trend)' })
+  @Get('csat')
+  csat(@CurrentUser() user: AuthenticatedUser) {
+    return this.analytics.csat(user);
+  }
+
+  @ApiOperation({ summary: 'Operatör performans metrikleri (son 30 gün)' })
+  @Get('operators')
+  operatorPerformance(@CurrentUser() user: AuthenticatedUser) {
+    return this.analytics.operatorPerformance(user);
+  }
 }
