@@ -1,4 +1,5 @@
 import { Prisma, PrismaClient, TicketStatus } from '@kentos/database';
+import { logger } from '../logger.js';
 
 const prisma = new PrismaClient();
 
@@ -153,7 +154,7 @@ export async function processReportJob(job: { name: string; data: ReportJobData 
     };
   } catch (err) {
     // Non-fatal: log the error but still return success
-    console.error('[reports] Failed to persist report to DB', err instanceof Error ? err.message : String(err));
+    logger.error('Failed to persist report to DB', { error: err instanceof Error ? err.message : String(err) });
     return {
       processor: 'reports',
       job: job.name,

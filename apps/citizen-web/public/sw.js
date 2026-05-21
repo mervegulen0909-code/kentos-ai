@@ -1,5 +1,5 @@
 const CACHE_NAME = 'kentos-citizen-v1';
-const APP_SHELL = ['/', '/demo-belediye/report', '/demo-belediye/track', '/manifest.webmanifest', '/icon.svg'];
+const APP_SHELL = ['/', '/manifest.webmanifest', '/icon.svg'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -40,7 +40,7 @@ self.addEventListener('fetch', (event) => {
 
         if (event.request.mode === 'navigate') {
           return (
-            (await caches.match('/demo-belediye/report')) ||
+            (await caches.match('/')) ||
             new Response('Offline', {
               status: 503,
               headers: { 'Content-Type': 'text/plain; charset=utf-8' },

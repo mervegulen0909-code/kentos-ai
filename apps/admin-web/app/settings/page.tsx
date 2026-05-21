@@ -97,14 +97,14 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
   const controlsDisabled = !hasSession || !canEditSettings;
   const { success, error, errorMessage } = await searchParams;
   const fallbackWidgetSettings: WidgetSettings = {
-    tenantSlug: session?.user.tenantSlug ?? 'demo-belediye',
+    tenantSlug: session?.user.tenantSlug ?? '',
     widgetEnabled: true,
     widgetTitle: 'Belediye asistanı',
     widgetWelcome: 'Merhaba, belediyeye iletmek istediğiniz konuyu yazın.',
     widgetAllowedOrigins: [],
   };
   const fallbackRetentionSettings: RetentionSettings = {
-    tenantSlug: session?.user.tenantSlug ?? 'demo-belediye',
+    tenantSlug: session?.user.tenantSlug ?? '',
     defaults: {
       'channel-events': 60,
       'audit-logs': 365,
@@ -115,7 +115,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
     overrides: {},
   };
   const fallbackAiBudgetSettings: AiBudgetSettings = {
-    tenantSlug: session?.user.tenantSlug ?? 'demo-belediye',
+    tenantSlug: session?.user.tenantSlug ?? '',
     overrides: {},
   };
   const [departments, categories, slaPolicies, templates, widgetSettings, retentionSettings, aiBudgetSettings] = token

@@ -65,3 +65,6 @@ test-results/
 /apps/api/output/
 /admin-home-*.png
 /citizen-home-*.png
+
+# Automated backups
+backups/

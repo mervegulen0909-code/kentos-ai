@@ -134,6 +134,12 @@ services:
         condition: service_healthy
       clamav:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3130/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
 
   admin-web:
     build:
@@ -165,6 +171,12 @@ services:
     depends_on:
       api:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3101/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
 
   citizen-web:
     build:
@@ -196,6 +208,12 @@ services:
     depends_on:
       api:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3102/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
 
   whatsapp-gateway:
     build:
@@ -239,6 +257,36 @@ services:
       - admin-web
       - citizen-web
       - whatsapp-gateway
+
+  backup:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      PGHOST: postgres
+      PGUSER: kentos
+      PGDATABASE: kentos_ai
+      RETENTION_DAYS: ${KENTOS_BACKUP_RETENTION_DAYS:-14}
+    volumes:
+      - ../backups:/backups
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        apk add --no-cache dcron > /dev/null 2>&1
+        mkdir -p /backups
+        cat > /cron-backup.sh << 'EOF'
+        #!/bin/sh
+        STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
+        FILE="/backups/postgres-${STAMP}.sql.gz"
+        pg_dump | gzip -9 > "$FILE" && echo "Backup OK: $FILE" || echo "Backup FAILED" >&2
+        find /backups -name "postgres-*.sql.gz" -mtime +${RETENTION_DAYS:-14} -exec rm -f {} \;
+        EOF
+        chmod +x /cron-backup.sh
+        echo "0 2 * * * /cron-backup.sh" | crontab -
+        crond -f -l 6
+    depends_on:
+      postgres:
+        condition: service_healthy
 
 volumes:
   postgres-prod-data:

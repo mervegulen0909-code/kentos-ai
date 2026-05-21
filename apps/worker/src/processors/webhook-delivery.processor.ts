@@ -1,6 +1,16 @@
 import { PrismaClient } from '@kentos/database';
 import { createHmac } from 'node:crypto';
 
+// Block SSRF: private/loopback IPs and internal service hostnames
+const PRIVATE_URL_RE =
+  /^https?:\/\/(localhost|127\.|0\.0\.0\.0|10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.|::1|\[::1\]|redis|postgres|minio|clamav|caddy|api|worker|admin-web|citizen-web)/i;
+
+function assertPublicUrl(url: string) {
+  if (PRIVATE_URL_RE.test(url)) {
+    throw new Error(`webhook-blocked-private-url: ${url}`);
+  }
+}
+
 const prisma = new PrismaClient();
 
 type WebhookJobData = {
@@ -24,6 +34,8 @@ export async function processWebhookJob(job: { name: string; data: WebhookJobDat
   if (!webhook) {
     return { processor: 'webhook-delivery', skipped: 'webhook-not-found-or-inactive' };
   }
+
+  assertPublicUrl(webhook.url);
 
   const events = Array.isArray(webhook.events) ? webhook.events as string[] : [];
   if (!events.includes(event)) {

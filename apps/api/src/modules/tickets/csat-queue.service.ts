@@ -1,4 +1,4 @@
-import { Injectable, OnModuleDestroy } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { Queue } from 'bullmq';
 import { LENIENT_JOB_OPTIONS } from '../../common/queue/queue-job-defaults.js';
 
@@ -9,6 +9,7 @@ type CsatJobData = {
 
 @Injectable()
 export class CsatQueueService implements OnModuleDestroy {
+  private readonly logger = new Logger(CsatQueueService.name);
   private queue?: Queue<CsatJobData>;
 
   async enqueueCsat(ticketId: string, tenantId: string, delayMs = 3_600_000) {
@@ -21,7 +22,7 @@ export class CsatQueueService implements OnModuleDestroy {
       });
       return true;
     } catch (error) {
-      console.warn('CSAT enqueue failed', error);
+      this.logger.warn(`CSAT enqueue failed: ${error instanceof Error ? error.message : String(error)}`);
       return false;
     }
   }

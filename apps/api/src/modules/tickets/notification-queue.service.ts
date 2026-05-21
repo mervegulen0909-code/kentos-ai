@@ -1,10 +1,11 @@
-import { Injectable, OnModuleDestroy } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { Queue } from 'bullmq';
 import type { NotificationJobData } from '@kentos/shared';
 import { DEFAULT_JOB_OPTIONS } from '../../common/queue/queue-job-defaults.js';
 
 @Injectable()
 export class NotificationQueueService implements OnModuleDestroy {
+  private readonly logger = new Logger(NotificationQueueService.name);
   private queue?: Queue<NotificationJobData | { deliveryId: string }>;
 
   async enqueueMessage(messageId: string) {
@@ -15,7 +16,7 @@ export class NotificationQueueService implements OnModuleDestroy {
       });
       return true;
     } catch (error) {
-      console.warn('Notification queue enqueue failed', error);
+      this.logger.warn(`Notification queue enqueue failed: ${error instanceof Error ? error.message : String(error)}`);
       return false;
     }
   }
@@ -29,7 +30,7 @@ export class NotificationQueueService implements OnModuleDestroy {
       });
       return true;
     } catch (error) {
-      console.warn('Scheduled delivery enqueue failed', error);
+      this.logger.warn(`Scheduled delivery enqueue failed: ${error instanceof Error ? error.message : String(error)}`);
       return false;
     }
   }

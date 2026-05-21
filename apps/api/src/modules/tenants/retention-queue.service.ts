@@ -1,4 +1,4 @@
-import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { Queue } from 'bullmq';
 
 export type RetentionJobPayload = {
@@ -26,6 +26,7 @@ export function buildRetentionScheduleOptions(env: NodeJS.ProcessEnv = process.e
 
 @Injectable()
 export class RetentionQueueService implements OnModuleInit, OnModuleDestroy {
+  private readonly logger = new Logger(RetentionQueueService.name);
   private queue?: Queue<RetentionJobPayload>;
   private registered = false;
 
@@ -44,7 +45,7 @@ export class RetentionQueueService implements OnModuleInit, OnModuleDestroy {
       });
       this.registered = true;
     } catch (error) {
-      console.warn('Retention scheduler bootstrap failed', error instanceof Error ? error.message : error);
+      this.logger.warn(`Retention scheduler bootstrap failed: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -56,7 +57,7 @@ export class RetentionQueueService implements OnModuleInit, OnModuleDestroy {
       });
       return true;
     } catch (error) {
-      console.warn('Retention run-now enqueue failed', error instanceof Error ? error.message : error);
+      this.logger.warn(`Retention run-now enqueue failed: ${error instanceof Error ? error.message : String(error)}`);
       return false;
     }
   }

@@ -44,6 +44,9 @@ jobs:
       WIDGET_ORIGIN_ALLOWLIST: http://localhost:3002,http://127.0.0.1:3002
       PUBLIC_RATE_LIMIT_MAX: 240
       PUBLIC_RATE_LIMIT_WINDOW_MS: 60000
+      JWT_ACCESS_SECRET: ci-test-access-secret-32-chars-minimum
+      JWT_REFRESH_SECRET: ci-test-refresh-secret-32-chars-minimum
+      CORS_ORIGIN: http://localhost:3101,http://localhost:3102
 
     steps:
       - name: Checkout
@@ -107,6 +110,34 @@ jobs:
 
       - name: API smoke
         run: pnpm smoke:api
+
+  deploy:
+    name: Deploy to Production
+    needs: [verify]
+    if: github.ref == 'refs/heads/master' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: production
+    steps:
+      - name: SSH deploy
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.PROD_HOST }}
+          username: ${{ secrets.PROD_USER }}
+          key: ${{ secrets.PROD_SSH_KEY }}
+          port: ${{ secrets.PROD_SSH_PORT || 22 }}
+          script: |
+            set -e
+            cd /opt/kentos
+            git pull origin master
+            pnpm install --frozen-lockfile
+            pnpm db:generate
+            pnpm db:migrate
+            docker compose -f infra/docker-compose.prod.yml up -d --build --remove-orphans
+            echo "Waiting for services to become healthy..."
+            sleep 30
+            ./infra/healthcheck-prod.sh
+            echo "Deploy completed successfully"
 
   ui-e2e:
     runs-on: ubuntu-latest
