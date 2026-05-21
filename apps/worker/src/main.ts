@@ -1,5 +1,6 @@
 import { createServer } from 'node:http';
 import { logger } from './logger.js';
+import { initSentry } from './sentry.js';
 import { processCsatJob } from './processors/csat.processor.js';
 import { processMediaJob } from './processors/media.processor.js';
 import { processNotificationJob } from './processors/notifications.processor.js';
@@ -10,6 +11,8 @@ import { processSlaJob } from './processors/sla.processor.js';
 import { processWebhookJob } from './processors/webhook-delivery.processor.js';
 import { createWorker } from './queues/create-worker.js';
 import { queueNames } from './queues/queue-names.js';
+
+await initSentry(process.env.SENTRY_DSN, process.env.NODE_ENV ?? 'development');
 
 const workers = [
   createWorker(queueNames.sla, processSlaJob),

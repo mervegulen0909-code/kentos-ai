@@ -1,5 +1,6 @@
 import { Injectable, OnModuleDestroy } from '@nestjs/common';
 import { Queue } from 'bullmq';
+import { redisConnection } from '../../common/redis.js';
 import { LENIENT_JOB_OPTIONS } from '../../common/queue/queue-job-defaults.js';
 
 export type ReportJobData = {
@@ -23,7 +24,7 @@ export class ReportsQueueService implements OnModuleDestroy {
 
   private getQueue() {
     this.queue ??= new Queue<ReportJobData>('kentos.reports', {
-      connection: { url: process.env.REDIS_URL ?? 'redis://localhost:6379' },
+      connection: redisConnection(),
     });
     return this.queue;
   }

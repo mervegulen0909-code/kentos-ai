@@ -1,6 +1,7 @@
 import { Inject, Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Queue } from 'bullmq';
+import { redisConnection } from '../../common/redis.js';
 import { AuditActorType, ChannelType, OutboundDeliveryState } from '@kentos/database';
 import type { IntakeChannel } from '@kentos/shared';
 import { PrismaService } from '../prisma/prisma.service.js';
@@ -33,7 +34,7 @@ export class OutboundDispatchService implements OnModuleDestroy {
 
   private getQueue() {
     this.queue ??= new Queue<{ deliveryId: string }>('kentos.outbound', {
-      connection: { url: this.config.get<string>('REDIS_URL') ?? 'redis://localhost:6379' },
+      connection: redisConnection(),
     });
     return this.queue;
   }

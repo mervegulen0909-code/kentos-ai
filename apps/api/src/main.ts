@@ -8,6 +8,7 @@ import helmet from 'helmet';
 import { AppModule } from './app.module.js';
 import { AllExceptionsFilter } from './common/filters/http-exception.filter.js';
 import { initSentry } from './common/sentry.js';
+import { mountBullBoard } from './common/bull-board.js';
 
 async function bootstrap() {
   // Init Sentry before anything else so all errors are captured
@@ -50,10 +51,18 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, swaggerConfig);
   SwaggerModule.setup('api/docs', app, document);
 
+  // Bull Board queue monitoring — /admin/queues (HTTP Basic Auth via BULL_BOARD_USER/PASS)
+  mountBullBoard(app.getHttpAdapter().getInstance() as Parameters<typeof mountBullBoard>[0]);
+
   const port = Number(config.get<string>('PORT') ?? 3100);
   await app.listen(port);
   logger.log(`KentOS API listening on http://localhost:${port}/api/v1`);
   logger.log(`KentOS API docs available on http://localhost:${port}/api/docs`);
+
+  // Outbound kanal ve kritik özellik durumları
+  const live = (flag: string | undefined) => flag === 'true' ? 'LIVE 🟢' : 'DRY-RUN 🟡';
+  logger.log(`Outbound → WA:${live(process.env.WHATSAPP_OUTBOUND_LIVE)} EMAIL:${live(process.env.EMAIL_OUTBOUND_LIVE)} SMS:${live(process.env.SMS_OUTBOUND_LIVE)} IG:${live(process.env.INSTAGRAM_OUTBOUND_LIVE)} FB:${live(process.env.FACEBOOK_OUTBOUND_LIVE)}`);
+  logger.log(`Retention: ${process.env.RETENTION_DRY_RUN === 'false' ? 'GERÇEK SİLME 🔴' : 'DRY-RUN 🟡'} | AI Budget: ${process.env.AI_DAILY_BUDGET_USD ?? 'sınırsız ⚠️'} | Sentry: ${process.env.SENTRY_DSN ? 'aktif 🟢' : 'kapalı 🔴'}`);
 }
 
 void bootstrap();

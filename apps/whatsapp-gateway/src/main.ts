@@ -12,8 +12,16 @@ function createProvider(): WhatsAppProvider {
 
 const provider: WhatsAppProvider = createProvider();
 
+// ── Kanal durumu başlangıç logu ───────────────────────────────────────────────
+const channelFlags: Record<string, string> = {
+  WHATSAPP:  process.env.WHATSAPP_OUTBOUND_LIVE  === 'true' ? 'LIVE 🟢' : 'DRY-RUN 🟡',
+  INSTAGRAM: process.env.INSTAGRAM_OUTBOUND_LIVE === 'true' ? 'LIVE 🟢' : 'DRY-RUN 🟡',
+  FACEBOOK:  process.env.FACEBOOK_OUTBOUND_LIVE  === 'true' ? 'LIVE 🟢' : 'DRY-RUN 🟡',
+  SMS:       process.env.SMS_OUTBOUND_LIVE        === 'true' ? 'LIVE 🟢' : 'DRY-RUN 🟡',
+  EMAIL:     process.env.EMAIL_OUTBOUND_LIVE      === 'true' ? 'LIVE 🟢' : 'DRY-RUN 🟡',
+};
 logger.info(`KentOS WhatsApp gateway adapter ready`, { provider: provider.providerName });
-logger.info('Aktif kanal saglayicilari: WHATSAPP, INSTAGRAM, FACEBOOK, SMS (env-flag ile canli send)');
+logger.info('Outbound kanal durumları', channelFlags);
 
 export async function handleWebhook(raw: unknown) {
   const messages = await provider.parseWebhook(raw);

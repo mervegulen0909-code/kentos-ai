@@ -2,7 +2,8 @@ import { Inject, Injectable } from '@nestjs/common';
 import { AuditActorType, MessageVisibility, OutboundDeliveryState, TicketStatus } from '@kentos/database';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import { PrismaService } from '../prisma/prisma.service.js';
-import { Redis } from 'ioredis';
+import { createRedisClient } from '../../common/redis.js';
+import type { Redis } from 'ioredis';
 import {
   summarizeAiUsageByProvider,
   summarizeAiUsageWindow,
@@ -17,7 +18,7 @@ export class AnalyticsService {
 
   private _redis?: Redis;
   private redis() {
-    this._redis ??= new Redis(process.env.REDIS_URL ?? 'redis://localhost:6379', { lazyConnect: true, maxRetriesPerRequest: 1 });
+    this._redis ??= createRedisClient();
     return this._redis;
   }
 

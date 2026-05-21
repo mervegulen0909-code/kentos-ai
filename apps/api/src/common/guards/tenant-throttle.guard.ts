@@ -1,5 +1,6 @@
 import { CanActivate, ExecutionContext, HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
-import { Redis } from 'ioredis';
+import { createRedisClient } from '../redis.js';
+import type { Redis } from 'ioredis';
 
 /**
  * F8 — Tenant-Based Rate Limiting
@@ -25,11 +26,7 @@ export class TenantThrottleGuard implements CanActivate {
   }
 
   private redis(): Redis {
-    this._redis ??= new Redis(process.env.REDIS_URL ?? 'redis://localhost:6379', {
-      lazyConnect: true,
-      maxRetriesPerRequest: 1,
-      enableOfflineQueue: false,
-    });
+    this._redis ??= createRedisClient();
     return this._redis;
   }
 

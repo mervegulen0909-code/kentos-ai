@@ -1,5 +1,6 @@
 import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { Queue } from 'bullmq';
+import { redisConnection } from '../../common/redis.js';
 import type { NotificationJobData } from '@kentos/shared';
 import { DEFAULT_JOB_OPTIONS } from '../../common/queue/queue-job-defaults.js';
 
@@ -41,7 +42,7 @@ export class NotificationQueueService implements OnModuleDestroy {
 
   private getQueue() {
     this.queue ??= new Queue<NotificationJobData | { deliveryId: string }>('kentos.notifications', {
-      connection: { url: process.env.REDIS_URL ?? 'redis://localhost:6379' },
+      connection: redisConnection(),
     });
     return this.queue;
   }

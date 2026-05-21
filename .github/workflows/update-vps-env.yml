@@ -1,0 +1,105 @@
+name: VPS Env Güncelle & Servisleri Yeniden Başlat
+
+on:
+  workflow_dispatch:
+    inputs:
+      bull_board_user:
+        description: 'Bull Board kullanıcı adı (BULL_BOARD_USER)'
+        required: true
+        default: 'admin'
+      services_to_restart:
+        description: 'Yeniden başlatılacak servisler'
+        required: true
+        default: 'api worker'
+        type: choice
+        options:
+          - 'api worker'
+          - 'api worker whatsapp-gateway'
+          - 'all'
+
+jobs:
+  update-env:
+    name: .env Güncelle → Servisleri Yeniden Başlat
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 10
+
+    steps:
+      - name: SSH → .env güncelle
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.PROD_HOST }}
+          username: root
+          key: ${{ secrets.PROD_SSH_KEY }}
+          script: |
+            set -e
+            ENV_FILE="/opt/kentos/.env"
+
+            echo "📝 .env güncelleniyor..."
+
+            # BULL_BOARD_USER
+            if grep -q "^BULL_BOARD_USER=" "$ENV_FILE"; then
+              sed -i "s|^BULL_BOARD_USER=.*|BULL_BOARD_USER=${{ inputs.bull_board_user }}|" "$ENV_FILE"
+            else
+              echo "BULL_BOARD_USER=${{ inputs.bull_board_user }}" >> "$ENV_FILE"
+            fi
+
+            # BULL_BOARD_PASS (GitHub Secret'tan)
+            if [ -n "${{ secrets.BULL_BOARD_PASS }}" ]; then
+              if grep -q "^BULL_BOARD_PASS=" "$ENV_FILE"; then
+                sed -i "s|^BULL_BOARD_PASS=.*|BULL_BOARD_PASS=${{ secrets.BULL_BOARD_PASS }}|" "$ENV_FILE"
+              else
+                echo "BULL_BOARD_PASS=${{ secrets.BULL_BOARD_PASS }}" >> "$ENV_FILE"
+              fi
+              echo "✅ BULL_BOARD_PASS set"
+            else
+              echo "⚠️  BULL_BOARD_PASS secret tanımlı değil, atlanıyor"
+            fi
+
+            # SENTRY_DSN (GitHub Secret'tan)
+            if [ -n "${{ secrets.SENTRY_DSN }}" ]; then
+              if grep -q "^SENTRY_DSN=" "$ENV_FILE"; then
+                sed -i "s|^SENTRY_DSN=.*|SENTRY_DSN=${{ secrets.SENTRY_DSN }}|" "$ENV_FILE"
+              else
+                echo "SENTRY_DSN=${{ secrets.SENTRY_DSN }}" >> "$ENV_FILE"
+              fi
+              echo "✅ SENTRY_DSN set"
+            else
+              echo "⚠️  SENTRY_DSN secret tanımlı değil, atlanıyor"
+            fi
+
+            echo "📋 Güncellenen değerler:"
+            grep -E "^(BULL_BOARD_USER|BULL_BOARD_PASS|SENTRY_DSN)=" "$ENV_FILE" | \
+              sed 's/=.*/=***/' || true
+
+      - name: SSH → Servisleri yeniden başlat
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.PROD_HOST }}
+          username: root
+          key: ${{ secrets.PROD_SSH_KEY }}
+          script: |
+            set -e
+            cd /opt/kentos/infra
+
+            SERVICES="${{ inputs.services_to_restart }}"
+
+            if [ "$SERVICES" = "all" ]; then
+              echo "🔄 Tüm servisler yeniden başlatılıyor..."
+              docker compose -f docker-compose.prod.yml up -d --remove-orphans
+            else
+              echo "🔄 Servisler yeniden başlatılıyor: $SERVICES"
+              docker compose -f docker-compose.prod.yml restart $SERVICES
+            fi
+
+            echo "⏳ Sağlık kontrolü bekleniyor (15s)..."
+            sleep 15
+
+            echo "🏥 API /health/ready kontrol ediliyor..."
+            curl -sf http://localhost:3100/api/v1/health/ready && \
+              echo "✅ API sağlıklı" || \
+              echo "⚠️  API sağlık kontrolü başarısız — logları kontrol edin"
+
+            echo ""
+            echo "📊 Container durumları:"
+            docker compose -f docker-compose.prod.yml ps --format "table {{.Name}}\t{{.Status}}"

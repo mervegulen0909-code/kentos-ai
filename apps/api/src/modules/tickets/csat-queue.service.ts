@@ -1,5 +1,6 @@
 import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { Queue } from 'bullmq';
+import { redisConnection } from '../../common/redis.js';
 import { LENIENT_JOB_OPTIONS } from '../../common/queue/queue-job-defaults.js';
 
 type CsatJobData = {
@@ -33,7 +34,7 @@ export class CsatQueueService implements OnModuleDestroy {
 
   private getQueue() {
     this.queue ??= new Queue<CsatJobData>('kentos.csat', {
-      connection: { url: process.env.REDIS_URL ?? 'redis://localhost:6379' },
+      connection: redisConnection(),
     });
     return this.queue;
   }

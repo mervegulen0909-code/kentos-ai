@@ -1,7 +1,8 @@
 import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { ThrottlerModule } from '@nestjs/throttler';
+import { ThrottlerWithHeadersGuard } from './common/guards/throttler-with-headers.guard.js';
 import { TenantThrottleGuard } from './common/guards/tenant-throttle.guard.js';
 import { AdminModule } from './modules/admin/admin.module.js';
 import { CitizensModule } from './modules/citizens/citizens.module.js';
@@ -44,8 +45,8 @@ import { RootController } from './root.controller.js';
   ],
   controllers: [RootController],
   providers: [
-    // Global throttle: 120 req/min per IP
-    { provide: APP_GUARD, useClass: ThrottlerGuard },
+    // Global throttle: 120 req/min per IP — with X-RateLimit-* response headers
+    { provide: APP_GUARD, useClass: ThrottlerWithHeadersGuard },
     // F8 — Tenant-based rate limit: 300 req/min per tenant (after auth)
     { provide: APP_GUARD, useClass: TenantThrottleGuard },
   ],

@@ -1,5 +1,6 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { Queue } from 'bullmq';
+import { redisConnection } from '../../common/redis.js';
 
 export type RetentionJobPayload = {
   tenantId?: string;
@@ -72,7 +73,7 @@ export class RetentionQueueService implements OnModuleInit, OnModuleDestroy {
 
   private getQueue() {
     this.queue ??= new Queue<RetentionJobPayload>('kentos.retention', {
-      connection: { url: process.env.REDIS_URL ?? 'redis://localhost:6379' },
+      connection: redisConnection(),
     });
     return this.queue;
   }
