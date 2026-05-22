@@ -784,13 +784,13 @@ export class TicketsService {
     const ids = tickets.map((t) => t.id);
     if (ids.length === 0) return { updated: 0, skipped: dto.ticketIds.length };
 
-    await this.prisma.$transaction(async (tx) => {
+    await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       await tx.ticket.updateMany({
         where: { id: { in: ids }, tenantId: user.tenantId },
         data: { assignedToId: dto.assignedToId, status: 'ASSIGNED' as TicketStatus },
       });
       await tx.auditLog.createMany({
-        data: ids.map((ticketId) => ({
+        data: ids.map((ticketId: string) => ({
           tenantId: user.tenantId,
           ticketId,
           actorType: AuditActorType.USER,
@@ -818,13 +818,13 @@ export class TicketsService {
     if (dto.status === 'RESOLVED') extraData.resolvedAt = now;
     if (dto.status === 'CLOSED') extraData.closedAt = now;
 
-    await this.prisma.$transaction(async (tx) => {
+    await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       await tx.ticket.updateMany({
         where: { id: { in: ids }, tenantId: user.tenantId },
         data: { status: dto.status, ...extraData },
       });
       await tx.auditLog.createMany({
-        data: ids.map((ticketId) => ({
+        data: ids.map((ticketId: string) => ({
           tenantId: user.tenantId,
           ticketId,
           actorType: AuditActorType.USER,

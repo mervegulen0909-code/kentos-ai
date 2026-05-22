@@ -2,6 +2,8 @@
 
 This repository now includes a self-hosted production scaffold for a single VPS/VM. It prepares the platform, but it does not perform a live deploy automatically.
 
+If `pnpm` is not yet available on the local machine `PATH`, you can still bootstrap the Node-backed root scripts with `npm run infra:prod:bootstrap -- --help`, `npm run ops:preflight -- --help`, and `npm run ops:external -- --help`. On Windows PowerShell with execution-policy blocks, use `npm.cmd run ...`. Once `corepack enable` (or the team's normal pnpm install flow) has been applied, switch back to the canonical `pnpm ...` commands below.
+
 ## Included Services
 
 - PostgreSQL 16
@@ -84,6 +86,7 @@ On the server:
 set -a
 . ./.env.production.local
 set +a
+pnpm verify --skip install,ui
 pnpm ops:preflight -- --with-verification
 ```
 
@@ -102,6 +105,128 @@ pnpm ops:external -- --env-file .env.production.local --compose --skip-network
 ```
 
 The first command checks env completeness, DNS, HTTPS health endpoints, provider readiness, and safety gates. The second command is intended for the VPS and also validates Docker Compose state. Reports are written under `output/ops-external-systems/`.
+
+Recommended production-readiness order after env review:
+
+1. `pnpm infra:prod:bootstrap -- ...`
+2. review `.env.production.local`
+3. `pnpm verify --skip install,ui`
+4. `pnpm ops:preflight -- --with-verification`
+5. `pnpm ops:external -- --env-file .env.production.local --compose --json`
+6. `docker compose ... ps`
+7. HTTPS health probes
+8. read-only browser smoke
+9. approved write-path smoke
+
+Operator-owned gates that are intentionally outside repo automation:
+
+- Meta business verification / permanent token / phone registration
+- Twilio login + MFA / phone verification
+- Postmark business email approval or SMTP credential handoff
+- live outbound enable decision
+- paid AI provider enable decision
+- retention live delete decision
+
+## Current external provider snapshot (2026-05-22)
+
+Observed from operator-assisted browser review:
+
+- Meta Developers:
+  - app `KentOS AI` exists and remains `In development`
+  - business verification for `FERSA ELEKTRONIK SANAYI VE TICARET LIMITED SIRKETI` is `Değerlendirmede`
+  - WhatsApp Business account is attached and approved
+  - only the Meta test number `+1 555-647-0488` is currently attached
+  - real production phone registration for `+90 535 281 12 35` is still blocked until Meta verification completes
+- Twilio:
+  - account is still `trial`
+  - active Twilio-owned number: `+1 218 663 3732`
+  - operator number `+90 535 281 12 35` already exists under `Verified Caller IDs`
+  - final `TWILIO_FROM_NUMBER` policy remains operator-owned until the sending-number decision is made
+- Postmark:
+  - sender signature `destek@cebtecep.com` is confirmed
+  - account remains `Test mode`
+  - domain `cebtecep.com` still needs DNS verification:
+    - DKIM TXT host `20260519190009pm._domainkey`
+    - Return-Path CNAME host `pm-bounces`
+  - the authoritative DNS control panel for `cebtecep.com` was not found in the accessible Natro account
+
+Treat these as live operator checkpoints. Repo automation should remain on safe defaults until they are resolved.
+
+## Immediate VPS-focused next steps
+
+Use this order after the provider/account blockers above are recorded:
+
+1. keep all live outbound flags false in `.env.production.local`
+2. keep `ATTACHMENT_SCAN_PROVIDER=clamav` only if the VPS ClamAV service is healthy; otherwise leave the current safe value and recreate `worker` after the change
+3. confirm Bull Board credentials are present:
+   - `BULL_BOARD_USER`
+   - `BULL_BOARD_PASS`
+4. run the canonical server-side gate:
+
+```bash
+pnpm verify --skip install,ui
+pnpm ops:preflight -- --with-verification
+pnpm ops:external -- --env-file .env.production.local --compose --json
+docker compose --env-file .env.production.local -f infra/docker-compose.prod.yml ps
+```
+
+5. verify public health endpoints:
+
+```bash
+curl -fsS "https://$API_DOMAIN/api/v1/health"
+curl -fsS "https://$API_DOMAIN/api/v1/health/ready"
+curl -fsS "https://$GATEWAY_DOMAIN/health"
+```
+
+6. only after provider approval and credential readiness, update `.env.production.local`, recreate the affected services, and record a new run-log checkpoint
+
+## SSH rescue fallback
+
+Use this only if normal SSH access to the VPS stops working.
+
+1. In Hetzner Cloud open the server `Rescue` tab and enable rescue mode with power cycle.
+2. Prefer attaching a fresh SSH key to rescue mode instead of relying on the temporary password path.
+3. Connect to the rescue OS and identify the normal root filesystem:
+
+```bash
+lsblk
+blkid
+mkdir -p /mnt
+mount /dev/sda1 /mnt
+ls /mnt
+```
+
+If `/mnt/etc` and `/mnt/root` do not exist, unmount and try the correct root partition for that host.
+
+4. Restore normal root key access:
+
+```bash
+mkdir -p /mnt/root/.ssh
+chmod 700 /mnt/root/.ssh
+cat ~/.ssh/authorized_keys > /mnt/root/.ssh/authorized_keys
+chmod 600 /mnt/root/.ssh/authorized_keys
+```
+
+5. Confirm SSH daemon key-auth settings on the mounted normal OS:
+
+```bash
+grep -E '^(PermitRootLogin|PubkeyAuthentication)' /mnt/etc/ssh/sshd_config || true
+sed -i 's/^#\?PubkeyAuthentication.*/PubkeyAuthentication yes/' /mnt/etc/ssh/sshd_config
+```
+
+6. Reboot back into the normal OS, disable rescue mode, and verify:
+
+```bash
+sync
+reboot
+```
+
+Then reconnect normally and rerun:
+
+```bash
+docker compose --env-file .env.production.local -f infra/docker-compose.prod.yml ps
+/opt/kentos-ai/infra/healthcheck-prod.sh
+```
 
 If production deploy approval has been recorded, the same script can run the deploy sequence on the VPS:
 

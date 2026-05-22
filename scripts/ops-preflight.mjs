@@ -10,7 +10,14 @@ import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const args = new Set(process.argv.slice(2));
+const PACKAGE_MANAGER_ENV = 'KENTOS_PNPM_BIN';
+const COREPACK_HOME = path.join(REPO_ROOT, '.tools', 'corepack-home');
+const rawArgs = process.argv.slice(2);
+if (rawArgs.includes('--help') || rawArgs.includes('-h')) {
+  printHelp();
+  process.exit(0);
+}
+const args = new Set(rawArgs);
 const withVerification = args.has('--with-verification');
 const allowLive = args.has('--allow-live');
 const allowRetentionDelete = args.has('--allow-retention-delete');
@@ -23,6 +30,7 @@ const reportPath = path.join(reportDir, `ops-preflight-${stamp(startedAt)}.md`);
 
 const checks = [];
 const commandResults = [];
+const resolvedPnpmCommand = await resolvePnpmCommand();
 
 await addGitChecks();
 addEnvGuardChecks();
@@ -162,7 +170,10 @@ async function runVerificationCommands() {
     ['db-generate', 'pnpm', ['db:generate'], { PRISMA_GENERATE_NO_ENGINE: process.env.PRISMA_GENERATE_NO_ENGINE ?? 'true' }],
     ['api-test', 'pnpm', ['--filter', '@kentos/api', 'test']],
     ['worker-test', 'pnpm', ['--filter', '@kentos/worker', 'test']],
+    ['gateway-test', 'pnpm', ['--filter', '@kentos/whatsapp-gateway', 'test']],
+    ['admin-web-test', 'pnpm', ['--filter', '@kentos/admin-web', 'test']],
     ['shared-test', 'pnpm', ['--filter', '@kentos/shared', 'test']],
+    ['citizen-web-test', 'pnpm', ['--filter', '@kentos/citizen-web', 'test']],
     ['typecheck', 'pnpm', ['typecheck']],
     ['build', 'pnpm', ['build']],
     ['diff-check', 'git', ['diff', '--check']],
@@ -206,6 +217,26 @@ function printHuman(summary) {
   }
 }
 
+function printHelp() {
+  console.log(`KentOS ops preflight
+
+Usage:
+  node scripts/ops-preflight.mjs
+  node scripts/ops-preflight.mjs --with-verification
+  node scripts/ops-preflight.mjs --allow-live
+  node scripts/ops-preflight.mjs --allow-retention-delete
+  node scripts/ops-preflight.mjs --allow-deploy
+  node scripts/ops-preflight.mjs --json
+
+Root aliases:
+  pnpm ops:preflight
+  npm run ops:preflight
+
+Notes:
+  - Override pnpm binary: set ${PACKAGE_MANAGER_ENV}=C:\\path\\to\\pnpm.cmd
+`);
+}
+
 function renderMarkdown(summary) {
   const lines = [
     '# KentOS Ops Preflight Report',
@@ -241,11 +272,11 @@ function renderMarkdown(summary) {
 
 async function run(command, commandArgs, extraEnv = {}) {
   const started = Date.now();
-  const invocation = buildInvocation(command, commandArgs);
+  const invocation = await buildInvocation(command, commandArgs);
   return new Promise((resolve) => {
     const child = spawn(invocation.command, invocation.args, {
       cwd: REPO_ROOT,
-      env: { ...process.env, ...extraEnv, FORCE_COLOR: '0', CI: '1' },
+      env: { ...process.env, ...extraEnv, COREPACK_HOME, FORCE_COLOR: '0', CI: '1' },
     });
     let output = '';
     child.stdout.on('data', (chunk) => {
@@ -263,12 +294,53 @@ async function run(command, commandArgs, extraEnv = {}) {
   });
 }
 
-function buildInvocation(command, commandArgs) {
+async function buildInvocation(command, commandArgs) {
+  if (command === 'pnpm') {
+    if (resolvedPnpmCommand.kind === 'direct') return buildPlatformInvocation(resolvedPnpmCommand.command, commandArgs);
+    return buildPlatformInvocation(resolvedPnpmCommand.command, [...resolvedPnpmCommand.prefixArgs, ...commandArgs]);
+  }
+  return buildPlatformInvocation(command, commandArgs);
+}
+
+function buildPlatformInvocation(command, commandArgs) {
   if (process.platform !== 'win32') return { command, args: commandArgs };
   return {
     command: 'cmd.exe',
     args: ['/d', '/c', [command, ...commandArgs].map(quoteCmdArg).join(' ')],
   };
+}
+
+async function resolvePnpmCommand() {
+  const override = process.env[PACKAGE_MANAGER_ENV]?.trim();
+  if (override) return { kind: 'direct', command: override };
+
+  const candidates = process.platform === 'win32'
+    ? ['pnpm.cmd', 'pnpm.exe', 'pnpm']
+    : ['pnpm'];
+
+  for (const candidate of candidates) {
+    if (await canSpawn(candidate, ['--version'])) return { kind: 'direct', command: candidate };
+  }
+
+  if (await canSpawn('corepack', ['pnpm', '--version'])) {
+    return { kind: 'prefix', command: 'corepack', prefixArgs: ['pnpm'] };
+  }
+
+  return { kind: 'direct', command: process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm' };
+}
+
+async function canSpawn(command, args) {
+  return new Promise((resolve) => {
+    const invocation = buildPlatformInvocation(command, args);
+    const child = spawn(invocation.command, invocation.args, {
+      cwd: REPO_ROOT,
+      shell: false,
+      stdio: 'ignore',
+      env: { ...process.env, COREPACK_HOME, FORCE_COLOR: '0', CI: '1' },
+    });
+    child.once('error', () => resolve(false));
+    child.once('close', (code) => resolve(code === 0));
+  });
 }
 
 function quoteCmdArg(value) {

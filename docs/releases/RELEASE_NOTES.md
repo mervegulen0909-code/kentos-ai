@@ -1,5 +1,54 @@
 # Release Notes
 
+## Next - Closure command surface alignment - 2026-05-22
+
+### Summary
+
+- Aligned the root command surface with the repo's documented release/ops workflow by restoring `pnpm verify`, `pnpm ops:preflight`, `pnpm ops:external`, `pnpm infra:prod:bootstrap`, and `pnpm db:deploy` as first-class root scripts.
+- Added `--help` entrypoints to the Node-backed verification/ops scripts so script-contract checks can run even when `pnpm` is temporarily missing from `PATH`.
+- Expanded verification coverage in both `verify` and `ops:preflight -- --with-verification` to include API, worker, gateway, admin-web, shared, and citizen-web tests plus diff hygiene.
+- Documented repo hygiene boundaries for local account/browser state versus committed operator helper tooling under `docs/accounts/**` and the release checklist.
+- Standardized local bootstrap guidance: `pnpm` remains canonical, while `npm run <root-script>` is the fallback only for Node-backed root entrypoints during PATH/bootstrap issues.
+
+### Current decision
+
+- Merge/release state: `hold`
+- Reason: command-surface drift is closed, but this slice does not re-run the full pnpm-backed verification chain or production smoke in the current sandboxed shell. Final `go` still depends on a clean worktree plus the canonical local/prod evidence rerun.
+
+### Operator-owned go-live gates
+
+- Meta business verification, permanent token, and phone registration
+- Twilio MFA / phone verification
+- Postmark business-email approval or SMTP credential handoff
+- Live outbound enable decision
+- Paid AI provider enable decision
+- Retention live-delete approval
+
+### 2026-05-22 production access recovery note
+
+- Production SSH/root access on the Hetzner VPS (`46.224.217.16`) was successfully recovered through rescue mode after the prior login path stopped working.
+- Recovery used a fresh rescue SSH key instead of relying on the temporary rescue password flow.
+- The normal OS root filesystem was confirmed on `/dev/sda1`.
+- Root key-based access was restored through `/root/.ssh/authorized_keys`, and `PubkeyAuthentication yes` was confirmed in `/etc/ssh/sshd_config`.
+- Post-recovery verification confirmed the production compose stack remains healthy and `/opt/kentos-ai/infra/healthcheck-prod.sh` reports API and gateway healthy.
+- Keep the recovery key available in secure local storage for future incidents, but leave live outbound and other provider-controlled gates unchanged.
+
+### 2026-05-22 external-state note
+
+- Meta Developers app `KentOS AI` exists and remains `In development`.
+- Meta Business verification for `FERSA ELEKTRONIK SANAYI VE TICARET LIMITED SIRKETI` is currently `Değerlendirmede`; the UI states review may take about 2 business days.
+- WhatsApp Business account `Test WhatsApp Business Account` is attached and approved, but it currently exposes only the default Meta test number `+1 555-647-0488` (`Test Number`).
+- A real production registration for `+90 535 281 12 35` has not been completed yet. The add-phone flow is currently blocked until Meta business verification finishes.
+- Twilio is currently a `trial` account. The active Twilio-owned number is `+1 218 663 3732`, and the operator phone `+90 535 281 12 35` already exists under `Verified Caller IDs`.
+- Postmark login succeeded. The sender signature `destek@cebtecep.com` is now confirmed, but the account is still in `Test mode` and the sender domain `cebtecep.com` is not yet verified (`DKIM Not Verified`, `Return-Path Not Verified`).
+- Pending Postmark DNS records for `cebtecep.com` are:
+  - DKIM TXT host `20260519190009pm._domainkey`
+  - DKIM TXT value `k=rsa;p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQCTHIKURDmWmAl+8NRhoQpDo6xl4Z+/PRskjXsRnjcR+xcqQWsqM3/VEGyfMdNhNXR13P9O8s+q2U4qNu3pmMtXLcDQk+ZwI767vf8T8rc68iVut32NwpPxSFoGwmPcCBjGzXqUlbB4JJ+CPzIFHHoJDk1tl5bWxdrRqslpd5bn3QIDAQAB`
+  - Return-Path CNAME host `pm-bounces`
+  - Return-Path CNAME value `pm.mtasv.net`
+- The currently accessible Natro account (`arif gülen`, customer `166312`) does not contain `cebtecep.com`; it lists only `didimonline.com` and `izmirusulü.com`. The authoritative DNS control panel for `cebtecep.com` is still unknown and remains operator-owned.
+- Keep release state as `prod-ready, live integrations gated` until Meta verification completes, the real phone number is registered in international format, and the required SMS/voice verification is completed by the operator.
+
 ## Next - Production VPS deploy closure - 2026-05-12
 
 ### Summary

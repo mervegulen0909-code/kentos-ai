@@ -9,7 +9,7 @@
     "start": "next start -p 3101",
     "lint": "next lint",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "pnpm typecheck && tsx lib/api.test.ts && tsx lib/session.test.ts"
+    "test": "npm run typecheck && tsx lib/api.test.ts && tsx lib/session.test.ts"
   },
   "dependencies": {
     "@kentos/shared": "workspace:*",

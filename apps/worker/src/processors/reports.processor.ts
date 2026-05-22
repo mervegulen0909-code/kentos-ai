@@ -6,6 +6,17 @@ const prisma = new PrismaClient();
 const openStatuses = ['NEW', 'TRIAGED', 'ASSIGNED', 'IN_PROGRESS', 'WAITING_INFO'] satisfies TicketStatus[];
 const closedStatuses = ['RESOLVED', 'CLOSED'] satisfies TicketStatus[];
 
+type DepartmentBreakdownRow = {
+  departmentId: null | string;
+  openTickets: number;
+};
+
+type DepartmentLookup = {
+  code: string;
+  id: string;
+  name: string;
+};
+
 type ReportJobData = {
   tenantId?: string;
   type?: string;
@@ -19,7 +30,7 @@ export async function processReportJob(job: { name: string; data: ReportJobData 
   const now = new Date();
   const sevenDaysAgo = new Date(now.getTime() - 7 * 86_400_000);
 
-  const tenantFilter = tenantId ? { tenantId } : {};
+  const tenantFilter: Prisma.TicketWhereInput = tenantId ? { tenantId } : {};
 
   // ── Ticket volume over the past 7 days ───────────────────────────────────
   const [openedCount, closedCount] = await Promise.all([
@@ -67,35 +78,44 @@ export async function processReportJob(job: { name: string; data: ReportJobData 
   });
 
   // ── Department breakdown (open tickets) ─────────────────────────────────
-  const departmentBreakdownRaw = await prisma.ticket.groupBy({
-    by: ['departmentId'],
+  const openTicketsForBreakdown = await prisma.ticket.findMany({
     where: {
       ...tenantFilter,
       status: { in: openStatuses },
     },
-    _count: { _all: true },
-    orderBy: { _count: { departmentId: 'desc' } },
+    select: { departmentId: true },
   });
+
+  const breakdownCounts = new Map<null | string, number>();
+  for (const ticket of openTicketsForBreakdown) {
+    const current = breakdownCounts.get(ticket.departmentId) ?? 0;
+    breakdownCounts.set(ticket.departmentId, current + 1);
+  }
+
+  const departmentBreakdownRaw: DepartmentBreakdownRow[] = [...breakdownCounts.entries()].map(([departmentId, openTickets]) => ({
+    departmentId,
+    openTickets,
+  }));
 
   // Resolve department names
   const departmentIds = departmentBreakdownRaw
-    .map((row) => row.departmentId)
+    .map((row: DepartmentBreakdownRow) => row.departmentId)
     .filter((id): id is string => Boolean(id));
 
-  const departments = departmentIds.length
+  const departments: DepartmentLookup[] = departmentIds.length
     ? await prisma.department.findMany({
         where: { id: { in: departmentIds } },
         select: { id: true, name: true, code: true },
       })
     : [];
 
-  const departmentMap = new Map(departments.map((d) => [d.id, d]));
+  const departmentMap = new Map<string, DepartmentLookup>(departments.map((d: DepartmentLookup) => [d.id, d]));
 
-  const departmentBreakdown = departmentBreakdownRaw.map((row) => ({
+  const departmentBreakdown = departmentBreakdownRaw.map((row: DepartmentBreakdownRow) => ({
     departmentId: row.departmentId,
     departmentName: row.departmentId ? (departmentMap.get(row.departmentId)?.name ?? 'Unknown') : 'Unassigned',
     departmentCode: row.departmentId ? (departmentMap.get(row.departmentId)?.code ?? null) : null,
-    openTickets: row._count._all,
+    openTickets: row.openTickets,
   }));
 
   // ── SLA breach count ─────────────────────────────────────────────────────
@@ -140,7 +160,7 @@ export async function processReportJob(job: { name: string; data: ReportJobData 
         periodStart: sevenDaysAgo,
         periodEnd: now,
         summary: `${reportType} — ${openedCount} açılan, ${closedCount} kapanan, ${currentlyOpenCount} bekleyen ticket`,
-        metrics: generatedReport as unknown as Prisma.InputJsonValue,
+        metrics: generatedReport as unknown as Prisma.JsonObject,
       },
     });
     return {

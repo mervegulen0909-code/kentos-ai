@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import bcrypt from 'bcryptjs';
 import { UserRole } from '@kentos/database';
+import type { Prisma } from '@kentos/database';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import { CreateUserDto } from './dto/create-user.dto.js';
@@ -141,7 +142,7 @@ export class UsersService {
       updateData.passwordHash = await bcrypt.hash(dto.password, 12);
     }
 
-    const updated = await this.prisma.$transaction(async (tx) => {
+    const updated = await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       if (dto.departmentIds !== undefined) {
         await tx.userDepartment.deleteMany({ where: { userId: id } });
         if (dto.departmentIds.length > 0) {
