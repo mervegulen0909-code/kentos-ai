@@ -66,6 +66,13 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Verify root script contracts
+        run: |
+          npm run verify -- --help
+          npm run ops:preflight -- --help
+          npm run ops:external -- --help
+          npm run infra:prod:bootstrap -- --help
+
       - name: Prisma generate
         run: pnpm db:generate
 

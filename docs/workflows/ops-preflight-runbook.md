@@ -2,6 +2,8 @@
 
 `pnpm ops:preflight` is the safe automation layer for the remaining production gates. It does not deploy, send live channel messages, call paid models, or delete DB/S3 data.
 
+If `pnpm` is temporarily unavailable on `PATH`, the Node-backed root entrypoint can still be reached with `npm run ops:preflight -- --help` or `npm run ops:preflight -- --with-verification`. On Windows PowerShell with execution-policy blocks, use `npm.cmd run ...`. Use `corepack enable` plus a fresh terminal to restore the normal `pnpm ...` workflow on the machine.
+
 ## Default check
 
 ```bash
@@ -31,7 +33,10 @@ This also runs:
 - `pnpm db:generate` with `PRISMA_GENERATE_NO_ENGINE=true` by default to avoid local Windows Prisma engine lock issues.
 - `pnpm --filter @kentos/api test`
 - `pnpm --filter @kentos/worker test`
+- `pnpm --filter @kentos/whatsapp-gateway test`
+- `pnpm --filter @kentos/admin-web test`
 - `pnpm --filter @kentos/shared test`
+- `pnpm --filter @kentos/citizen-web test`
 - `pnpm typecheck`
 - `pnpm build`
 - `git diff --check`

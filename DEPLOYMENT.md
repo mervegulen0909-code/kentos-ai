@@ -22,12 +22,12 @@ sudo usermod -aG docker $USER
 
 ```bash
 # Repo klon
-git clone https://github.com/<org>/kentos-ai.git /opt/kentos
-cd /opt/kentos
+git clone https://github.com/<org>/kentos-ai.git /opt/kentos-ai
+cd /opt/kentos-ai
 
 # Env dosyası oluştur
-cp .env.example .env
-nano .env   # Aşağıdaki zorunlu değerleri doldur
+cp .env.example .env.production.local
+nano .env.production.local   # Aşağıdaki zorunlu değerleri doldur
 ```
 
 ### Zorunlu Env Var'lar
@@ -89,17 +89,17 @@ FACEBOOK_OUTBOUND_LIVE=false
 ## 2. İlk Başlatma
 
 ```bash
-cd /opt/kentos/infra
+cd /opt/kentos-ai/infra
 
 # Veritabanı migrate + seed
-docker compose -f docker-compose.prod.yml run --rm api \
-  sh -c "npx prisma migrate deploy && npx prisma db seed"
+docker compose --env-file ../.env.production.local -f docker-compose.prod.yml run --rm api pnpm db:deploy
+docker compose --env-file ../.env.production.local -f docker-compose.prod.yml run --rm api pnpm db:seed
 
 # Tüm servisleri başlat
-docker compose -f docker-compose.prod.yml up -d
+docker compose --env-file ../.env.production.local -f docker-compose.prod.yml up -d
 
 # Logları izle
-docker compose -f docker-compose.prod.yml logs -f api worker
+docker compose --env-file ../.env.production.local -f docker-compose.prod.yml logs -f api worker
 ```
 
 ### Sağlık Kontrolü
@@ -112,7 +112,7 @@ curl https://api.xn--izmirusul-y9a.com/api/v1/health/ready
 docker exec kentos-worker curl -s http://localhost:3130/health
 
 # Tüm container'lar ayakta mı?
-docker compose -f docker-compose.prod.yml ps
+docker compose --env-file ../.env.production.local -f docker-compose.prod.yml ps
 ```
 
 ---
@@ -120,18 +120,17 @@ docker compose -f docker-compose.prod.yml ps
 ## 3. Güncelleme (Zero-Downtime)
 
 ```bash
-cd /opt/kentos
+cd /opt/kentos-ai
 git pull origin master
 
 # Migrate varsa
-docker compose -f infra/docker-compose.prod.yml run --rm api \
-  npx prisma migrate deploy
+docker compose --env-file .env.production.local -f infra/docker-compose.prod.yml run --rm api pnpm db:deploy
 
 # Rebuild + restart (rolling)
-docker compose -f infra/docker-compose.prod.yml up -d --build
+docker compose --env-file .env.production.local -f infra/docker-compose.prod.yml up -d --build
 
 # Durum
-docker compose -f infra/docker-compose.prod.yml ps
+docker compose --env-file .env.production.local -f infra/docker-compose.prod.yml ps
 ```
 
 ---
@@ -142,11 +141,11 @@ docker compose -f infra/docker-compose.prod.yml ps
 
 ```bash
 # Adım 1: Email'i aç ve test et
-nano .env   # EMAIL_OUTBOUND_LIVE=true
-docker compose -f infra/docker-compose.prod.yml up -d api worker
+nano .env.production.local   # EMAIL_OUTBOUND_LIVE=true
+docker compose --env-file .env.production.local -f infra/docker-compose.prod.yml up -d api worker
 
 # Test: Bir bilet kapat, CSAT maili geldi mi kontrol et
-docker compose -f infra/docker-compose.prod.yml logs worker | grep outbound
+docker compose --env-file .env.production.local -f infra/docker-compose.prod.yml logs worker | grep outbound
 
 # Adım 2: WhatsApp (Meta webhook test geçtikten sonra)
 # WHATSAPP_OUTBOUND_LIVE=true — aynı şekilde
@@ -187,10 +186,10 @@ k6 run test/load/k6-smoke.js \
 
 ```bash
 # Manuel anlık yedek
-bash /opt/kentos/infra/backup-prod.sh
+bash /opt/kentos-ai/infra/backup-prod.sh
 
 # Yedekler nerede?
-ls -lh /opt/kentos/backups/
+ls -lh /opt/kentos-backups/
 
 # Otomatik: docker-compose backup servisi gece 02:00 UTC çalışır (14 gün retention)
 ```
@@ -203,18 +202,18 @@ ls -lh /opt/kentos/backups/
 
 ```bash
 # 1. Dry-run loglarını oku
-docker compose -f infra/docker-compose.prod.yml logs worker | grep retention
+docker compose --env-file .env.production.local -f infra/docker-compose.prod.yml logs worker | grep retention
 
 # 2. Manuel yedek al
-bash /opt/kentos/infra/backup-prod.sh
+bash /opt/kentos-ai/infra/backup-prod.sh
 
 # 3. Flags'i aç
-nano .env
+nano .env.production.local
 # RETENTION_DRY_RUN=false
 # RETENTION_DELETE_ATTACHMENT_OBJECTS=true
 
 # 4. Worker'ı yeniden başlat
-docker compose -f infra/docker-compose.prod.yml restart worker
+docker compose --env-file .env.production.local -f infra/docker-compose.prod.yml restart worker
 ```
 
 ---

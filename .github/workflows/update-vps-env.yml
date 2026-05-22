@@ -33,7 +33,7 @@ jobs:
           key: ${{ secrets.PROD_SSH_KEY }}
           script: |
             set -e
-            ENV_FILE="/opt/kentos/.env"
+            ENV_FILE="/opt/kentos-ai/.env.production.local"
 
             echo "📝 .env güncelleniyor..."
 
@@ -80,16 +80,16 @@ jobs:
           key: ${{ secrets.PROD_SSH_KEY }}
           script: |
             set -e
-            cd /opt/kentos/infra
+            cd /opt/kentos-ai/infra
 
             SERVICES="${{ inputs.services_to_restart }}"
 
             if [ "$SERVICES" = "all" ]; then
               echo "🔄 Tüm servisler yeniden başlatılıyor..."
-              docker compose -f docker-compose.prod.yml up -d --remove-orphans
+              docker compose --env-file ../.env.production.local -f docker-compose.prod.yml up -d --remove-orphans
             else
               echo "🔄 Servisler yeniden başlatılıyor: $SERVICES"
-              docker compose -f docker-compose.prod.yml restart $SERVICES
+              docker compose --env-file ../.env.production.local -f docker-compose.prod.yml restart $SERVICES
             fi
 
             echo "⏳ Sağlık kontrolü bekleniyor (15s)..."
@@ -102,4 +102,4 @@ jobs:
 
             echo ""
             echo "📊 Container durumları:"
-            docker compose -f docker-compose.prod.yml ps --format "table {{.Name}}\t{{.Status}}"
+            docker compose --env-file ../.env.production.local -f docker-compose.prod.yml ps --format "table {{.Name}}\t{{.Status}}"

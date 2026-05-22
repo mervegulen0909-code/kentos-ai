@@ -19,6 +19,10 @@ const REPO_ROOT = path.resolve(
   "..",
 );
 const args = process.argv.slice(2);
+if (args.includes("--help") || args.includes("-h")) {
+  printHelp();
+  process.exit(0);
+}
 const flags = new Set(args.filter((arg) => arg.startsWith("--")));
 const options = readOptions(args);
 
@@ -118,6 +122,20 @@ if (json) {
 }
 
 process.exit(summary.blocked > 0 || summary.failed > 0 ? 1 : 0);
+
+function printHelp() {
+  console.log(`KentOS ops external
+
+Usage:
+  node scripts/ops-external-systems.mjs --env-file .env.production.local
+  node scripts/ops-external-systems.mjs --compose --json
+  node scripts/ops-external-systems.mjs --compose --apply-deploy --i-accept-production-deploy
+
+Root aliases:
+  pnpm ops:external
+  npm run ops:external
+`);
+}
 
 function addRequiredEnvChecks() {
   const required = [

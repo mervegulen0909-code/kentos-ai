@@ -15,6 +15,12 @@ coverage/
 .env
 .env.*
 !.env.example
+.accounts.local.example.md
+.accounts.local.md
+.accounts.machine.env
+.api-keys.local.env
+.browser-profiles/
+docs/accounts/private/
 *.pem
 *.key
 *.p12
@@ -65,6 +71,7 @@ test-results/
 /apps/api/output/
 /admin-home-*.png
 /citizen-home-*.png
+verification-report.txt
 
 # Automated backups
 backups/

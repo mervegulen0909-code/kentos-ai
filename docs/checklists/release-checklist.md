@@ -28,10 +28,12 @@ Use this checklist before merging wave branches into `master` and before publish
 - [ ] `pnpm db:generate`
 - [ ] `pnpm typecheck`
 - [ ] `pnpm build`
+- [ ] Canonical local gate is recorded in this order: `pnpm db:generate`, targeted unit tests, `pnpm typecheck`, `pnpm build`, `git diff --check`, optional Playwright discovery/full run, then `pnpm ops:preflight -- --with-verification`.
 - [ ] `pnpm ops:preflight` reports no blocked gates before any production approval meeting.
 - [ ] API `/health` responds locally.
 - [ ] API `/health/ready` responds locally after database seed.
 - [ ] No hardcoded secrets, production credentials, or real tokens are staged.
+- [ ] If `pnpm` is not on `PATH`, bootstrap note is followed (`corepack enable` + new terminal, or `npm run <root-script>` / `npm.cmd run <root-script>` for Node-backed root entrypoints only).
 - [ ] If the production VPS scaffold (`infra/docker-compose.prod.yml`) is part of the release: DNS for API/admin/citizen/gateway plus any `MUNICIPALITY_DOMAIN` is in place; `.env.production.local` was generated via `pnpm infra:prod:bootstrap` and reviewed; `pnpm ops:external` has no blocked gates; safety defaults (`*_OUTBOUND_LIVE=false`, `RETENTION_DRY_RUN=true`, `ATTACHMENT_SCAN_PROVIDER=placeholder`) are confirmed before any production deploy. See `docs/workflows/production-infra-runbook.md`.
 
 ## 4. API smoke
@@ -111,6 +113,8 @@ Run browser smoke when admin or citizen UI routes, forms, auth/session, settings
 - [ ] Browser smoke status recorded with enum + gaps/blockers; widget/admin-install UI changes require explicit browser note.
 - [ ] Owner and SLA recorded for each open gap/blocker.
 - [ ] Local-only file exclusions recorded (for example `.claude/settings.json`).
+- [ ] Local-only account/browser state is excluded: `.accounts.local.md`, `.accounts.machine.env`, `.api-keys.local.env`, `.browser-profiles/`, and `verification-report.txt`.
+- [ ] Committed operator helpers are intentional and documented: `scripts/open-*.ps1`, `scripts/headless-*.ps1`, `scripts/setup-ai-accounts.mjs`, and `docs/accounts/**` are not runtime dependencies.
 - [ ] Risk level for the cycle recorded (`low`/`medium`/`high`) with one-line reason.
 - [ ] Rollback note recorded when any `partial` or `blocked` status exists.
 - [ ] Merge decision state recorded (`go`/`hold`) with rationale.
@@ -121,6 +125,7 @@ Run browser smoke when admin or citizen UI routes, forms, auth/session, settings
 - [ ] Merged feature branches are deleted locally and on remote unless explicitly preserved.
 - [ ] Active worktree branches are not deleted while attached to another session.
 - [ ] Local release operations keep `.claude/settings.json` and other local-only state out of staged release commits.
+- [ ] Root example/local helper files are intentionally classified: tracked docs under `docs/accounts/**`, ignored local notes under repo-root dotfiles, and operator launcher scripts under `scripts/`.
 - [ ] `git status --short` is clean or intentionally documented before final release report.
 - [ ] Housekeeping completion is logged in `docs/workflows/autonomous-run-log.md`.
 - [ ] Owner and SLA are set for unresolved housekeeping exceptions.

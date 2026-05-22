@@ -15,6 +15,19 @@ const REPO_ROOT = path.resolve(
 );
 const outputPath = path.join(REPO_ROOT, ".env.production.local");
 const args = process.argv.slice(2);
+if (args.includes("--help") || args.includes("-h")) {
+  console.log(`KentOS production env bootstrap
+
+Usage:
+  node scripts/bootstrap-prod-env.mjs --municipality-domain www.example.com --api-domain api.example.com
+  node scripts/bootstrap-prod-env.mjs --force
+
+Root aliases:
+  pnpm infra:prod:bootstrap -- --municipality-domain www.example.com ...
+  npm run infra:prod:bootstrap -- --municipality-domain www.example.com ...
+`);
+  process.exit(0);
+}
 const force = args.includes("--force");
 
 const options = readOptions(args);
