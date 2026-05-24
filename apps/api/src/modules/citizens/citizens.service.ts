@@ -1,7 +1,8 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { AuditActorType, Prisma } from '@kentos/database';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
+import type { MergeCitizenDto } from './dto/merge-citizen.dto.js';
 
 const ERASED_TEXT = '[KVKK gereği silindi]';
 
@@ -89,6 +90,72 @@ export class CitizensService {
     }
 
     return citizen;
+  }
+
+  async merge(user: AuthenticatedUser, sourceId: string, dto: MergeCitizenDto) {
+    const { mergeIntoId } = dto;
+
+    if (sourceId === mergeIntoId) {
+      throw new BadRequestException('Source and target citizen must be different');
+    }
+
+    const [source, target] = await Promise.all([
+      this.prisma.citizen.findUnique({ where: { id: sourceId } }),
+      this.prisma.citizen.findUnique({ where: { id: mergeIntoId } }),
+    ]);
+
+    if (!source || source.tenantId !== user.tenantId) {
+      throw new NotFoundException('Citizen not found');
+    }
+    if (!target || target.tenantId !== user.tenantId) {
+      throw new NotFoundException('Target citizen not found');
+    }
+    if (source.mergedIntoCitizenId) {
+      throw new BadRequestException('Source citizen is already merged into another citizen');
+    }
+
+    const now = new Date();
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.ticket.updateMany({
+        where: { tenantId: user.tenantId, citizenId: sourceId },
+        data: { citizenId: mergeIntoId },
+      });
+      await tx.conversation.updateMany({
+        where: { tenantId: user.tenantId, citizenId: sourceId },
+        data: { citizenId: mergeIntoId },
+      });
+
+      const sourceIdentifiers = await tx.citizenIdentifier.findMany({ where: { citizenId: sourceId } });
+      const targetIdentifiers = await tx.citizenIdentifier.findMany({ where: { citizenId: mergeIntoId } });
+      const targetKeys = new Set(targetIdentifiers.map((i) => `${i.kind}:${i.normalizedValue}`));
+
+      for (const identifier of sourceIdentifiers) {
+        const key = `${identifier.kind}:${identifier.normalizedValue}`;
+        if (targetKeys.has(key)) {
+          await tx.citizenIdentifier.delete({ where: { id: identifier.id } });
+        } else {
+          await tx.citizenIdentifier.update({ where: { id: identifier.id }, data: { citizenId: mergeIntoId } });
+        }
+      }
+
+      await tx.citizen.update({
+        where: { id: sourceId },
+        data: { mergedIntoCitizenId: mergeIntoId, mergedAt: now },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          tenantId: user.tenantId,
+          actorType: AuditActorType.USER,
+          actorUserId: user.id,
+          action: 'citizen.merged',
+          after: { sourceId, mergeIntoId },
+        },
+      });
+    });
+
+    return { merged: true, sourceId, mergeIntoId, mergedAt: now.toISOString() };
   }
 
   async anonymize(

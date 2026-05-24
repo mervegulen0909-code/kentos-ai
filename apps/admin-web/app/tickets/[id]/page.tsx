@@ -1,4 +1,4 @@
-import { adminApi, formatMissingFieldLabel } from '../../../lib/api';
+import { adminApi, formatMissingFieldLabel, type AuditLogItem, type UserSummary } from '../../../lib/api';
 import { canAssignTickets, canMutateTickets, isReadOnlyRole, resolveAdminSession } from '../../../lib/session';
 import { AdminShell } from '../../components/admin-shell';
 import { PendingFieldset, PendingSubmitButton } from '../../components/form-controls';
@@ -144,9 +144,16 @@ export default async function TicketDetailPage({
   const token = session?.accessToken ?? null;
   const hasSession = Boolean(token);
   const role = session?.user.role ?? null;
-  const ticket = token ? await adminApi.ticket(token, id).catch(() => null) : null;
-  const auditLog = token ? await adminApi.auditLog(token, id).catch(() => []) : [];
-  const departments = token ? await adminApi.departments(token).catch(() => []) : [];
+  const emptyAuditLog: AuditLogItem[] = [];
+  const emptyUsers: UserSummary[] = [];
+  const [ticket, auditLog, departments, staffUsers] = token
+    ? await Promise.all([
+        adminApi.ticket(token, id).catch(() => null),
+        adminApi.auditLog(token, id).catch(() => emptyAuditLog),
+        adminApi.departments(token).catch(() => []),
+        adminApi.users(token, { limit: 100 }).then((result) => result.data).catch(() => emptyUsers),
+      ])
+    : [null, emptyAuditLog, [], emptyUsers];
   const statusOptions = ticket ? [ticket.status, ...(transitions[ticket.status] ?? [])] : [];
   const isTerminal = ticket?.status === 'CLOSED' || ticket?.status === 'REJECTED';
   const canUpdateTicket = Boolean(ticket && !isTerminal && canMutateTickets(role));
@@ -214,6 +221,10 @@ export default async function TicketDetailPage({
                 <select name="departmentId" defaultValue="" disabled={!canAssignTicket || !departments.length}>
                   <option value="">Birim secin</option>
                   {departments.map((department) => <option key={department.id} value={department.id}>{department.name}</option>)}
+                </select>
+                <select name="assignedToId" defaultValue="" disabled={!canAssignTicket}>
+                  <option value="">Personel secin (opsiyonel)</option>
+                  {staffUsers.map((u) => <option key={u.id} value={u.id}>{u.fullName} — {u.role}</option>)}
                 </select>
                 <PendingSubmitButton type="submit" disabled={!canAssignTicket || !departments.length} idleLabel="Birime ata" pendingLabel="Ataniyor..." />
               </PendingFieldset>

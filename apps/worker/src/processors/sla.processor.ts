@@ -7,8 +7,6 @@ const actionableStatuses = ['NEW', 'TRIAGED', 'ASSIGNED', 'IN_PROGRESS', 'WAITIN
 export async function processSlaJob(job: { name: string; data: unknown }) {
   const now = new Date();
 
-  // F21: Find tickets that are ABOUT to be marked breached (slaBreachedAt === null but overdue)
-  // We capture them before updateMany so we know which ones to escalate.
   const toEscalate = await prisma.ticket.findMany({
     where: {
       status: { in: actionableStatuses },
@@ -18,7 +16,6 @@ export async function processSlaJob(job: { name: string; data: unknown }) {
     select: { id: true, tenantId: true, departmentId: true, assignedToId: true, ticketNo: true },
   });
 
-  // Persist slaBreachedAt for tickets that have crossed their resolution deadline for the first time.
   const { count: newlyBreached } = await prisma.ticket.updateMany({
     where: {
       status: { in: actionableStatuses },
@@ -32,12 +29,10 @@ export async function processSlaJob(job: { name: string; data: unknown }) {
     logger.warn('[sla] SLA breach persisted', { newlyBreached, checkedAt: now.toISOString() });
   }
 
-  // F21: Auto-escalation — assign unassigned breached tickets to a MANAGER
   let escalated = 0;
   for (const ticket of toEscalate) {
-    if (ticket.assignedToId) continue; // already assigned — skip
+    if (ticket.assignedToId) continue;
     try {
-      // Find first active MANAGER in the ticket's department (or any MANAGER in the tenant)
       const manager = await prisma.user.findFirst({
         where: {
           tenantId: ticket.tenantId,

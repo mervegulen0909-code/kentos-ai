@@ -250,6 +250,7 @@ export type Category = { id: string; name: string; code: string; departmentId?: 
 export type MessageTemplate = { id: string; key: string; body: string; locale: string; isActive: boolean; channel?: string | null };
 export type SlaPolicy = { id: string; priority: string; responseMinutes: number; resolutionMinutes: number; isActive: boolean; department?: Department | null; category?: Category | null };
 export type AuditLogItem = { id: string; action: string; createdAt: string; before?: unknown; after?: unknown };
+export type UserSummary = { id: string; email: string; fullName: string; role: string; isActive: boolean; createdAt: string };
 export type HandoffSummary = {
   id: string;
   channel: string;
@@ -437,13 +438,13 @@ export const adminApi = {
     apiFetch<AiBudgetSettings>('/ai-budget-settings', { method: 'PATCH', token, body: JSON.stringify(input) }),
   runRetentionNow: (token: string) =>
     apiFetch<{ enqueued: boolean; tenantId: string }>('/retention-settings/run-now', { method: 'POST', token }),
-
   // Users
-  users: async (token: string, params?: { role?: string; q?: string; page?: number }) => {
+  users: async (token: string, params?: { role?: string; q?: string; page?: number; limit?: number }) => {
     const qs = new URLSearchParams();
     if (params?.role) qs.set('role', params.role);
     if (params?.q) qs.set('q', params.q);
     if (params?.page) qs.set('page', String(params.page));
+    if (params?.limit) qs.set('limit', String(params.limit));
     const query = qs.toString();
     const result = await apiFetch<{
       data: Array<Omit<UserListItem, 'departments'> & { departments: Array<{ department: { id: string; name: string } }> }>;

@@ -1,4 +1,4 @@
-import { adminApi, type AiBudgetSettings, type RetentionSettings, type WidgetEmbedConfig, type WidgetSettings } from '../../lib/api';
+import { adminApi, type AiBudgetSettings, type RetentionSettings, type UserSummary, type WidgetEmbedConfig, type WidgetSettings } from '../../lib/api';
 import { canManageSettings, resolveAdminSession } from '../../lib/session';
 import { AdminShell } from '../components/admin-shell';
 import { PendingFieldset, PendingSubmitButton } from '../components/form-controls';
@@ -14,6 +14,7 @@ import {
   updateRetentionSettingsAction,
   updateSlaPolicyAction,
   updateTemplateAction,
+  updateUserAction,
   updateWidgetSettingsAction,
 } from './actions';
 
@@ -31,6 +32,7 @@ const successCopy: Record<string, FeedbackCopy> = {
   'retention-updated': { title: 'Saklama suresi ayarlari kaydedildi.', detail: 'Yeni degerler bir sonraki retention worker dongusunde uygulanir; bos birakilan kapsamlar varsayilana doner.' },
   'retention-run-triggered': { title: 'Retention isi kuyruga eklendi.', detail: 'Worker dry-run/canli bayraklarina gore aktif kapsamlari isler. Bu islem dosya/dB silmeyi tetiklemez ki RETENTION_DRY_RUN=false olmadikca.' },
   'ai-budget-updated': { title: 'AI butce ayarlari kaydedildi.', detail: 'Tenant butce sinirlari sonraki vatandas intake cagrisinda gecerli olur; bos birakilan alanlar global env varsayilanina doner.' },
+  'user-updated': { title: 'Kullanici guncellendi.', detail: 'Ad, rol ve aktiflik degisiklikleri kaydedildi; sonraki giriste gecerli olur.' },
 };
 
 const retentionScopeCopy: Record<string, { title: string; detail: string }> = {
@@ -84,6 +86,7 @@ const errorCopy: Record<string, FeedbackCopy> = {
   'update-widget': { title: 'Widget ayarlari kaydedilemedi.', detail: 'Baslik, karsilama metni ve origin satirlarini kontrol edip tekrar deneyin.' },
   'update-retention': { title: 'Saklama ayarlari kaydedilemedi.', detail: 'Her kapsam icin 1 ile 3650 gun arasi tam sayi girin ya da bos birakarak varsayilana donmesini saglayin.' },
   'update-ai-budget': { title: 'AI butce ayarlari kaydedilemedi.', detail: 'Her alan pozitif tam sayi olmali ya da bos kalmali; bos alan global env varsayilani kullanmaya doner.' },
+  'update-user': { title: 'Kullanici guncellenemedi.', detail: 'Rol, ad ve aktiflik alanlarini kontrol edip tekrar deneyin.' },
   forbidden: { title: 'Ayar degisikligi bu rol icin kapali.', detail: 'Frontend ayar mutasyonlarini yonetici rolleriyle sinirlandiriyor; son yetki kontrolu yine backend tarafinda.' },
   general: { title: 'Ayar kaydedilemedi.', detail: 'Baglanti, yetki veya kayit durumunu kontrol edip islemi tekrar deneyin.' },
 };
@@ -118,7 +121,8 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
     tenantSlug: session?.user.tenantSlug ?? '',
     overrides: {},
   };
-  const [departments, categories, slaPolicies, templates, widgetSettings, retentionSettings, aiBudgetSettings] = token
+  const emptyUsers: UserSummary[] = [];
+  const [departments, categories, slaPolicies, templates, widgetSettings, retentionSettings, aiBudgetSettings, staffUsers] = token
     ? await Promise.all([
         adminApi.departments(token).catch(() => []),
         adminApi.categories(token).catch(() => []),
@@ -127,8 +131,9 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
         adminApi.widgetSettings(token).catch(() => fallbackWidgetSettings),
         adminApi.retentionSettings(token).catch(() => fallbackRetentionSettings),
         adminApi.aiBudgetSettings(token).catch(() => fallbackAiBudgetSettings),
+        adminApi.users(token, { limit: 100 }).then((result) => result.data).catch(() => emptyUsers),
       ])
-    : [[], [], [], [], fallbackWidgetSettings, fallbackRetentionSettings, fallbackAiBudgetSettings];
+    : [[], [], [], [], fallbackWidgetSettings, fallbackRetentionSettings, fallbackAiBudgetSettings, emptyUsers];
   const widgetEmbed = buildWidgetEmbedConfig(widgetSettings);
   const retentionScopes = Object.keys(retentionSettings.defaults) as Array<keyof typeof retentionSettings.defaults>;
 
@@ -424,6 +429,42 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
               </PendingFieldset>
             </form>
           )) : <p style={{ color: 'var(--muted)' }}>SLA politikasi yok.</p>}
+        </section>
+        <section className="card">
+          <h2>Personel yonetimi</h2>
+          <p style={{ color: 'var(--muted)' }}>Tum aktif ve pasif kullanici hesaplari. Sifre sifirlamak veya rol degistirmek icin ilgili kullanicinin kaydini duzenleyin.</p>
+          {(staffUsers as UserSummary[]).length ? (
+            <div style={{ display: 'grid', gap: 12, marginTop: 12 }}>
+              {(staffUsers as UserSummary[]).map((u) => (
+                <form key={u.id} action={updateUserAction} style={{ display: 'grid', gap: 8, padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
+                  <PendingFieldset style={{ display: 'grid', gap: 8 }}>
+                    <input type="hidden" name="intent" value="update-user" />
+                    <input type="hidden" name="id" value={u.id} />
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 8, alignItems: 'center' }}>
+                      <strong>{u.email}</strong>
+                      <span style={{ color: u.isActive ? 'var(--accent)' : 'var(--muted)', fontSize: '0.85em' }}>{u.isActive ? 'Aktif' : 'Pasif'}</span>
+                    </div>
+                    <input name="fullName" defaultValue={u.fullName} placeholder="Ad soyad" disabled={controlsDisabled} />
+                    <select name="role" defaultValue={u.role} disabled={controlsDisabled}>
+                      <option value="SUPER_ADMIN">SUPER_ADMIN</option>
+                      <option value="TENANT_ADMIN">TENANT_ADMIN</option>
+                      <option value="MANAGER">MANAGER</option>
+                      <option value="DEPARTMENT_STAFF">DEPARTMENT_STAFF</option>
+                      <option value="OPERATOR">OPERATOR</option>
+                      <option value="READ_ONLY">READ_ONLY</option>
+                    </select>
+                    <select name="isActive" defaultValue={String(u.isActive)} disabled={controlsDisabled}>
+                      <option value="true">Aktif</option>
+                      <option value="false">Pasif</option>
+                    </select>
+                    <PendingSubmitButton type="submit" disabled={controlsDisabled} idleLabel="Kullanici guncelle" pendingLabel="Kaydediliyor..." />
+                  </PendingFieldset>
+                </form>
+              ))}
+            </div>
+          ) : (
+            <p style={{ color: 'var(--muted)', marginTop: 8 }}>Personel listesi alinamadi veya henuz kimse eklenmemis.</p>
+          )}
         </section>
         <section className="card">
           <h2>Mesaj sablonlari</h2>

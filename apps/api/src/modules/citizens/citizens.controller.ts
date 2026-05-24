@@ -1,4 +1,5 @@
 import {
+  Body,
   Controller,
   Get,
   Inject,
@@ -22,6 +23,7 @@ import {
   AuthenticatedUser,
 } from '../../common/decorators/current-user.decorator.js';
 import { CitizensService } from './citizens.service.js';
+import { MergeCitizenDto } from './dto/merge-citizen.dto.js';
 
 @ApiBearerAuth()
 @ApiTags('citizens')
@@ -58,6 +60,17 @@ export class CitizensController {
     @Param('id') id: string,
   ) {
     return this.citizens.get(user, id);
+  }
+
+  @Post(':id/merge')
+  @Roles(UserRole.TENANT_ADMIN)
+  @ApiOperation({ summary: 'Merge a duplicate citizen into another citizen' })
+  merge(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body() dto: MergeCitizenDto,
+  ) {
+    return this.citizens.merge(user, id, dto);
   }
 
   @Post(':id/anonymize')

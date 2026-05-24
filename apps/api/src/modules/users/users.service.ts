@@ -81,13 +81,14 @@ export class UsersService {
   }
 
   async create(user: AuthenticatedUser, dto: CreateUserDto): Promise<unknown> {
+    const email = dto.email.toLowerCase().trim();
     const existing = await this.prisma.user.findUnique({
-      where: { tenantId_email: { tenantId: user.tenantId, email: dto.email } },
+      where: { tenantId_email: { tenantId: user.tenantId, email } },
     });
 
     if (existing) {
       throw new ConflictException(
-        `A user with email "${dto.email}" already exists in this tenant.`,
+        `A user with email "${email}" already exists in this tenant.`,
       );
     }
 
@@ -96,8 +97,8 @@ export class UsersService {
     const created = await this.prisma.user.create({
       data: {
         tenantId: user.tenantId,
-        email: dto.email,
-        fullName: dto.fullName,
+        email,
+        fullName: dto.fullName.trim(),
         role: dto.role,
         passwordHash,
         ...(dto.departmentIds?.length
@@ -133,9 +134,13 @@ export class UsersService {
       throw new ForbiddenException('You cannot change your own role.');
     }
 
+    if (user.id === id && dto.isActive === false) {
+      throw new ForbiddenException('You cannot deactivate your own account.');
+    }
+
     const updateData: Record<string, unknown> = {};
 
-    if (dto.fullName !== undefined) updateData.fullName = dto.fullName;
+    if (dto.fullName !== undefined) updateData.fullName = dto.fullName.trim();
     if (dto.role !== undefined) updateData.role = dto.role;
     if (dto.isActive !== undefined) updateData.isActive = dto.isActive;
     if (dto.password !== undefined) {

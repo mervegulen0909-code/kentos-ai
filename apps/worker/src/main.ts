@@ -5,7 +5,6 @@ import { processCsatJob } from './processors/csat.processor.js';
 import { processMediaJob } from './processors/media.processor.js';
 import { processNotificationJob } from './processors/notifications.processor.js';
 import { processOutboundJob } from './processors/outbound.processor.js';
-import { processReportJob } from './processors/reports.processor.js';
 import { processRetentionJob } from './processors/retention.processor.js';
 import { processSlaJob } from './processors/sla.processor.js';
 import { processWebhookJob } from './processors/webhook-delivery.processor.js';
@@ -17,7 +16,6 @@ await initSentry(process.env.SENTRY_DSN, process.env.NODE_ENV ?? 'development');
 const workers = [
   createWorker(queueNames.sla, processSlaJob),
   createWorker(queueNames.notifications, processNotificationJob),
-  createWorker(queueNames.reports, processReportJob),
   createWorker(queueNames.media, processMediaJob),
   createWorker(queueNames.retention, processRetentionJob),
   createWorker(queueNames.outbound, processOutboundJob),
