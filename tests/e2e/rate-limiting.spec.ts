@@ -29,26 +29,14 @@ test.describe('Rate limiting', () => {
     }
   });
 
-  test('geçersiz login → brute-force koruması aktif (6. denemede 429)', async ({ request }) => {
-    // 5 limit / 60s. 6. denemede 429 beklenir.
-    const loginAttempt = () =>
-      request.post(`${apiBaseURL}/auth/login`, {
-        data: { tenantSlug, email: `bruteforce-${Date.now()}@test.com`, password: 'wrong' },
-      });
+  test('geçersiz login güvenli reddedilir ve rate-limit metadata döner', async ({ request }) => {
+    // Limiti tüketmek, aynı IP'yi paylaşan sonraki E2E login'lerini yanlış biçimde kilitler.
+    const resp = await request.post(`${apiBaseURL}/auth/login`, {
+      data: { tenantSlug, email: `bruteforce-${Date.now()}@test.com`, password: 'wrong' },
+    });
 
-    let got429 = false;
-    for (let i = 0; i < 6; i++) {
-      const resp = await loginAttempt();
-      if (resp.status() === 429) {
-        got429 = true;
-        break;
-      }
-      // Her deneme 401 olmalı (brute-force tetiklenmeden önce)
-      expect([401, 429]).toContain(resp.status());
-    }
-
-    // Not: test ortamında throttle IP bazlı çalışır, CI'da 429 garantili olmayabilir
-    // Bu nedenle test sadece 429'un döndüğünü DEĞİL, 500 gelmediğini doğrular
-    expect(got429 || true).toBeTruthy(); // Soft assertion — altyapı doğrulaması
+    expect(resp.status()).toBe(401);
+    expect(resp.headers()['x-ratelimit-limit']).toBeTruthy();
+    expect(resp.headers()['x-ratelimit-remaining']).toBeTruthy();
   });
 });

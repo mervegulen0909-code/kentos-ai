@@ -1,0 +1,46 @@
+import { cookies } from 'next/headers';
+import { NextRequest, NextResponse } from 'next/server';
+import { ApiError, citizenApi } from '../../../../lib/api';
+
+export async function POST(
+  _req: NextRequest,
+  { params }: { params: Promise<{ tenantSlug: string }> },
+) {
+  const { tenantSlug } = await params;
+  const cookieStore = await cookies();
+  const raw = cookieStore.get(`citizen_session_${tenantSlug}`)?.value;
+
+  if (!raw) {
+    return NextResponse.json({ error: 'Oturum bulunamadi.' }, { status: 401 });
+  }
+
+  let session: { sessionToken?: string } | null = null;
+  try {
+    session = JSON.parse(raw) as { sessionToken?: string };
+  } catch {
+    return NextResponse.json({ error: 'Oturum gecersiz.' }, { status: 401 });
+  }
+
+  if (!session.sessionToken) {
+    return NextResponse.json({ error: 'Oturum gecersiz.' }, { status: 401 });
+  }
+
+  try {
+    await citizenApi.requestErasure(tenantSlug, session.sessionToken);
+  } catch (error) {
+    if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
+      return NextResponse.json({ error: 'Oturum gecersiz veya suresi dolmus.' }, { status: 401 });
+    }
+    return NextResponse.json({ error: 'Silme islemi basarisiz oldu.' }, { status: 500 });
+  }
+
+  cookieStore.set(`citizen_session_${tenantSlug}`, '', {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    path: '/',
+    maxAge: 0,
+  });
+
+  return NextResponse.json({ erased: true });
+}

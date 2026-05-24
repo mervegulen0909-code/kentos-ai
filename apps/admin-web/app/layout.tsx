@@ -1,6 +1,7 @@
 import './globals.css';
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
+import { LiveProvider } from './components/live-provider';
 
 export const metadata: Metadata = {
   title: 'KentOS AI Operasyon Paneli',
@@ -13,7 +14,9 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="tr">
-      <body>{children}</body>
+      <body>
+        <LiveProvider>{children}</LiveProvider>
+      </body>
     </html>
   );
 }

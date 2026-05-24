@@ -16,8 +16,11 @@ set -a
 . "./${ENV_FILE}"
 set +a
 
-API_HEALTH_URL="https://${API_DOMAIN}/api/v1/health"
+API_HEALTH_URL="https://${API_DOMAIN}/api/v1/health/ready"
 GATEWAY_HEALTH_URL="https://${GATEWAY_DOMAIN}/health"
+ADMIN_HEALTH_URL="https://${ADMIN_DOMAIN}/login"
+CITIZEN_HEALTH_URL="https://${CITIZEN_DOMAIN}/${DEFAULT_TENANT_SLUG}/report"
+MUNICIPALITY_HEALTH_URL="https://${MUNICIPALITY_DOMAIN}/"
 
 echo "compose status"
 docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" ps
@@ -30,5 +33,8 @@ fi
 
 curl -fsS --max-time 20 "$API_HEALTH_URL" >/dev/null
 curl -fsS --max-time 20 "$GATEWAY_HEALTH_URL" >/dev/null
+curl -fsS --max-time 20 "$ADMIN_HEALTH_URL" >/dev/null
+curl -fsS --max-time 20 "$CITIZEN_HEALTH_URL" >/dev/null
+curl -fsS --max-time 20 "$MUNICIPALITY_HEALTH_URL" >/dev/null
 
-echo "healthcheck complete: api and gateway healthy"
+echo "healthcheck complete: api ready and public/admin/gateway surfaces reachable"

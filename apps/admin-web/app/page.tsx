@@ -1,8 +1,9 @@
-import { adminApi } from '../lib/api';
+import { adminApi, type CsatOverview } from '../lib/api';
 import { canViewAnalytics, resolveAdminSession } from '../lib/session';
 import { AdminShell } from './components/admin-shell';
 
-const fallbackOverview = { totalOpen: 0, slaBreached: 0, resolvedToday: 0 };
+const fallbackOverview = { totalOpen: 0, slaBreached: 0, slaDueSoon: 0, resolvedToday: 0 };
+const fallbackCsat: CsatOverview = { overall: { avg: null, responseCount: 0 }, byDepartment: [], trend: [], lowScoreTickets: [] };
 const fallbackTickets: Array<{
   ticketNo: string;
   title: string;
@@ -29,6 +30,12 @@ const slaCopy: Record<string, string> = {
   UNKNOWN: 'SLA bilinmiyor',
 };
 
+function formatCsatStars(avg: number | null) {
+  if (avg === null) return '—';
+  const full = Math.floor(avg);
+  return '★'.repeat(full) + (avg - full >= 0.5 ? '½' : '') + ` (${avg.toFixed(1)}/5)`;
+}
+
 export default async function AdminHome() {
   const session = await resolveAdminSession();
   const hasSession = Boolean(session);
@@ -37,7 +44,7 @@ export default async function AdminHome() {
   const token = session?.accessToken ?? null;
   let dataUnavailable = false;
 
-  const [overview, tickets] = token
+  const [overview, csat, tickets] = token
     ? await Promise.all([
         analyticsVisible
           ? adminApi.overview(token).catch(() => {
@@ -45,12 +52,15 @@ export default async function AdminHome() {
               return fallbackOverview;
             })
           : Promise.resolve(fallbackOverview),
+        analyticsVisible
+          ? adminApi.csat(token).catch(() => fallbackCsat)
+          : Promise.resolve(fallbackCsat),
         adminApi.tickets(token).catch(() => {
           dataUnavailable = true;
           return fallbackTickets;
         }),
       ])
-    : [fallbackOverview, fallbackTickets];
+    : [fallbackOverview, fallbackCsat, fallbackTickets];
 
   return (
     <AdminShell hasSession={hasSession} role={role}>
@@ -82,7 +92,16 @@ export default async function AdminHome() {
           <div className="grid">
             <article className="card"><p>Yetkili kuyruk yuku</p><p className="kpi">{overview.totalOpen}</p><p style={{ color: 'var(--muted)' }}>Rol kapsaminizda gorunen acik basvurular.</p></article>
             <article className="card"><p>SLA asimi</p><p className="kpi" style={{ color: 'var(--danger)' }}>{overview.slaBreached}</p><p style={{ color: 'var(--muted)' }}>Yonetici takibi isteyen sure ihlalleri.</p></article>
+            <article className="card"><p>SLA yaklasan</p><p className="kpi" style={{ color: overview.slaDueSoon > 0 ? 'var(--warning, #e67e22)' : undefined }}>{overview.slaDueSoon}</p><p style={{ color: 'var(--muted)' }}>Son 4 saat icinde dolacak SLA'lar.</p></article>
             <article className="card"><p>Bugun sonuclanan</p><p className="kpi">{overview.resolvedToday}</p><p style={{ color: 'var(--muted)' }}>Cozum bildirilen veya kapanisa hazir kayitlar.</p></article>
+            <article className="card"><p>Memnuniyet skoru</p><p className="kpi">{formatCsatStars(csat.overall.avg)}</p><p style={{ color: 'var(--muted)' }}>{csat.overall.responseCount} degerlendirme - tum zamanlar.</p></article>
+            {csat.lowScoreTickets.length > 0 ? (
+              <article className="card" style={{ borderColor: 'var(--danger)' }}>
+                <p>Dusuk puan alanlar</p>
+                <p className="kpi" style={{ color: 'var(--danger)' }}>{csat.lowScoreTickets.length}</p>
+                <p style={{ color: 'var(--muted)' }}>1-2 yildiz alan son talepler — inceleme oneriliyor.</p>
+              </article>
+            ) : null}
           </div>
         ) : null}
         <section className="card" style={{ marginTop: 18 }}>

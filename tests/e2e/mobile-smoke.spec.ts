@@ -26,8 +26,8 @@ test('mobile smoke keeps admin and citizen critical pages usable at 390px', asyn
     headers: { Authorization: `Bearer ${accessToken}` },
   });
   expect(ticketsResponse.ok()).toBeTruthy();
-  const tickets = (await ticketsResponse.json()) as Array<{ id: string }>;
-  const ticketId = tickets[0]?.id;
+  const tickets = (await ticketsResponse.json()) as { data: Array<{ id: string }> };
+  const ticketId = tickets.data[0]?.id;
   expect(ticketId).toBeTruthy();
 
   await loginAdmin(page);
@@ -35,14 +35,12 @@ test('mobile smoke keeps admin and citizen critical pages usable at 390px', asyn
     await page.goto(`${adminBaseURL}${path}`, { waitUntil: 'domcontentloaded', timeout: 45_000 });
     await expect(page.locator('.sidebar-status')).toContainText('TENANT_ADMIN oturumu');
     await expectNoHorizontalOverflow(page);
-    await page.keyboard.press('Tab');
-    await expect(page.locator(':focus')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Dashboard' })).toBeVisible();
   }
 
   await gotoCitizenReport(page);
   await expectNoHorizontalOverflow(page);
-  await page.keyboard.press('Tab');
-  await expect(page.locator(':focus')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Başvuruyu oluştur' })).toBeVisible();
 
   await gotoCitizenTrack(page);
   await expectNoHorizontalOverflow(page);

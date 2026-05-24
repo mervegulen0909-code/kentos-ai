@@ -14,6 +14,7 @@ import { BulkStatusDto } from './dto/bulk-status.dto.js';
 import { CreateTicketMessageDto } from './dto/create-ticket-message.dto.js';
 import { CreateTicketDto } from './dto/create-ticket.dto.js';
 import { ScheduleMessageDto } from './dto/schedule-message.dto.js';
+import { SuggestReplyDto } from './dto/suggest-reply.dto.js';
 import { UpdateTicketStatusDto } from './dto/update-ticket-status.dto.js';
 import { TicketsService } from './tickets.service.js';
 
@@ -149,6 +150,14 @@ export class TicketsController {
   @Post(':id/reject')
   reject(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string, @Body() dto: CreateTicketMessageDto) {
     return this.tickets.updateStatus(user, id, { status: TicketStatus.REJECTED, publicMessage: dto.body });
+  }
+
+  @ApiOperation({ summary: 'AI yanıt önerisi — operatör için otomatik taslak üretir' })
+  @ApiResponse({ status: 200, description: 'Öneri metni, model adı ve token kullanımı' })
+  @Roles('SUPER_ADMIN', 'TENANT_ADMIN', 'MANAGER', 'DEPARTMENT_STAFF', 'OPERATOR')
+  @Post(':id/suggest-reply')
+  suggestReply(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string, @Body() dto: SuggestReplyDto) {
+    return this.tickets.suggestReply(user, id, dto);
   }
 
   @Roles('SUPER_ADMIN', 'TENANT_ADMIN', 'MANAGER', 'OPERATOR')

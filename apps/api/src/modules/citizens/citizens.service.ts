@@ -1,7 +1,9 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { AuditActorType } from '@kentos/database';
+import { AuditActorType, Prisma } from '@kentos/database';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
+
+const ERASED_TEXT = '[KVKK gereği silindi]';
 
 interface ListFilters {
   q?: string;
@@ -93,37 +95,87 @@ export class CitizensService {
     user: AuthenticatedUser,
     id: string,
   ): Promise<{ anonymized: boolean; citizenId: string }> {
+    return this.eraseByIdForTenant(user.tenantId, id, {
+      actorType: AuditActorType.USER,
+      actorUserId: user.id,
+    });
+  }
+
+  async selfErase(
+    tenantId: string,
+    citizenId: string,
+  ): Promise<{ anonymized: boolean; citizenId: string }> {
+    return this.eraseByIdForTenant(tenantId, citizenId, {
+      actorType: AuditActorType.CITIZEN,
+    });
+  }
+
+  private async eraseByIdForTenant(
+    tenantId: string,
+    id: string,
+    actor: { actorType: AuditActorType; actorUserId?: string },
+  ): Promise<{ anonymized: boolean; citizenId: string }> {
     const existing = await this.prisma.citizen.findFirst({
-      where: { id, tenantId: user.tenantId },
+      where: { id, tenantId },
     });
 
     if (!existing) {
       throw new NotFoundException(`Citizen "${id}" not found.`);
     }
 
-    await this.prisma.$transaction([
-      this.prisma.citizen.update({
+    await this.prisma.$transaction(async (tx) => {
+      const ticketIds = (
+        await tx.ticket.findMany({ where: { citizenId: id }, select: { id: true } })
+      ).map((t) => t.id);
+
+      const conversationIds = (
+        await tx.conversation.findMany({ where: { citizenId: id }, select: { id: true } })
+      ).map((c) => c.id);
+
+      await tx.citizen.update({
         where: { id },
+        data: { displayName: null, phone: null, email: null, firebaseUid: null, kvkkConsentAt: null },
+      });
+
+      await tx.citizenIdentifier.deleteMany({ where: { citizenId: id } });
+      await tx.citizenDeviceToken.deleteMany({ where: { citizenId: id } });
+
+      if (ticketIds.length > 0) {
+        await tx.ticket.updateMany({
+          where: { id: { in: ticketIds } },
+          data: { title: ERASED_TEXT, description: ERASED_TEXT, addressText: null },
+        });
+        await tx.ticketMessage.updateMany({
+          where: { ticketId: { in: ticketIds }, senderType: AuditActorType.CITIZEN },
+          data: { body: ERASED_TEXT },
+        });
+      }
+
+      if (conversationIds.length > 0) {
+        await tx.conversation.updateMany({
+          where: { id: { in: conversationIds } },
+          data: { context: Prisma.DbNull },
+        });
+        await tx.outboundDelivery.updateMany({
+          where: { conversationId: { in: conversationIds } },
+          data: { recipientPhone: null, recipientEmail: null, body: ERASED_TEXT },
+        });
+      }
+
+      await tx.auditLog.create({
         data: {
-          displayName: null,
-          phone: null,
-          email: null,
-          kvkkConsentAt: null,
-        },
-      }),
-      this.prisma.citizenIdentifier.deleteMany({
-        where: { citizenId: id },
-      }),
-      this.prisma.auditLog.create({
-        data: {
-          tenantId: user.tenantId,
-          actorType: AuditActorType.USER,
-          actorUserId: user.id,
+          tenantId,
+          actorType: actor.actorType,
+          actorUserId: actor.actorUserId,
           action: 'citizen.anonymized',
-          after: { citizenId: id },
+          after: {
+            citizenId: id,
+            cascadeTickets: ticketIds.length,
+            cascadeConversations: conversationIds.length,
+          },
         },
-      }),
-    ]);
+      });
+    });
 
     return { anonymized: true, citizenId: id };
   }

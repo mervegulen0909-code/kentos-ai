@@ -22,6 +22,7 @@ const withVerification = args.has('--with-verification');
 const allowLive = args.has('--allow-live');
 const allowRetentionDelete = args.has('--allow-retention-delete');
 const allowDeploy = args.has('--allow-deploy');
+const strictLaunch = args.has('--strict-launch');
 const json = args.has('--json');
 
 const startedAt = new Date();
@@ -142,16 +143,18 @@ function addProductionReadinessChecks() {
     'REDIS_URL',
     'JWT_ACCESS_SECRET',
     'JWT_REFRESH_SECRET',
+    'CITIZEN_SESSION_SECRET',
     'S3_BUCKET',
     'S3_ACCESS_KEY',
     'S3_SECRET_KEY',
     'INTERNAL_API_KEY',
+    'INTERNAL_EVENTS_KEY',
     'WIDGET_ORIGIN_ALLOWLIST',
   ];
   const missing = requiredForProduction.filter((name) => !process.env[name]);
   addCheck({
     id: 'prod-env-present',
-    status: missing.length ? 'warning' : 'passed',
+    status: missing.length ? (strictLaunch ? 'blocked' : 'warning') : 'passed',
     summary: missing.length ? `Production env values are missing: ${missing.join(', ')}` : 'Required production env values are present.',
     detail: 'Secrets are not printed. This check only verifies presence.',
   });
@@ -159,9 +162,41 @@ function addProductionReadinessChecks() {
   const scanningProvider = process.env.ATTACHMENT_SCAN_PROVIDER;
   addCheck({
     id: 'attachment-scan-provider',
-    status: scanningProvider ? 'passed' : 'warning',
+    status: scanningProvider === 'clamav' ? 'passed' : strictLaunch ? 'blocked' : 'warning',
     summary: scanningProvider ? `Attachment scan provider configured: ${scanningProvider}` : 'Attachment virus scanning provider is not configured.',
-    detail: 'Current product state allows this as a documented placeholder, independent from retention.',
+    detail: strictLaunch
+      ? 'Launch readiness requires ATTACHMENT_SCAN_PROVIDER=clamav and a healthy daemon.'
+      : 'Placeholder mode is allowed only before final launch readiness approval.',
+  });
+
+  const firebaseRequired = [
+    'NEXT_PUBLIC_FIREBASE_API_KEY',
+    'NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN',
+    'NEXT_PUBLIC_FIREBASE_PROJECT_ID',
+    'NEXT_PUBLIC_FIREBASE_APP_ID',
+    'FIREBASE_PROJECT_ID',
+  ];
+  const firebaseMissing = firebaseRequired.filter((name) => !process.env[name]);
+  if (!process.env.FIREBASE_SERVICE_ACCOUNT_BASE64 && !process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+    firebaseMissing.push('FIREBASE_SERVICE_ACCOUNT_BASE64 or GOOGLE_APPLICATION_CREDENTIALS');
+  }
+  addCheck({
+    id: 'citizen-firebase-auth',
+    status: firebaseMissing.length ? (strictLaunch ? 'blocked' : 'warning') : 'passed',
+    summary: firebaseMissing.length
+      ? `Citizen Firebase auth configuration is missing: ${firebaseMissing.join(', ')}`
+      : 'Citizen Firebase auth client and API verifier configuration are present.',
+    detail: 'This is a presence-only check; public Firebase build values and API verifier credentials are not printed.',
+  });
+
+  const operationsMissing = ['SENTRY_DSN', 'BULL_BOARD_USER', 'BULL_BOARD_PASS'].filter((name) => !process.env[name]);
+  addCheck({
+    id: 'operations-observability',
+    status: operationsMissing.length ? (strictLaunch ? 'blocked' : 'warning') : 'passed',
+    summary: operationsMissing.length
+      ? `Operational monitoring values are missing: ${operationsMissing.join(', ')}`
+      : 'Operational monitoring and queue access values are configured.',
+    detail: 'Strict launch mode requires error monitoring and protected queue inspection for incident response.',
   });
 }
 
@@ -226,6 +261,7 @@ Usage:
   node scripts/ops-preflight.mjs --allow-live
   node scripts/ops-preflight.mjs --allow-retention-delete
   node scripts/ops-preflight.mjs --allow-deploy
+  node scripts/ops-preflight.mjs --strict-launch
   node scripts/ops-preflight.mjs --json
 
 Root aliases:

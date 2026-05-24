@@ -22,7 +22,7 @@ test.describe('SLA enforcement', () => {
       data: {
         title: 'SLA Test Talebi',
         description: 'E2E SLA testi için oluşturulmuş test talebi.',
-        channel: 'WEB',
+        channel: 'OPERATOR',
         priority: 'NORMAL',
       },
     });

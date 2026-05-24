@@ -5,6 +5,7 @@ const { PrismaClient } = databaseRequire('@prisma/client');
 
 const baseUrl = process.env.KENTOS_API_BASE_URL ?? 'http://127.0.0.1:3110/api/v1';
 const internalApiKey = process.env.INTERNAL_API_KEY ?? 'change-me-internal';
+const internalEventsKey = process.env.INTERNAL_EVENTS_KEY ?? 'kentos-internal-dev';
 const prisma = new PrismaClient();
 
 function section(name) {
@@ -101,6 +102,24 @@ const departmentStaffLogin = await request('/auth/login', {
   body: JSON.stringify({ tenantSlug: 'demo-belediye', email: 'fen.staff@demo.local', password: 'ChangeMe123!' }),
 });
 console.log('department_staff_login', departmentStaffLogin.status, departmentStaffLogin.body.user.role);
+
+section('internal event stream ingress');
+const internalEvent = await request('/events/internal/emit', {
+  method: 'POST',
+  body: JSON.stringify({
+    key: internalEventsKey,
+    event: { type: 'ticket.updated', tenantId: login.body.user.tenantId, payload: { source: 'smoke-api' } },
+  }),
+});
+assert(internalEvent.body.ok === true, 'Internal event emission should accept the configured shared key without JWT.');
+await expectStatus('/events/internal/emit', 403, {
+  method: 'POST',
+  body: JSON.stringify({
+    key: `${internalEventsKey}-invalid`,
+    event: { type: 'ticket.updated', tenantId: login.body.user.tenantId, payload: { source: 'smoke-api' } },
+  }),
+});
+console.log('internal_events_key_contract', internalEvent.status, true);
 
 const managerLogin = await request('/auth/login', {
   method: 'POST',
@@ -504,7 +523,8 @@ const adminAttachmentDownload = await request(`/attachments/${adminAttachmentUpl
 assert(adminAttachmentDownload.body.downloadUrl, 'Admin attachment download did not return a signed URL.');
 
 const quarantinedList = await request('/attachments/quarantined', { token });
-assert(Array.isArray(quarantinedList.body), 'Attachments quarantined list is not an array.');
+assert(Array.isArray(quarantinedList.body.data), 'Attachments quarantined data is not an array.');
+assert(typeof quarantinedList.body.meta?.total === 'number', 'Attachments quarantined pagination metadata is missing.');
 await expectStatus('/attachments/quarantined', 403, { token: operatorToken });
 await expectStatus('/attachments/quarantined', 403, { token: readOnlyToken });
 const rescanResponse = await request(`/attachments/${adminAttachmentUpload.body.attachmentId}/rescan`, {
@@ -614,7 +634,7 @@ await request(`/tickets/${operatorMatrixTicket.body.id}/status`, {
   body: JSON.stringify({ status: 'ASSIGNED' }),
 });
 const managerTickets = await request(`/tickets?q=${encodeURIComponent(operatorMatrixTicket.body.title)}`, { token: managerToken });
-assert(managerTickets.body.some((ticket) => ticket.id === operatorMatrixTicket.body.id), 'Manager cannot see tenant ticket list.');
+assert(managerTickets.body.data.some((ticket) => ticket.id === operatorMatrixTicket.body.id), 'Manager cannot see tenant ticket list.');
 const managerMatrixTicket = await request(`/tickets/${operatorMatrixTicket.body.id}`, { token: managerToken });
 assert(managerMatrixTicket.body.id === operatorMatrixTicket.body.id, 'Manager cannot read tenant ticket detail.');
 await request(`/tickets/${operatorMatrixTicket.body.id}/public-messages`, {
@@ -654,16 +674,16 @@ const temizlikTicket = await request('/tickets', {
 console.log('department_staff_hidden_ticket_create', temizlikTicket.status, temizlikTicket.body.ticketNo);
 
 const departmentStaffTickets = await request(`/tickets?q=${encodeURIComponent(fenTicket.body.title)}`, { token: departmentStaffToken });
-const departmentStaffTicketIds = departmentStaffTickets.body.map((ticket) => ticket.id);
+const departmentStaffTicketIds = departmentStaffTickets.body.data.map((ticket) => ticket.id);
 assert(departmentStaffTicketIds.includes(fenTicket.body.id), 'Department staff cannot see own department ticket.');
 const departmentStaffHiddenTickets = await request(`/tickets?q=${encodeURIComponent(temizlikTicket.body.title)}`, { token: departmentStaffToken });
-assert(!departmentStaffHiddenTickets.body.some((ticket) => ticket.id === temizlikTicket.body.id), 'Department staff can see another department ticket.');
+assert(!departmentStaffHiddenTickets.body.data.some((ticket) => ticket.id === temizlikTicket.body.id), 'Department staff can see another department ticket.');
 
 const departmentStaffFenTicket = await request(`/tickets/${fenTicket.body.id}`, { token: departmentStaffToken });
 console.log('department_staff_read_scope', departmentStaffFenTicket.status, departmentStaffFenTicket.body.department.id === fenDepartment.id);
 await expectStatus(`/tickets/${temizlikTicket.body.id}`, 404, { token: departmentStaffToken });
 const departmentStaffFilteredOutTickets = await expectStatus(`/tickets?departmentId=${temizlikDepartment.id}`, 200, { token: departmentStaffToken });
-assert(departmentStaffFilteredOutTickets.body.length === 0, 'Department staff department filter returned out-of-scope tickets.');
+assert(departmentStaffFilteredOutTickets.body.data.length === 0, 'Department staff department filter returned out-of-scope tickets.');
 
 await request(`/tickets/${fenTicket.body.id}/notes`, {
   method: 'POST',
@@ -945,7 +965,7 @@ assert(
 );
 
 const publicTicketAdminView = await request('/tickets?q=kald%C4%B1r%C4%B1m%20%C3%A7%C3%B6kt%C3%BC', { token });
-const publicTicketRecord = publicTicketAdminView.body.find((ticket) => ticket.publicTrackingToken === publicTicket.body.trackingToken);
+const publicTicketRecord = publicTicketAdminView.body.data.find((ticket) => ticket.publicTrackingToken === publicTicket.body.trackingToken);
 assert(publicTicketRecord, 'Public ticket not visible from staff list for audit verification.');
 const publicTicketDbRecord = await prisma.ticket.findFirst({
   where: { tenantId: login.body.user.tenantId, publicTrackingToken: publicTicket.body.trackingToken },

@@ -104,7 +104,7 @@ export default async function UsersPage({
       {canManage && (
         <section className="card">
           <h2>Yeni Kullanıcı Ekle</h2>
-          <form action={async (fd) => { await createUserAction(fd); }} className="filter-grid">
+          <form action={createUserAction} className="filter-grid">
             <label>
               E-posta
               <input name="email" type="email" required placeholder="kullanici@belediye.gov.tr" />

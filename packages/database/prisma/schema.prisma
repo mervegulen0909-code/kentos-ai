@@ -259,6 +259,7 @@ model Citizen {
   displayName         String?
   phone               String?
   email               String?
+  firebaseUid         String?
   kvkkConsentAt       DateTime?
   mergedIntoCitizenId String?
   mergedAt            DateTime?
@@ -273,6 +274,7 @@ model Citizen {
   tickets             Ticket[]
   deviceTokens        CitizenDeviceToken[]
 
+  @@unique([tenantId, firebaseUid])
   @@index([tenantId, phone])
   @@index([tenantId, email])
   @@index([tenantId, mergedIntoCitizenId])
@@ -351,6 +353,9 @@ model Ticket {
   @@index([tenantId, categoryId, status])
   @@index([tenantId, assignedToId, status])
   @@index([tenantId, resolutionDueAt])
+  @@index([tenantId, status, resolutionDueAt])
+  @@index([tenantId, status, resolvedAt])
+  @@index([tenantId, slaBreachedAt])
   @@index([tenantId, createdAt])
 }
 

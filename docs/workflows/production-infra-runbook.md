@@ -42,6 +42,18 @@ Edit the generated file before server use:
 - Keep `RETENTION_DRY_RUN=true` until a data cleanup window is explicitly approved.
 - Keep all `*_OUTBOUND_LIVE=false` until provider credentials and operator approval are recorded.
 - Replace `ATTACHMENT_SCAN_PROVIDER=placeholder` with `clamav` once the in-stack ClamAV daemon is healthy. The compose file already starts a ClamAV service on `clamav:3310`; the worker reads `CLAMAV_HOST`/`CLAMAV_PORT` from env and falls back to skipping scans when those are unset.
+- Keep the generated `CITIZEN_SESSION_SECRET` and `INTERNAL_EVENTS_KEY` secret and distinct; they authorize citizen account actions and live event emission respectively.
+- Fill `NEXT_PUBLIC_FIREBASE_API_KEY`, `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`, `NEXT_PUBLIC_FIREBASE_PROJECT_ID`, and `NEXT_PUBLIC_FIREBASE_APP_ID` before building the citizen image. These public values are embedded into the Next.js bundle at Docker build time.
+- Set `FIREBASE_PROJECT_ID` and `FIREBASE_SERVICE_ACCOUNT_BASE64` for API-side ID token verification. Never place the service account value in a `NEXT_PUBLIC_*` variable.
+- Configure `SENTRY_DSN`, `BULL_BOARD_USER`, and `BULL_BOARD_PASS` before a final launch-readiness decision.
+
+Before declaring the service available to end users, run the strict gate:
+
+```bash
+pnpm ops:external -- --strict-launch --compose
+```
+
+The strict gate intentionally blocks launch while ClamAV, citizen Firebase authentication, signed-session/event secrets, or incident-response monitoring values are incomplete.
 
 ## Server Bootstrap
 
@@ -71,6 +83,8 @@ docker compose --env-file .env.production.local -f infra/docker-compose.prod.yml
 docker compose --env-file .env.production.local -f infra/docker-compose.prod.yml run --rm api pnpm db:deploy
 docker compose --env-file .env.production.local -f infra/docker-compose.prod.yml up -d
 ```
+
+After the services are healthy and Firebase values have been reviewed, rebuild `citizen-web` whenever a `NEXT_PUBLIC_FIREBASE_*` value changes; runtime-only container restarts do not change browser bundle configuration.
 
 Optional initial seed is local/demo oriented. Do not seed production tenant data unless you intentionally want demo accounts:
 

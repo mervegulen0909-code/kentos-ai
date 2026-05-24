@@ -96,18 +96,19 @@ async function refreshAdminAccessToken(refreshToken: string) {
     },
     body: JSON.stringify({ refreshToken }),
     cache: 'no-store',
+    signal: AbortSignal.timeout(8_000),
   });
 
   if (!response.ok) {
     throw new Error(`Refresh failed with status ${response.status}`);
   }
 
-  const result = await response.json() as { accessToken?: string };
+  const result = await response.json() as { accessToken?: string; refreshToken?: string };
   if (!result.accessToken) {
     throw new Error('Refresh response missing accessToken');
   }
 
-  return result.accessToken;
+  return { accessToken: result.accessToken, refreshToken: result.refreshToken };
 }
 
 export async function getSessionToken() {
@@ -150,9 +151,14 @@ export async function resolveAdminSession(): Promise<AdminSession | null> {
   if (isTokenFresh(accessToken)) return { accessToken: accessToken!, refreshToken, user };
 
   try {
-    const refreshedAccessToken = await refreshAdminAccessToken(refreshToken);
-    await setSessionAccessToken(refreshedAccessToken).catch(() => undefined);
-    return { accessToken: refreshedAccessToken, refreshToken, user };
+    const refreshed = await refreshAdminAccessToken(refreshToken);
+    const store = await cookies();
+    store.set(sessionCookieName, refreshed.accessToken, getAccessCookieOptions());
+    // If API issued a new refresh token (rotation), persist it
+    if (refreshed.refreshToken) {
+      store.set(refreshCookieName, refreshed.refreshToken, getLongLivedCookieOptions());
+    }
+    return { accessToken: refreshed.accessToken, refreshToken: refreshed.refreshToken ?? refreshToken, user };
   } catch {
     return null;
   }

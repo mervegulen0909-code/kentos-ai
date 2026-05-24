@@ -1,4 +1,6 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:3100/api/v1';
+const API_BASE_URL = process.env.NEXT_PUBLIC_PUBLIC_API_BASE_URL
+  ?? process.env.NEXT_PUBLIC_API_BASE_URL
+  ?? 'http://localhost:3100/api/v1';
 
 function safeErrorMessage(status: number) {
   if (status === 400) return 'Gonderdiginiz bilgiler dogrulanamadi.';
@@ -101,7 +103,20 @@ export type SendPublicConversationMessageInput = {
   attachmentIds?: string[];
 };
 
+export type CitizenAuthResult = {
+  citizenId: string;
+  displayName: string | null;
+  email: string | null;
+  phone: string | null;
+  sessionToken: string;
+};
+
 export const citizenApi = {
+  firebaseLogin: (tenantSlug: string, idToken: string) =>
+    apiFetch<CitizenAuthResult>(`/public/${tenantSlug}/auth/firebase`, {
+      method: 'POST',
+      body: JSON.stringify({ idToken }),
+    }),
   createTicket: (tenantSlug: string, input: CreatePublicTicketInput) =>
     apiFetch<PublicTicket>(`/public/${tenantSlug}/tickets`, { method: 'POST', body: JSON.stringify(input) }),
   getTicket: (tenantSlug: string, ticketIdentifier: string) => apiFetch<PublicTicket>(`/public/${tenantSlug}/tickets/${ticketIdentifier}`),
@@ -115,6 +130,11 @@ export const citizenApi = {
     apiFetch<{ attachmentId: string; checksumSha256: string }>(`/public/${tenantSlug}/attachments/${attachmentId}/confirm`, {
       method: 'POST',
       body: JSON.stringify({ checksumSha256 }),
+    }),
+  requestErasure: (tenantSlug: string, sessionToken: string) =>
+    apiFetch<{ anonymized: boolean; citizenId: string }>(`/public/${tenantSlug}/citizen/erasure`, {
+      method: 'POST',
+      body: JSON.stringify({ sessionToken }),
     }),
   startConversation: (tenantSlug: string, input: StartPublicConversationInput) =>
     apiFetch<PublicConversation>(`/public/${tenantSlug}/conversations`, { method: 'POST', body: JSON.stringify(input) }),

@@ -11,6 +11,7 @@
  * - ready()   → DB sorgusu başarısız → hata fırlatır (propagates)
  */
 import assert from 'node:assert/strict';
+import { shouldRequireClamavReadiness } from './health.controller.js';
 
 // ── Test yardımcısı ──────────────────────────────────────────────────────────
 let passed = 0;
@@ -133,5 +134,13 @@ await test('ready() — DB hatası ready() içinden fırlatılır (error propaga
 });
 
 // ── Sonuç ────────────────────────────────────────────────────────────────────
+await test('readiness requires ClamAV only for the clamav scan provider', () => {
+  assert.equal(shouldRequireClamavReadiness('clamav'), true);
+  assert.equal(shouldRequireClamavReadiness(' CLAMAV '), true);
+  assert.equal(shouldRequireClamavReadiness('placeholder'), false);
+  assert.equal(shouldRequireClamavReadiness('disabled'), false);
+  assert.equal(shouldRequireClamavReadiness(undefined), false);
+});
+
 console.log(`\n${passed} passed, ${failed} failed\n`);
 if (failed > 0) process.exit(1);

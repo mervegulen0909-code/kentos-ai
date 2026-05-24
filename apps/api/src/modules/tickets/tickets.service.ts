@@ -1,4 +1,4 @@
-import { ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { AuditActorType, ChannelType, MessageVisibility, OutboundDeliveryState, TicketStatus, UserRole } from '@kentos/database';
 import type { Prisma } from '@kentos/database';
 import { intakeClassificationSchema } from '@kentos/shared';
@@ -13,9 +13,13 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { AssignTicketDto } from './dto/assign-ticket.dto.js';
 import { CreateTicketMessageDto } from './dto/create-ticket-message.dto.js';
 import { CreateTicketDto } from './dto/create-ticket.dto.js';
+import { SuggestReplyDto } from './dto/suggest-reply.dto.js';
 import { UpdateTicketStatusDto } from './dto/update-ticket-status.dto.js';
+import { FcmPushService } from './fcm-push.service.js';
 import { SlaService } from './sla.service.js';
+import { TicketAiService } from './ticket-ai.service.js';
 import { TicketNumberService } from './ticket-number.service.js';
+import { EventsService } from '../events/events.service.js';
 
 @Injectable()
 export class TicketsService {
@@ -28,7 +32,14 @@ export class TicketsService {
     @Inject(AttachmentsService) private readonly attachments: AttachmentsService,
     @Inject(CsatQueueService) private readonly csatQueue: CsatQueueService,
     @Inject(NeighborhoodRoutingService) private readonly neighborhoodRouting: NeighborhoodRoutingService,
+    @Inject(EventsService) private readonly eventsService: EventsService,
+    @Inject(TicketAiService) private readonly ticketAi: TicketAiService,
+    @Inject(FcmPushService) private readonly fcmPush: FcmPushService,
   ) {}
+
+  suggestReply(user: AuthenticatedUser, ticketId: string, dto: SuggestReplyDto) {
+    return this.ticketAi.suggestReply(user.tenantId, ticketId, dto.operatorNote);
+  }
 
   async list(
     user: AuthenticatedUser,
@@ -82,6 +93,16 @@ export class TicketsService {
   }
 
   async create(user: AuthenticatedUser, dto: CreateTicketDto) {
+    if (!Object.values(ChannelType).includes(dto.channel)) {
+      throw new BadRequestException('Kanal degeri gecersiz.');
+    }
+    if (typeof dto.title !== 'string' || dto.title.trim().length < 3) {
+      throw new BadRequestException('Baslik en az 3 karakter olmalidir.');
+    }
+    if (typeof dto.description !== 'string' || dto.description.trim().length < 10) {
+      throw new BadRequestException('Aciklama en az 10 karakter olmalidir.');
+    }
+
     const relations = await this.validateTicketRelations(user.tenantId, dto);
 
     // F4: GIS routing — if lat/lon provided and no explicit departmentId, resolve via polygon
@@ -139,6 +160,12 @@ export class TicketsService {
     });
 
     await this.attachments.attachAdminToTicket(user, ticket.id, dto.attachmentIds);
+
+    this.eventsService.emit({
+      type: 'ticket.created',
+      tenantId: user.tenantId,
+      payload: { ticketId: ticket.id, ticketNo: ticket.ticketNo, status: ticket.status, priority: ticket.priority },
+    });
 
     // F9: Duplicate detection — link to an existing open ticket from the same citizen if similar title in last 48h
     if (relations.citizenId) {
@@ -263,6 +290,13 @@ export class TicketsService {
 
     const latestPublicMessageId = routedMessage ? updatedTicket.messages?.[0]?.id : undefined;
     if (latestPublicMessageId) await this.notifications.enqueueMessage(latestPublicMessageId);
+
+    this.eventsService.emit({
+      type: 'ticket.assigned',
+      tenantId: user.tenantId,
+      payload: { ticketId: id, departmentId: dto.departmentId, assignedToId: dto.assignedToId ?? null },
+    });
+
     return updatedTicket;
   }
 
@@ -283,6 +317,13 @@ export class TicketsService {
 
     await this.audit(user, id, 'ticket.internal_note_added', undefined, { messageId: message.id });
     await this.attachments.attachAdminToMessage(user, id, message.id, dto.attachmentIds);
+
+    this.eventsService.emit({
+      type: 'ticket.message_added',
+      tenantId: user.tenantId,
+      payload: { ticketId: id, messageId: message.id, visibility: 'INTERNAL' },
+    });
+
     return message;
   }
 
@@ -305,6 +346,13 @@ export class TicketsService {
     await this.audit(user, id, 'ticket.public_message_added', undefined, { messageId: message.id });
     await this.attachments.attachAdminToMessage(user, id, message.id, dto.attachmentIds);
     await this.notifications.enqueueMessage(message.id);
+
+    this.eventsService.emit({
+      type: 'ticket.message_added',
+      tenantId: user.tenantId,
+      payload: { ticketId: id, messageId: message.id, visibility: 'PUBLIC' },
+    });
+
     return message;
   }
 
@@ -365,6 +413,16 @@ export class TicketsService {
     if (dto.status === TicketStatus.RESOLVED) {
       void this.csatQueue.enqueueCsat(id, user.tenantId);
     }
+
+    this.eventsService.emit({
+      type: 'ticket.updated',
+      tenantId: user.tenantId,
+      payload: { ticketId: id, status: dto.status },
+    });
+
+    // FCM push notification — fire-and-forget, does not block response
+    void this.sendStatusPush(ticket, dto.status);
+
     return updated;
   }
 
@@ -598,6 +656,31 @@ export class TicketsService {
 
   private asRecord(value: unknown): Record<string, unknown> | null {
     return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
+  }
+
+  private async sendStatusPush(ticket: { id: string; tenantId: string; title: string; citizenId: string | null }, newStatus: string) {
+    if (!ticket.citizenId) return;
+    const statusNotifyMap: Record<string, string> = {
+      RESOLVED: 'Talebiniz cozuldu',
+      CLOSED: 'Talebiniz kapatildi',
+      IN_PROGRESS: 'Talebiniz isleme alindi',
+      WAITING_INFO: 'Talebiniz icin bilgi bekleniyor',
+    };
+    const title = statusNotifyMap[newStatus];
+    if (!title) return;
+
+    try {
+      const deviceTokens = await (this.prisma as unknown as {
+        citizenDeviceToken: {
+          findMany(args: unknown): Promise<Array<{ token: string }>>;
+        };
+      }).citizenDeviceToken.findMany({
+        where: { tenantId: ticket.tenantId, citizenId: ticket.citizenId, isActive: true },
+        select: { token: true },
+      });
+      const tokens = deviceTokens.map((dt) => dt.token);
+      await this.fcmPush.sendToMany(tokens, title, ticket.title, { ticketId: ticket.id, status: newStatus });
+    } catch { /* push failure must never break the response */ }
   }
 
   private toHandoffSummary(conversation: {

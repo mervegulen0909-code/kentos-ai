@@ -433,7 +433,7 @@ export default async function ReportsPage() {
             {/* Generated Reports */}
             <section className="card" style={{ marginTop: 18 }}>
               <h2>Yönetici Raporları</h2>
-              <form action={async (fd) => { await generateReportAction(fd); }} style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
+              <form action={generateReportAction} style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
                 <select name="type" defaultValue="weekly_summary">
                   <option value="weekly_summary">Haftalık Özet</option>
                   <option value="sla_report">SLA Raporu</option>

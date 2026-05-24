@@ -32,7 +32,12 @@ export async function apiFetch<T>(path: string, options: ApiOptions = {}): Promi
   if (options.body && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
   if (options.token) headers.set('Authorization', `Bearer ${options.token}`);
 
-  const response = await fetch(`${API_BASE_URL}${path}`, { ...options, headers, cache: 'no-store' });
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    ...options,
+    headers,
+    cache: 'no-store',
+    signal: options.signal ?? AbortSignal.timeout(10_000),
+  });
   if (!response.ok) {
     const rawBody = await response.text();
     throw new ApiError(response.status, rawBody || `KentOS API ${response.status}`, safeErrorMessage(response.status));
@@ -385,8 +390,8 @@ export const adminApi = {
   outboundDeliveries: (token: string) => apiFetch<AnalyticsOutboundDeliveries>('/analytics/outbound-deliveries', { token }),
   rescanAttachment: (token: string, attachmentId: string) =>
     apiFetch<{ attachmentId: string; scanStatus: 'PENDING' }>(`/attachments/${attachmentId}/rescan`, { method: 'POST', token }),
-  quarantinedAttachments: (token: string) =>
-    apiFetch<Array<{
+  quarantinedAttachments: async (token: string) =>
+    (await apiFetch<{ data: Array<{
       attachmentId: string;
       fileName: string;
       mimeType: string;
@@ -397,8 +402,9 @@ export const adminApi = {
       ticketId: string | null;
       ticketNo: string | null;
       ticketTitle: string | null;
-    }>>('/attachments/quarantined', { token }),
-  tickets: (token: string, filters?: TicketListFilters) => apiFetch<TicketListItem[]>(`/tickets${buildQuery(filters)}`, { token }),
+    }>; meta: { total: number; page: number; limit: number; totalPages: number } }>('/attachments/quarantined', { token })).data,
+  tickets: async (token: string, filters?: TicketListFilters) =>
+    (await apiFetch<{ data: TicketListItem[]; meta: { total: number; page: number; limit: number; totalPages: number } }>(`/tickets${buildQuery(filters)}`, { token })).data,
   ticket: (token: string, id: string) => apiFetch<TicketDetail>(`/tickets/${id}`, { token }),
   auditLog: (token: string, id: string) => apiFetch<AuditLogItem[]>(`/tickets/${id}/audit-log`, { token }),
   handoffs: (token: string) => apiFetch<HandoffSummary[]>('/tickets/handoffs', { token }),
@@ -433,13 +439,25 @@ export const adminApi = {
     apiFetch<{ enqueued: boolean; tenantId: string }>('/retention-settings/run-now', { method: 'POST', token }),
 
   // Users
-  users: (token: string, params?: { role?: string; q?: string; page?: number }) => {
+  users: async (token: string, params?: { role?: string; q?: string; page?: number }) => {
     const qs = new URLSearchParams();
     if (params?.role) qs.set('role', params.role);
     if (params?.q) qs.set('q', params.q);
     if (params?.page) qs.set('page', String(params.page));
     const query = qs.toString();
-    return apiFetch<{ data: UserListItem[]; meta: { total: number; page: number; limit: number } }>(`/users${query ? `?${query}` : ''}`, { token });
+    const result = await apiFetch<{
+      data: Array<Omit<UserListItem, 'departments'> & { departments: Array<{ department: { id: string; name: string } }> }>;
+      total: number;
+      page: number;
+      limit: number;
+    }>(`/users${query ? `?${query}` : ''}`, { token });
+    return {
+      data: result.data.map((user) => ({
+        ...user,
+        departments: user.departments.map((entry) => entry.department),
+      })),
+      meta: { total: result.total, page: result.page, limit: result.limit },
+    };
   },
   createUser: (token: string, input: CreateUserInput) =>
     apiFetch<UserListItem>('/users', { method: 'POST', token, body: JSON.stringify(input) }),
@@ -449,12 +467,24 @@ export const adminApi = {
     apiFetch<{ id: string; isActive: false }>(`/users/${id}`, { method: 'DELETE', token }),
 
   // Citizens
-  citizens: (token: string, params?: { q?: string; page?: number }) => {
+  citizens: async (token: string, params?: { q?: string; page?: number }) => {
     const qs = new URLSearchParams();
     if (params?.q) qs.set('q', params.q);
     if (params?.page) qs.set('page', String(params.page));
     const query = qs.toString();
-    return apiFetch<{ data: CitizenListItem[]; meta: { total: number; page: number; limit: number } }>(`/citizens${query ? `?${query}` : ''}`, { token });
+    const result = await apiFetch<{
+      data: Array<Omit<CitizenListItem, 'ticketCount'> & { _count: { tickets: number } }>;
+      total: number;
+      page: number;
+      limit: number;
+    }>(`/citizens${query ? `?${query}` : ''}`, { token });
+    return {
+      data: result.data.map(({ _count, ...citizen }) => ({
+        ...citizen,
+        ticketCount: _count.tickets,
+      })),
+      meta: { total: result.total, page: result.page, limit: result.limit },
+    };
   },
   citizen: (token: string, id: string) => apiFetch<CitizenDetail>(`/citizens/${id}`, { token }),
   anonymizeCitizen: (token: string, id: string) =>

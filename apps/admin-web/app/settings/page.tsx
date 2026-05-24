@@ -161,22 +161,26 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
         <p style={{ color: 'var(--muted)', maxWidth: 820 }}>
           Bu kodu belediye sitesinin kapanis <code>{'</body>'}</code> etiketinden hemen once ekleyin. Widget iframe icinde acilir, tenant slug degeriyle izole calisir ve vatandas mesajlarini <strong>WEB_CHAT</strong> kanalindan mevcut ticket omurgasina aktarir.
         </p>
-        <div className="install-code-grid">
-          <div>
-            <strong>Kurulum kodu</strong>
-            <pre className="install-code" aria-label="Widget kurulum kodu">{widgetEmbed.scriptSnippet}</pre>
+        {token ? (
+          <div className="install-code-grid">
+            <div>
+              <strong>Kurulum kodu</strong>
+              <pre className="install-code" aria-label="Widget kurulum kodu">{widgetEmbed.scriptSnippet}</pre>
+            </div>
+            <div className="install-checklist">
+              <strong>Kurulum kontrolu</strong>
+              <ul>
+                <li>Tenant: <code>{widgetEmbed.tenantSlug}</code></li>
+                <li>Script: <code>{widgetEmbed.scriptPath || '/widget.js'}</code></li>
+                <li>Onizleme: <a href={widgetEmbed.previewPath}>{widgetEmbed.previewPath}</a></li>
+                <li>Beklenen kanal: <code>WEB_CHAT</code></li>
+                <li>Durum: <code>{widgetEmbed.widgetEnabled ? 'Aktif' : 'Pasif'}</code></li>
+              </ul>
+            </div>
           </div>
-          <div className="install-checklist">
-            <strong>Kurulum kontrolu</strong>
-            <ul>
-              <li>Tenant: <code>{widgetEmbed.tenantSlug}</code></li>
-              <li>Script: <code>{widgetEmbed.scriptPath || '/widget.js'}</code></li>
-              <li>Onizleme: <a href={widgetEmbed.previewPath}>{widgetEmbed.previewPath}</a></li>
-              <li>Beklenen kanal: <code>WEB_CHAT</code></li>
-              <li>Durum: <code>{widgetEmbed.widgetEnabled ? 'Aktif' : 'Pasif'}</code></li>
-            </ul>
-          </div>
-        </div>
+        ) : (
+          <p className="notice muted">Widget kurulum kodunu ve tenant baglanti kontrolunu gormek icin giris yapin.</p>
+        )}
         <form action={updateWidgetSettingsAction} style={{ display: 'grid', gap: 12, marginTop: 18 }}>
           <PendingFieldset style={{ display: 'grid', gap: 12 }}>
             <input type="hidden" name="intent" value="update-widget" />
@@ -206,7 +210,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
           <strong>Guvenlik notu</strong>
           <p>Origin izin listesi tenant ayari olarak saklanir; env allowlist sadece operasyonel ek izin katmani olarak kalir.</p>
         </div>
-        <WidgetStatusProbe tenantSlug={widgetEmbed.tenantSlug} />
+        {token ? <WidgetStatusProbe tenantSlug={widgetEmbed.tenantSlug} /> : null}
       </section>
       <section className="card">
         <p className="badge">KVKK / Saklama suresi</p>

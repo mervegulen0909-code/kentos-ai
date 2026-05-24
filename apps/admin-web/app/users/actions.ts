@@ -6,7 +6,7 @@ import { resolveAdminSession } from '../../lib/session';
 
 export async function createUserAction(formData: FormData) {
   const session = await resolveAdminSession();
-  if (!session?.accessToken) return { error: 'Oturum bulunamadi.' };
+  if (!session?.accessToken) return;
   try {
     await adminApi.createUser(session.accessToken, {
       email: String(formData.get('email') ?? ''),
@@ -15,10 +15,7 @@ export async function createUserAction(formData: FormData) {
       password: String(formData.get('password') ?? ''),
     });
     revalidatePath('/users');
-    return { success: true };
-  } catch (err) {
-    return { error: err instanceof Error ? err.message : 'Kullanici olusturulamadi.' };
-  }
+  } catch {}
 }
 
 export async function toggleUserActiveAction(id: string, isActive: boolean) {

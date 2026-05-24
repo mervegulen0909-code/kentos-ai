@@ -1,6 +1,8 @@
 import { adminApi, type CitizenListItem } from '../../lib/api';
 import { resolveAdminSession } from '../../lib/session';
 import { AdminShell } from '../components/admin-shell';
+import { AnonymizeCitizenButton } from './[id]/anonymize-button';
+import { anonymizeCitizenAction } from './actions';
 
 const fallback: CitizenListItem[] = [];
 
@@ -68,15 +70,7 @@ export default async function CitizensPage({
                   Detay
                 </a>
                 {canAnonymize && !citizen.isAnonymized && (
-                  <form method="POST" action={`/citizens/${citizen.id}/anonymize`} style={{ display: 'inline' }}>
-                    <button
-                      type="submit"
-                      style={{ fontSize: '0.8rem', padding: '0.25rem 0.6rem', background: 'var(--error, #dc2626)', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
-                      onClick={(e) => { if (!confirm('Bu vatandaşın kişisel verileri silinecek. Onaylıyor musunuz?')) e.preventDefault(); }}
-                    >
-                      Anonimleştir
-                    </button>
-                  </form>
+                  <AnonymizeCitizenButton action={anonymizeCitizenAction.bind(null, citizen.id)} />
                 )}
               </div>
             </div>

@@ -7,6 +7,7 @@ import { TenantThrottleGuard } from './common/guards/tenant-throttle.guard.js';
 import { AdminModule } from './modules/admin/admin.module.js';
 import { CitizensModule } from './modules/citizens/citizens.module.js';
 import { AnalyticsModule } from './modules/analytics/analytics.module.js';
+import { EventsModule } from './modules/events/events.module.js';
 import { AttachmentsModule } from './modules/attachments/attachments.module.js';
 import { AuthModule } from './modules/auth/auth.module.js';
 import { HealthModule } from './modules/health/health.module.js';
@@ -20,7 +21,10 @@ import { RootController } from './root.controller.js';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true, envFilePath: ['.env', '../../.env'] }),
+    ConfigModule.forRoot({
+      isGlobal: true,
+      envFilePath: ['.env.local', '.env', '../../.env.local', '../../.env'],
+    }),
     ThrottlerModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ([{
@@ -42,6 +46,7 @@ import { RootController } from './root.controller.js';
     ReportsModule,
     AdminModule,
     CitizensModule,
+    EventsModule,
   ],
   controllers: [RootController],
   providers: [

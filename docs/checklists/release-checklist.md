@@ -30,11 +30,12 @@ Use this checklist before merging wave branches into `master` and before publish
 - [ ] `pnpm build`
 - [ ] Canonical local gate is recorded in this order: `pnpm db:generate`, targeted unit tests, `pnpm typecheck`, `pnpm build`, `git diff --check`, optional Playwright discovery/full run, then `pnpm ops:preflight -- --with-verification`.
 - [ ] `pnpm ops:preflight` reports no blocked gates before any production approval meeting.
+- [ ] `pnpm ops:preflight -- --strict-launch` reports no blocked gates before declaring the product ready for end users.
 - [ ] API `/health` responds locally.
 - [ ] API `/health/ready` responds locally after database seed.
 - [ ] No hardcoded secrets, production credentials, or real tokens are staged.
 - [ ] If `pnpm` is not on `PATH`, bootstrap note is followed (`corepack enable` + new terminal, or `npm run <root-script>` / `npm.cmd run <root-script>` for Node-backed root entrypoints only).
-- [ ] If the production VPS scaffold (`infra/docker-compose.prod.yml`) is part of the release: DNS for API/admin/citizen/gateway plus any `MUNICIPALITY_DOMAIN` is in place; `.env.production.local` was generated via `pnpm infra:prod:bootstrap` and reviewed; `pnpm ops:external` has no blocked gates; safety defaults (`*_OUTBOUND_LIVE=false`, `RETENTION_DRY_RUN=true`, `ATTACHMENT_SCAN_PROVIDER=placeholder`) are confirmed before any production deploy. See `docs/workflows/production-infra-runbook.md`.
+- [ ] If the production VPS scaffold (`infra/docker-compose.prod.yml`) is part of the release: DNS for API/admin/citizen/gateway plus any `MUNICIPALITY_DOMAIN` is in place; `.env.production.local` was generated via `pnpm infra:prod:bootstrap` and reviewed; `CITIZEN_SESSION_SECRET`, `INTERNAL_EVENTS_KEY`, Firebase client build values and Firebase API credential are configured; `pnpm ops:external -- --strict-launch` has no blocked gates. Safety defaults (`*_OUTBOUND_LIVE=false`, `RETENTION_DRY_RUN=true`, `ATTACHMENT_SCAN_PROVIDER=placeholder`) may be used while provisioning only; final launch requires healthy ClamAV and `ATTACHMENT_SCAN_PROVIDER=clamav`. See `docs/workflows/production-infra-runbook.md`.
 
 ## 4. API smoke
 
@@ -49,6 +50,7 @@ Run local API smoke when API, database, auth, RBAC, tenant settings, ticket work
 - [ ] Smoke verifies tenant settings write/read.
 - [ ] Smoke verifies authenticated ticket create, assignment, internal note, public message, status transition, and audit log.
 - [ ] Smoke verifies public citizen ticket create and TK tracking-code lookup.
+- [ ] Automated account-security coverage rejects missing/forged citizen erasure session tokens and permits deletion only for a signed-in disposable QA citizen.
 - [ ] Smoke verifies legacy/internal `KNT-*` ticket numbers do not work on public lookup endpoints.
 - [ ] Smoke verifies WhatsApp/internal channel ingest rejects missing internal key and accepts authorized text-only envelope handoff.
 - [ ] Smoke verifies public widget/ticket endpoint rejects disallowed `Origin` and accepts allowlisted widget origin.

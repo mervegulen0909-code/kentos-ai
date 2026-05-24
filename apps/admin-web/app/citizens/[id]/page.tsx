@@ -2,6 +2,7 @@ import { adminApi } from '../../../lib/api';
 import { resolveAdminSession } from '../../../lib/session';
 import { AdminShell } from '../../components/admin-shell';
 import { anonymizeCitizenAction } from '../actions';
+import { AnonymizeCitizenButton } from './anonymize-button';
 
 const statusCopy: Record<string, string> = {
   OPEN: 'Açık',
@@ -92,21 +93,19 @@ export default async function CitizenDetailPage({
               </div>
             </div>
 
+            <div style={{ marginTop: '1.5rem', paddingTop: '1rem', borderTop: '1px solid var(--border)', display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'flex-start' }}>
+              <a href={`/citizens/${citizen.id}/export`} className="button-like secondary-button">
+                Veriyi Disa Aktar (KVKK)
+              </a>
+
+              {canAnonymize && !citizen.isAnonymized && (
+                <AnonymizeCitizenButton action={anonymizeCitizenAction.bind(null, citizen.id)} />
+              )}
+            </div>
             {canAnonymize && !citizen.isAnonymized && (
-              <div style={{ marginTop: '1.5rem', paddingTop: '1rem', borderTop: '1px solid var(--border)' }}>
-                <form action={async (_fd: FormData) => { await anonymizeCitizenAction(citizen.id); }}>
-                  <button
-                    type="submit"
-                    style={{ background: 'var(--error, #dc2626)', color: '#fff', border: 'none', borderRadius: '4px', padding: '0.5rem 1rem', cursor: 'pointer' }}
-                    onClick={(e) => { if (!confirm('Bu vatandaşın kişisel verileri kalıcı olarak silinecek. Bu işlem geri alınamaz. Onaylıyor musunuz?')) e.preventDefault(); }}
-                  >
-                    Kişisel Verileri Anonimleştir (GDPR)
-                  </button>
-                  <p className="muted" style={{ marginTop: '0.5rem', fontSize: '0.8rem' }}>
-                    Bu işlem vatandaşın adı, telefonu ve e-postasını kalıcı olarak siler. Talepler korunur.
-                  </p>
-                </form>
-              </div>
+              <p className="muted" style={{ marginTop: '0.5rem', fontSize: '0.8rem' }}>
+                Anonimleştirme: ad, telefon, e-posta ve tüm talep açıklamaları kalıcı olarak silinir.
+              </p>
             )}
           </section>
 

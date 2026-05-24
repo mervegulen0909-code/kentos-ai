@@ -45,9 +45,9 @@ test('citizen and admin attachment uploads keep public metadata safe', async ({ 
     headers: { Authorization: `Bearer ${accessToken}` },
   });
   expect(ticketsResponse.ok()).toBeTruthy();
-  const tickets = (await ticketsResponse.json()) as Array<{ id: string }>;
-  expect(tickets[0]?.id).toBeTruthy();
-  const ticketId = tickets[0].id;
+  const tickets = (await ticketsResponse.json()) as { data: Array<{ id: string }> };
+  expect(tickets.data[0]?.id).toBeTruthy();
+  const ticketId = tickets.data[0].id;
 
   await loginAdmin(page);
   await page.goto(`${adminBaseURL}/tickets/${ticketId}`);

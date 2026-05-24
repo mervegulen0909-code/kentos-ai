@@ -1,10 +1,10 @@
 /**
  * retention-enforcement.spec.ts
  * Veri saklama politikası E2E testleri:
- * - GET /tenants/retention-settings → defaults + overrides yapısı
- * - PATCH /tenants/retention-settings → geçerli değerler kaydedilir
- * - PATCH /tenants/retention-settings → aralık dışı değerler reddedilir / yoksayılır
- * - POST /tenants/retention-settings/run-now → job tetiklenir
+ * - GET /retention-settings → defaults + overrides yapısı
+ * - PATCH /retention-settings → geçerli değerler kaydedilir
+ * - PATCH /retention-settings → aralık dışı değerler reddedilir / yoksayılır
+ * - POST /retention-settings/run-now → job tetiklenir
  * - Anonim erişim → 401
  */
 import { expect, test } from '@playwright/test';
@@ -19,20 +19,20 @@ test.describe('Retention policy enforcement', () => {
 
   // Erişim kontrolü
   test('anonim → 401', async ({ request }) => {
-    const resp = await request.get(`${apiBaseURL}/tenants/retention-settings`);
+    const resp = await request.get(`${apiBaseURL}/retention-settings`);
     expect(resp.status()).toBe(401);
   });
 
   test('geçersiz token → 401', async ({ request }) => {
-    const resp = await request.get(`${apiBaseURL}/tenants/retention-settings`, {
+    const resp = await request.get(`${apiBaseURL}/retention-settings`, {
       headers: { Authorization: 'Bearer invalid.token.here' },
     });
     expect(resp.status()).toBe(401);
   });
 
   // Retention settings GET
-  test('GET /tenants/retention-settings → defaults ve overrides alanları döner', async ({ request }) => {
-    const resp = await request.get(`${apiBaseURL}/tenants/retention-settings`, {
+  test('GET /retention-settings → defaults ve overrides alanları döner', async ({ request }) => {
+    const resp = await request.get(`${apiBaseURL}/retention-settings`, {
       headers: { Authorization: `Bearer ${accessToken}` },
     });
     expect(resp.ok()).toBeTruthy();
@@ -56,8 +56,8 @@ test.describe('Retention policy enforcement', () => {
     }
   });
 
-  test('GET /tenants/retention-settings → bilinen scope\'lar defaults\'da mevcut', async ({ request }) => {
-    const resp = await request.get(`${apiBaseURL}/tenants/retention-settings`, {
+  test('GET /retention-settings → bilinen scope\'lar defaults\'da mevcut', async ({ request }) => {
+    const resp = await request.get(`${apiBaseURL}/retention-settings`, {
       headers: { Authorization: `Bearer ${accessToken}` },
     });
     expect(resp.ok()).toBeTruthy();
@@ -73,16 +73,16 @@ test.describe('Retention policy enforcement', () => {
   });
 
   // Retention settings PATCH — geçerli değer
-  test('PATCH /tenants/retention-settings → geçerli değer kaydedilir', async ({ request }) => {
+  test('PATCH /retention-settings → geçerli değer kaydedilir', async ({ request }) => {
     // Önce mevcut değeri oku
-    const getResp = await request.get(`${apiBaseURL}/tenants/retention-settings`, {
+    const getResp = await request.get(`${apiBaseURL}/retention-settings`, {
       headers: { Authorization: `Bearer ${accessToken}` },
     });
     expect(getResp.ok()).toBeTruthy();
     const before = await getResp.json() as { overrides?: Record<string, unknown> };
 
     // Güvenli bir override ayarla (90 gün — geçerli aralıkta)
-    const patchResp = await request.patch(`${apiBaseURL}/tenants/retention-settings`, {
+    const patchResp = await request.patch(`${apiBaseURL}/retention-settings`, {
       headers: { Authorization: `Bearer ${accessToken}` },
       data: { 'audit-logs': 90 },
     });
@@ -93,15 +93,15 @@ test.describe('Retention policy enforcement', () => {
 
     // Temizle — orijinal değere geri döndür
     const originalValue = (before.overrides ?? {})['audit-logs'];
-    await request.patch(`${apiBaseURL}/tenants/retention-settings`, {
+    await request.patch(`${apiBaseURL}/retention-settings`, {
       headers: { Authorization: `Bearer ${accessToken}` },
       data: { 'audit-logs': originalValue ?? null },
     });
   });
 
   // Retention settings PATCH — geçersiz değer
-  test('PATCH /tenants/retention-settings → negatif değer yoksayılır', async ({ request }) => {
-    const patchResp = await request.patch(`${apiBaseURL}/tenants/retention-settings`, {
+  test('PATCH /retention-settings → negatif değer yoksayılır', async ({ request }) => {
+    const patchResp = await request.patch(`${apiBaseURL}/retention-settings`, {
       headers: { Authorization: `Bearer ${accessToken}` },
       data: { 'conversations': -10 },
     });
@@ -118,15 +118,15 @@ test.describe('Retention policy enforcement', () => {
     }
   });
 
-  test('PATCH /tenants/retention-settings → null değer override\'ı siler', async ({ request }) => {
+  test('PATCH /retention-settings → null değer override\'ı siler', async ({ request }) => {
     // Önce bir override ekle
-    await request.patch(`${apiBaseURL}/tenants/retention-settings`, {
+    await request.patch(`${apiBaseURL}/retention-settings`, {
       headers: { Authorization: `Bearer ${accessToken}` },
       data: { 'channel-events': 30 },
     });
 
     // Sonra null ile sil
-    const clearResp = await request.patch(`${apiBaseURL}/tenants/retention-settings`, {
+    const clearResp = await request.patch(`${apiBaseURL}/retention-settings`, {
       headers: { Authorization: `Bearer ${accessToken}` },
       data: { 'channel-events': null },
     });
@@ -139,8 +139,8 @@ test.describe('Retention policy enforcement', () => {
   });
 
   // AI budget settings
-  test('GET /tenants/ai-budget-settings → yapı doğrulaması', async ({ request }) => {
-    const resp = await request.get(`${apiBaseURL}/tenants/ai-budget-settings`, {
+  test('GET /ai-budget-settings → yapı doğrulaması', async ({ request }) => {
+    const resp = await request.get(`${apiBaseURL}/ai-budget-settings`, {
       headers: { Authorization: `Bearer ${accessToken}` },
     });
 
@@ -156,8 +156,8 @@ test.describe('Retention policy enforcement', () => {
   });
 
   // Retention job tetikleme
-  test('POST /tenants/retention-settings/run-now → job tetiklenir', async ({ request }) => {
-    const resp = await request.post(`${apiBaseURL}/tenants/retention-settings/run-now`, {
+  test('POST /retention-settings/run-now → job tetiklenir', async ({ request }) => {
+    const resp = await request.post(`${apiBaseURL}/retention-settings/run-now`, {
       headers: { Authorization: `Bearer ${accessToken}` },
     });
 
@@ -173,13 +173,13 @@ test.describe('Retention policy enforcement', () => {
   });
 
   test('run-now → anonim → 401', async ({ request }) => {
-    const resp = await request.post(`${apiBaseURL}/tenants/retention-settings/run-now`);
+    const resp = await request.post(`${apiBaseURL}/retention-settings/run-now`);
     expect(resp.status()).toBe(401);
   });
 
   // Widget settings (tenant settings grubu)
-  test('GET /tenants/widget-settings → yapı doğrulaması', async ({ request }) => {
-    const resp = await request.get(`${apiBaseURL}/tenants/widget-settings`, {
+  test('GET /widget-settings → yapı doğrulaması', async ({ request }) => {
+    const resp = await request.get(`${apiBaseURL}/widget-settings`, {
       headers: { Authorization: `Bearer ${accessToken}` },
     });
     expect(resp.ok()).toBeTruthy();
