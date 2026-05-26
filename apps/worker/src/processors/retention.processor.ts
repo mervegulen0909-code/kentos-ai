@@ -1,4 +1,4 @@
-import { OutboundDeliveryState } from '@kentos/database';
+import { OutboundDeliveryState, PrismaClient } from '@kentos/database';
 import { DeleteObjectsCommand, S3Client } from '@aws-sdk/client-s3';
 import { logger } from '../logger.js';
 import {
@@ -21,21 +21,8 @@ type RetentionJobData = {
   deleteAttachmentObjects?: boolean;
 };
 
-type RetentionPrisma = {
-  tenant: { findUnique(input: unknown): Promise<{ retentionOverrides: unknown } | null> };
-  channelEvent: { count(input: unknown): Promise<number>; deleteMany(input: unknown): Promise<{ count: number }> };
-  outboundDelivery: { count(input: unknown): Promise<number>; deleteMany(input: unknown): Promise<{ count: number }> };
-  auditLog: { count(input: unknown): Promise<number>; deleteMany(input: unknown): Promise<{ count: number }> };
-  conversation: { count(input: unknown): Promise<number>; deleteMany(input: unknown): Promise<{ count: number }> };
-  attachment: {
-    count(input: unknown): Promise<number>;
-    deleteMany(input: unknown): Promise<{ count: number }>;
-    findMany(input: unknown): Promise<Array<{ id: string; storageKey: string }>>;
-  };
-};
-
 type RetentionDependencies = {
-  prisma: RetentionPrisma;
+  prisma: PrismaClient;
   deleteAttachmentObjects?: (storageKeys: string[]) => Promise<{ deleted: number; errors: string[] }>;
 };
 
@@ -43,7 +30,7 @@ let s3Client: S3Client | null = null;
 
 export async function processRetentionJob(job: { name: string; data: RetentionJobData }) {
   return runRetentionJob(job, {
-    prisma: getPrismaClient() as unknown as RetentionPrisma,
+    prisma: getPrismaClient(),
     deleteAttachmentObjects: deleteS3Objects,
   });
 }
@@ -172,7 +159,7 @@ export async function runRetentionJob(job: { name: string; data: RetentionJobDat
   };
 }
 
-async function loadTenantOverrides(prisma: RetentionPrisma, tenantId: string): Promise<TenantRetentionOverrides> {
+async function loadTenantOverrides(prisma: PrismaClient, tenantId: string): Promise<TenantRetentionOverrides> {
   try {
     const tenant = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { retentionOverrides: true } });
     return normalizeOverrides(tenant?.retentionOverrides);

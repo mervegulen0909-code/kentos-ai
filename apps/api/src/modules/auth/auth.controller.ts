@@ -5,6 +5,8 @@ import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagg
 import { LoginDto } from './dto/login.dto.js';
 import { RefreshDto } from './dto/refresh.dto.js';
 import { LogoutDto } from './dto/logout.dto.js';
+import { RequestPasswordResetDto } from './dto/request-password-reset.dto.js';
+import { ResetPasswordDto } from './dto/reset-password.dto.js';
 import { AuthService } from './auth.service.js';
 import { JwtBlacklistGuard } from './jwt-blacklist.guard.js';
 
@@ -40,6 +42,25 @@ export class AuthController {
   @Post('logout')
   logout(@Body() dto: LogoutDto) {
     return this.auth.logout(dto.accessToken, dto.refreshToken);
+  }
+
+  @ApiOperation({ summary: 'Şifre sıfırlama talebi — e-posta ile token gönderir' })
+  @ApiResponse({ status: 200, description: 'ok: true (e-posta mevcut olmasa bile)' })
+  @ApiResponse({ status: 429, description: 'Çok fazla deneme' })
+  @Throttle({ default: { ttl: 60_000, limit: 3 } })
+  @Post('request-password-reset')
+  requestPasswordReset(@Body() dto: RequestPasswordResetDto) {
+    return this.auth.requestPasswordReset(dto.email);
+  }
+
+  @ApiOperation({ summary: 'Şifre sıfırla — token ile yeni şifre belirle' })
+  @ApiResponse({ status: 200, description: 'ok: true' })
+  @ApiResponse({ status: 401, description: 'Geçersiz veya süresi dolmuş token' })
+  @ApiResponse({ status: 429, description: 'Çok fazla deneme' })
+  @Throttle({ default: { ttl: 60_000, limit: 5 } })
+  @Post('reset-password')
+  resetPassword(@Body() dto: ResetPasswordDto) {
+    return this.auth.resetPassword(dto.token, dto.newPassword);
   }
 
   @ApiBearerAuth()

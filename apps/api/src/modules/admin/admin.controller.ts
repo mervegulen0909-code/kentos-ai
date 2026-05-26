@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Inject, Param, Patch, Post, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Roles } from '../../common/decorators/roles.decorator.js';
 import { RolesGuard } from '../../common/guards/roles.guard.js';
 import { AdminService } from './admin.service.js';
@@ -16,30 +16,42 @@ export class AdminController {
   constructor(@Inject(AdminService) private readonly adminService: AdminService) {}
 
   @ApiOperation({ summary: 'Tüm kiracıları listele' })
+  @ApiResponse({ status: 200, description: 'Kiracı listesi döndürüldü' })
   @Get('tenants')
   listTenants() {
     return this.adminService.listTenants();
   }
 
   @ApiOperation({ summary: 'Kiracı detayı' })
+  @ApiParam({ name: 'id', description: 'Kiracı ID' })
+  @ApiResponse({ status: 200, description: 'Kiracı detayı döndürüldü' })
+  @ApiResponse({ status: 404, description: 'Kiracı bulunamadı' })
   @Get('tenants/:id')
   getTenant(@Param('id') id: string) {
     return this.adminService.getTenant(id);
   }
 
   @ApiOperation({ summary: 'Yeni kiracı oluştur' })
+  @ApiResponse({ status: 201, description: 'Kiracı oluşturuldu' })
+  @ApiResponse({ status: 400, description: 'Geçersiz istek gövdesi' })
   @Post('tenants')
   createTenant(@Body() dto: CreateTenantDto) {
     return this.adminService.createTenant(dto);
   }
 
   @ApiOperation({ summary: 'Kiracı güncelle' })
+  @ApiParam({ name: 'id', description: 'Kiracı ID' })
+  @ApiResponse({ status: 200, description: 'Kiracı güncellendi' })
+  @ApiResponse({ status: 404, description: 'Kiracı bulunamadı' })
   @Patch('tenants/:id')
   updateTenant(@Param('id') id: string, @Body() dto: UpdateTenantDto) {
     return this.adminService.updateTenant(id, dto);
   }
 
   @ApiOperation({ summary: 'Kiracı için varsayılan veri ekle' })
+  @ApiParam({ name: 'id', description: 'Kiracı ID' })
+  @ApiResponse({ status: 201, description: 'Seed verisi eklendi' })
+  @ApiResponse({ status: 404, description: 'Kiracı bulunamadı' })
   @Post('tenants/:id/seed')
   seedTenant(@Param('id') id: string) {
     return this.adminService.seedTenant(id);

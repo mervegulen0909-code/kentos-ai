@@ -98,6 +98,14 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
+      - name: Scan for vulnerabilities (Trivy)
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          severity: 'CRITICAL,HIGH'
+          exit-code: '0'
+
       - name: Unit tests (API)
         run: pnpm --filter @kentos/api test
 

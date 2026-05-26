@@ -24,3 +24,15 @@ export const LENIENT_JOB_OPTIONS: JobsOptions = {
   removeOnComplete: 50,
   removeOnFail: 200,
 };
+
+/**
+ * Outbound options for external API calls (WhatsApp, email gateways).
+ * More generous retries with longer backoff to ride out transient gateway errors.
+ * 7 attempts with exponential backoff: 5s → 10s → 20s → 40s → 80s → 160s → 320s ≈ 10 min total
+ */
+export const OUTBOUND_JOB_OPTIONS: JobsOptions = {
+  attempts: 7,
+  backoff: { type: 'exponential', delay: 5_000 },
+  removeOnComplete: 200,
+  removeOnFail: 1_000,
+};
