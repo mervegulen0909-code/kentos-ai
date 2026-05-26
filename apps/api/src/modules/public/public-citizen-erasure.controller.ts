@@ -1,4 +1,4 @@
-import { Body, Controller, Inject, Param, Post, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Inject, Param, Post, UseGuards } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { IsNotEmpty, IsString, MaxLength } from 'class-validator';
@@ -32,6 +32,10 @@ export class PublicCitizenErasureController {
     @Param('tenantSlug') tenantSlug: string,
     @Body() dto: CitizenErasureDto,
   ) {
+    if (!dto.sessionToken || typeof dto.sessionToken !== 'string') {
+      throw new BadRequestException('sessionToken is required.');
+    }
+
     const session = this.sessions.verify(dto.sessionToken, tenantSlug);
     return this.citizens.selfErase(session.tenantId, session.citizenId);
   }
