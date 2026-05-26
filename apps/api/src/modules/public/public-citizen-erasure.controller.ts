@@ -13,9 +13,12 @@ class CitizenErasureDto {
   sessionToken!: string;
 }
 
+const CITIZEN_ERASURE_THROTTLE_TTL_MS = Number(process.env.CITIZEN_ERASURE_THROTTLE_TTL_MS ?? 3_600_000);
+const CITIZEN_ERASURE_THROTTLE_LIMIT = Number(process.env.CITIZEN_ERASURE_THROTTLE_LIMIT ?? 1);
+
 @ApiTags('public')
 @UseGuards(PublicChannelGuard)
-@Throttle({ default: { ttl: 3_600_000, limit: 1 } }) // max 1 erasure request / hour per IP
+@Throttle({ default: { ttl: CITIZEN_ERASURE_THROTTLE_TTL_MS, limit: CITIZEN_ERASURE_THROTTLE_LIMIT } })
 @Controller('public/:tenantSlug/citizen')
 export class PublicCitizenErasureController {
   constructor(

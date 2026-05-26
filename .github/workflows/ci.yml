@@ -44,6 +44,7 @@ jobs:
       INTERNAL_EVENTS_KEY: ci-test-events-secret-32-chars-minimum
       CITIZEN_SESSION_SECRET: ci-test-citizen-session-secret-32-chars-minimum
       AUTH_LOGIN_THROTTLE_LIMIT: 100
+      CITIZEN_ERASURE_THROTTLE_LIMIT: 10
       WIDGET_ORIGIN_ALLOWLIST: http://localhost:3002,http://127.0.0.1:3002
       PUBLIC_RATE_LIMIT_MAX: 240
       PUBLIC_RATE_LIMIT_WINDOW_MS: 60000
@@ -213,6 +214,7 @@ jobs:
       INTERNAL_API_KEY: ci-e2e-internal-key-32-chars-minimum
       INTERNAL_EVENTS_KEY: ci-e2e-events-key-32-chars-minimum
       AUTH_LOGIN_THROTTLE_LIMIT: 100
+      CITIZEN_ERASURE_THROTTLE_LIMIT: 10
       CORS_ORIGIN: http://127.0.0.1:3001,http://127.0.0.1:3002
       PUBLIC_API_BASE_URL: http://127.0.0.1:3100/api/v1
       NEXT_PUBLIC_API_BASE_URL: http://127.0.0.1:3100/api/v1
