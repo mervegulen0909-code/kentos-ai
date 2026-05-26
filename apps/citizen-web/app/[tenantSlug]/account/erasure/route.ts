@@ -3,9 +3,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { ApiError, citizenApi } from '../../../../lib/api';
 
 export async function POST(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ tenantSlug: string }> },
 ) {
+  if (req.headers.get('x-requested-with') !== 'KentOS') {
+    return NextResponse.json({ error: 'Gecersiz istek.' }, { status: 403 });
+  }
+
   const { tenantSlug } = await params;
   const cookieStore = await cookies();
   const raw = cookieStore.get(`citizen_session_${tenantSlug}`)?.value;

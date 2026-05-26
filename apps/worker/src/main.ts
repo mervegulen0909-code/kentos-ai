@@ -8,6 +8,7 @@ import { processOutboundJob } from './processors/outbound.processor.js';
 import { processRetentionJob } from './processors/retention.processor.js';
 import { processSlaJob } from './processors/sla.processor.js';
 import { processWebhookJob } from './processors/webhook-delivery.processor.js';
+import { createQueue } from './queues/create-queue.js';
 import { createWorker } from './queues/create-worker.js';
 import { queueNames } from './queues/queue-names.js';
 
@@ -37,16 +38,32 @@ for (const worker of workers) {
   });
 }
 
+// ── Queue instances for health introspection ─────────────────────────────────
+const queues = Object.values(queueNames).map((name) => createQueue(name));
+
 // ── Health check HTTP server ──────────────────────────────────────────────────
 const healthPort = Number(process.env.WORKER_HEALTH_PORT ?? 3130);
-const healthServer = createServer((req, res) => {
+const healthServer = createServer(async (req, res) => {
   if (req.url === '/health') {
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({
-      ok: true,
-      workers: workers.map((w) => w.name),
-      ts: new Date().toISOString(),
-    }));
+    try {
+      const queueStats = await Promise.all(
+        queues.map(async (q) => {
+          const counts = await q.getJobCounts('active', 'completed', 'failed', 'waiting', 'delayed');
+          return { name: q.name, ...counts };
+        }),
+      );
+      const totalFailed = queueStats.reduce((sum, q) => sum + (q.failed ?? 0), 0);
+      res.writeHead(totalFailed > 100 ? 503 : 200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        ok: totalFailed <= 100,
+        workers: workers.map((w) => w.name),
+        queues: queueStats,
+        ts: new Date().toISOString(),
+      }));
+    } catch (err) {
+      res.writeHead(503, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: 'queue introspection failed', ts: new Date().toISOString() }));
+    }
   } else {
     res.writeHead(404);
     res.end();

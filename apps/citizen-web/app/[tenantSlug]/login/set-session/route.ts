@@ -6,6 +6,10 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ tenantSlug: string }> },
 ) {
+  if (request.headers.get('x-requested-with') !== 'KentOS') {
+    return NextResponse.json({ error: 'Gecersiz istek.' }, { status: 403 });
+  }
+
   const { tenantSlug } = await params;
 
   let idToken: string;
@@ -39,9 +43,13 @@ export async function POST(
 }
 
 export async function DELETE(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ tenantSlug: string }> },
 ) {
+  if (request.headers.get('x-requested-with') !== 'KentOS') {
+    return NextResponse.json({ error: 'Gecersiz istek.' }, { status: 403 });
+  }
+
   const { tenantSlug } = await params;
   const cookieStore = await cookies();
   // Path must match the path used when the cookie was set (/${tenantSlug})

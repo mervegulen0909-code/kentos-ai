@@ -14,7 +14,10 @@ export function ErasureClientButton({ tenantSlug }: { tenantSlug: string }) {
     setState('loading');
     setErrorMsg('');
     try {
-      const res = await fetch(`/${tenantSlug}/account/erasure`, { method: 'POST' });
+      const res = await fetch(`/${tenantSlug}/account/erasure`, {
+        method: 'POST',
+        headers: { 'X-Requested-With': 'KentOS' },
+      });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         throw new Error((data as { error?: string }).error ?? 'Silme başarısız.');

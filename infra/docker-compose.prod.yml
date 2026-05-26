@@ -1,7 +1,14 @@
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
 services:
   postgres:
     image: postgres:16-alpine
     restart: unless-stopped
+    logging: *default-logging
     environment:
       POSTGRES_USER: kentos
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
@@ -17,6 +24,7 @@ services:
   redis:
     image: redis:7-alpine
     restart: unless-stopped
+    logging: *default-logging
     command:
       [
         "redis-server",
@@ -84,6 +92,7 @@ services:
         NEXT_PUBLIC_PUBLIC_API_BASE_URL: ${PUBLIC_API_BASE_URL}
         NEXT_PUBLIC_CITIZEN_WEB_BASE_URL: ${PUBLIC_CITIZEN_BASE_URL}
     restart: unless-stopped
+    logging: *default-logging
     env_file:
       - ../.env.production.local
     environment:
@@ -121,6 +130,7 @@ services:
         NEXT_PUBLIC_PUBLIC_API_BASE_URL: ${PUBLIC_API_BASE_URL}
         NEXT_PUBLIC_CITIZEN_WEB_BASE_URL: ${PUBLIC_CITIZEN_BASE_URL}
     restart: unless-stopped
+    logging: *default-logging
     env_file:
       - ../.env.production.local
     environment:
@@ -154,6 +164,7 @@ services:
         NEXT_PUBLIC_PUBLIC_API_BASE_URL: ${PUBLIC_API_BASE_URL}
         NEXT_PUBLIC_CITIZEN_WEB_BASE_URL: ${PUBLIC_CITIZEN_BASE_URL}
     restart: unless-stopped
+    logging: *default-logging
     env_file:
       - ../.env.production.local
     environment:
@@ -195,6 +206,7 @@ services:
         NEXT_PUBLIC_FIREBASE_PROJECT_ID: ${NEXT_PUBLIC_FIREBASE_PROJECT_ID:?NEXT_PUBLIC_FIREBASE_PROJECT_ID is required}
         NEXT_PUBLIC_FIREBASE_APP_ID: ${NEXT_PUBLIC_FIREBASE_APP_ID:?NEXT_PUBLIC_FIREBASE_APP_ID is required}
     restart: unless-stopped
+    logging: *default-logging
     env_file:
       - ../.env.production.local
     environment:
@@ -233,6 +245,7 @@ services:
         NEXT_PUBLIC_PUBLIC_API_BASE_URL: ${PUBLIC_API_BASE_URL}
         NEXT_PUBLIC_CITIZEN_WEB_BASE_URL: ${PUBLIC_CITIZEN_BASE_URL}
     restart: unless-stopped
+    logging: *default-logging
     env_file:
       - ../.env.production.local
     environment:
