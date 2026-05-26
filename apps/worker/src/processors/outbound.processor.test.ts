@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { OutboundDeliveryState } from '@kentos/database';
+import { OutboundDeliveryState, type PrismaClient } from '@kentos/database';
 import { runOutboundJob } from './outbound.processor.js';
 
 function buildPrisma(delivery?: Partial<{ id: string; state: OutboundDeliveryState; channel: string }>) {
@@ -34,7 +34,7 @@ function buildPrisma(delivery?: Partial<{ id: string; state: OutboundDeliverySta
 test('runOutboundJob dispatches through gateway and marks delivery dispatched', async () => {
   const { prisma, updates } = buildPrisma({});
   const result = await runOutboundJob({ name: 'channel-outbound', data: { deliveryId: 'delivery-1' } }, {
-    prisma,
+    prisma: prisma as unknown as PrismaClient,
     internalApiKey: 'internal-key',
     resolveGatewayUrl: () => 'http://gateway/internal/whatsapp/outbound',
     fetch: async (_url, init) => {
@@ -57,7 +57,7 @@ test('runOutboundJob leaves one failed attempt and bounded retry signal on gatew
   const { prisma, updates } = buildPrisma({});
   await assert.rejects(
     runOutboundJob({ name: 'channel-outbound', data: { deliveryId: 'delivery-1' } }, {
-      prisma,
+      prisma: prisma as unknown as PrismaClient,
       internalApiKey: 'internal-key',
       resolveGatewayUrl: () => 'http://gateway/internal/whatsapp/outbound',
       fetch: async () => new Response('provider down', { status: 503 }),
@@ -76,7 +76,7 @@ test('runOutboundJob fails fast when gateway configuration is missing', async ()
   const { prisma, updates } = buildPrisma({});
   await assert.rejects(
     runOutboundJob({ name: 'channel-outbound', data: { deliveryId: 'delivery-1' } }, {
-      prisma,
+      prisma: prisma as unknown as PrismaClient,
       internalApiKey: '',
       resolveGatewayUrl: () => null,
       fetch: async () => new Response('{}'),
@@ -93,7 +93,7 @@ test('runOutboundJob fails fast when gateway configuration is missing', async ()
 test('runOutboundJob skips already dispatched terminal deliveries', async () => {
   const { prisma, updates } = buildPrisma({ state: OutboundDeliveryState.DISPATCHED });
   const result = await runOutboundJob({ name: 'channel-outbound', data: { deliveryId: 'delivery-1' } }, {
-    prisma,
+    prisma: prisma as unknown as PrismaClient,
     internalApiKey: 'internal-key',
     resolveGatewayUrl: () => 'http://gateway/internal/whatsapp/outbound',
     fetch: async () => {

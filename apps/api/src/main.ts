@@ -21,11 +21,28 @@ async function bootstrap() {
   const config = app.get(ConfigService);
 
   app.setGlobalPrefix('api/v1', { exclude: [{ path: '/', method: RequestMethod.GET }] });
-  app.use(helmet());
+  app.use(helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", 'data:', 'blob:'],
+        connectSrc: ["'self'"],
+        fontSrc: ["'self'"],
+        objectSrc: ["'none'"],
+        frameAncestors: corsOrigin ? corsOrigin.split(',').map((o) => o.trim()) : ["'self'"],
+        baseUri: ["'self'"],
+        formAction: ["'self'"],
+      },
+    },
+  }));
 
-  // Attach a unique request ID to every incoming request
-  app.use((req: { headers: Record<string, string | undefined> }, _res: unknown, next: () => void) => {
-    req.headers['x-request-id'] ??= randomUUID();
+  // Attach a unique request ID to every incoming request and propagate to response
+  app.use((req: { headers: Record<string, string | undefined> }, res: { setHeader(name: string, value: string): void }, next: () => void) => {
+    const requestId = req.headers['x-request-id'] ?? randomUUID();
+    req.headers['x-request-id'] = requestId;
+    res.setHeader('x-request-id', requestId);
     next();
   });
 

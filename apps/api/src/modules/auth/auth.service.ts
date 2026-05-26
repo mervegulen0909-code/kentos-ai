@@ -1,5 +1,5 @@
-import { randomUUID } from 'node:crypto';
-import { Inject, Injectable, UnauthorizedException } from '@nestjs/common';
+import { randomBytes, randomUUID } from 'node:crypto';
+import { Inject, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import bcrypt from 'bcryptjs';
@@ -22,9 +22,12 @@ type AuthTokenPayload = {
 // TTL constants aligned with token expiresIn
 const ACCESS_TTL_S = 15 * 60;       // 15 min
 const REFRESH_TTL_S = 7 * 24 * 3600; // 7 days
+const PASSWORD_RESET_TTL_MS = 60 * 60 * 1000; // 1 hour
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     @Inject(PrismaService) private readonly prisma: PrismaService,
     @Inject(JwtService) private readonly jwt: JwtService,
@@ -135,6 +138,66 @@ export class AuthService {
     }
 
     await Promise.allSettled(revocations);
+    return { ok: true };
+  }
+
+  async requestPasswordReset(email: string) {
+    const user = await this.prisma.user.findFirst({
+      where: { email, isActive: true },
+    });
+
+    if (user) {
+      const rawToken = randomBytes(32).toString('hex');
+      const hashedToken = await bcrypt.hash(rawToken, 10);
+
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: {
+          passwordResetToken: hashedToken,
+          passwordResetExpiry: new Date(Date.now() + PASSWORD_RESET_TTL_MS),
+        },
+      });
+
+      // TODO: send email via Postmark when ready
+      this.logger.log(`Password reset token for ${email}: ${rawToken}`);
+    }
+
+    // Always return success to avoid leaking whether the email exists
+    return { ok: true };
+  }
+
+  async resetPassword(token: string, newPassword: string) {
+    // Find all users with a non-null reset token that hasn't expired
+    const candidates = await this.prisma.user.findMany({
+      where: {
+        passwordResetToken: { not: null },
+        passwordResetExpiry: { gte: new Date() },
+        isActive: true,
+      },
+    });
+
+    let matchedUser: (typeof candidates)[number] | undefined;
+    for (const candidate of candidates) {
+      if (candidate.passwordResetToken && await bcrypt.compare(token, candidate.passwordResetToken)) {
+        matchedUser = candidate;
+        break;
+      }
+    }
+
+    if (!matchedUser) {
+      throw new UnauthorizedException('Gecersiz veya suresi dolmus sifirlama anahtari.');
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+    await this.prisma.user.update({
+      where: { id: matchedUser.id },
+      data: {
+        passwordHash,
+        passwordResetToken: null,
+        passwordResetExpiry: null,
+      },
+    });
+
     return { ok: true };
   }
 

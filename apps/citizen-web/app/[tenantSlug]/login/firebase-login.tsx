@@ -34,7 +34,7 @@ export function FirebaseLogin({ tenantSlug, redirectTo }: Props) {
   async function saveSessionAndRedirect(idToken: string) {
     const res = await fetch(`/${tenantSlug}/login/set-session`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'KentOS' },
       body: JSON.stringify({ idToken }),
     });
     if (!res.ok) throw new Error('Oturum kaydedilemedi');

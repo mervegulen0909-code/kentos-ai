@@ -9,7 +9,10 @@ export default async function LoginPage({
 }) {
   const { tenantSlug } = await params;
   const { redirect: redirectTo } = await searchParams;
-  const safeRedirect = redirectTo?.startsWith(`/${tenantSlug}/`) ? redirectTo : `/${tenantSlug}/report`;
+  const safeRedirect =
+    redirectTo && redirectTo.startsWith(`/${tenantSlug}/`) && !redirectTo.includes('//')
+      ? redirectTo
+      : `/${tenantSlug}/report`;
 
   return (
     <main className="wrap">

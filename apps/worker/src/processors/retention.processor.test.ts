@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import type { PrismaClient } from '@kentos/database';
 import { normalizeOverrides, runRetentionJob } from './retention.processor.js';
 
 function buildModel(rows: Array<{ id?: string; storageKey?: string }> = []) {
@@ -54,7 +55,7 @@ function buildDeps(options: {
         auditLog: buildModel(),
         conversation: buildModel(),
         attachment,
-      },
+      } as unknown as PrismaClient,
       deleteAttachmentObjects: async (keys: string[]) => {
         deletedKeys.push(...keys);
         return { deleted: keys.length, errors: [] };

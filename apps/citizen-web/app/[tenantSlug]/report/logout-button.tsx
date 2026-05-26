@@ -6,7 +6,10 @@ type Props = {
 
 export function LogoutButton({ tenantSlug }: Props) {
   async function handleLogout() {
-    await fetch(`/${tenantSlug}/login/set-session`, { method: 'DELETE' });
+    await fetch(`/${tenantSlug}/login/set-session`, {
+      method: 'DELETE',
+      headers: { 'X-Requested-With': 'KentOS' },
+    });
     window.location.reload();
   }
 

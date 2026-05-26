@@ -23,11 +23,7 @@ type WebhookJobData = {
 export async function processWebhookJob(job: { name: string; data: WebhookJobData }) {
   const { webhookId, event, payload, tenantId } = job.data;
 
-  const webhook = await (prisma as unknown as {
-    tenantWebhook: {
-      findFirst(args: unknown): Promise<{ id: string; url: string; secret: string; events: string[] | unknown; isActive: boolean } | null>;
-    };
-  }).tenantWebhook.findFirst({
+  const webhook = await prisma.tenantWebhook.findFirst({
     where: { id: webhookId, tenantId, isActive: true },
   });
 

@@ -95,6 +95,30 @@ export async function processSlaJob(job: { name: string; data: unknown }) {
     }),
   ]);
 
+  // Metric-friendly structured log for Prometheus/log-scraping pipelines
+  logger.info('sla_breach_metric', {
+    metric: 'sla_breaches_total',
+    newlyBreached,
+    breached,
+    escalated,
+    dueSoon,
+    checkedAt: now.toISOString(),
+  });
+
+  // Per-tenant breakdown for multi-tenant metric granularity
+  const tenantBreachCounts = new Map<string, number>();
+  for (const ticket of toEscalate) {
+    tenantBreachCounts.set(ticket.tenantId, (tenantBreachCounts.get(ticket.tenantId) ?? 0) + 1);
+  }
+  for (const [tenantId, count] of tenantBreachCounts) {
+    logger.info('sla_breach_metric', {
+      metric: 'sla_breaches_total',
+      breached: count,
+      tenantId,
+      checkedAt: now.toISOString(),
+    });
+  }
+
   return {
     processor: 'sla',
     job: job.name,

@@ -183,7 +183,7 @@ export class PublicTicketAiService {
             intent: input.result.classification.intent,
             requestType: input.result.classification.requestType,
           }),
-          confidence: input.result.classification.confidence as unknown as Prisma.Decimal,
+          confidence: input.result.classification.confidence,
           latencyMs: input.latencyMs,
           tokensInput: tokensInput ?? undefined,
           tokensOutput: tokensOutput ?? undefined,
@@ -706,11 +706,7 @@ export class PublicTicketService {
     if (!identifier) throw new NotFoundException('Vatandaş bulunamadı');
 
     // Upsert device token
-    await (this.prisma as unknown as {
-      citizenDeviceToken: {
-        upsert(args: unknown): Promise<unknown>;
-      };
-    }).citizenDeviceToken.upsert({
+    await this.prisma.citizenDeviceToken.upsert({
       where: { tenantId_token: { tenantId: tenant.id, token: dto.token } },
       create: {
         tenantId: tenant.id,

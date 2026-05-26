@@ -15,7 +15,7 @@ class CitizenErasureDto {
 
 @ApiTags('public')
 @UseGuards(PublicChannelGuard)
-@Throttle({ default: { ttl: 60_000, limit: 5 } }) // max 5 erasure attempts / minute
+@Throttle({ default: { ttl: 3_600_000, limit: 1 } }) // max 1 erasure request / hour per IP
 @Controller('public/:tenantSlug/citizen')
 export class PublicCitizenErasureController {
   constructor(
