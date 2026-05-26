@@ -157,7 +157,7 @@ jobs:
           port: ${{ secrets.PROD_SSH_PORT || 22 }}
           script: |
             set -e
-            cd /opt/kentos
+            cd /opt/kentos-ai
             git pull origin master
             pnpm install --frozen-lockfile
             pnpm ops:external -- --strict-launch --skip-network
