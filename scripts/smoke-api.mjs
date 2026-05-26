@@ -1147,11 +1147,10 @@ await expectStatus(`/public/demo-belediye/citizen/erasure`, 400, {
 console.log('erasure_missing_body_400', true);
 
 // 4. Geçersiz tenantSlug ile Firebase auth → 404 veya 401 beklenir
-const invalidTenantRes = await request(`/public/nonexistent-tenant-slug-xyz/auth/firebase`, {
+const invalidTenantRes = await expectStatusIn(`/public/nonexistent-tenant-slug-xyz/auth/firebase`, [401, 404], {
   method: 'POST',
   body: JSON.stringify({ idToken: 'any' }),
 });
-assert([401, 404].includes(invalidTenantRes.status), `Expected 401 or 404 for invalid tenant, got ${invalidTenantRes.status}`);
 console.log('firebase_auth_invalid_tenant_4xx', true);
 
 await prisma.$disconnect();
