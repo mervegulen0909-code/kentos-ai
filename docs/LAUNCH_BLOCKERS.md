@@ -27,6 +27,13 @@
 | 16 | Permanent Token alindi -> `apps/whatsapp-gateway/.env.local` yazildi | 2026-05-25 |
 | 17 | App icon asset'i repoya eklendi: `docs/kentos-app-icon.png` | 2026-05-25 |
 | 18 | Public privacy policy sayfasi eklendi: `/privacy-policy` | 2026-05-26 |
+| 19 | Meta App domains `cebtecep.com` kaydedildi | 2026-05-26 |
+| 20 | Meta Category `Community & government` onaylandi | 2026-05-26 |
+| 21 | Meta Terms of Service URL kaydedildi | 2026-05-26 |
+| 22 | KVKK erasure hardening + smoke test commit push (`813c74a`) | 2026-05-26 |
+| 23 | Typecheck temiz (api, citizen-web, worker) | 2026-05-26 |
+| 24 | DKIM DNS kaydi dogrulandi (nslookup OK, Postmark propagasyon bekliyor) | 2026-05-26 |
+| 25 | Meta Basic Settings tamamlandi (icon, privacy, ToS, category, app domains) | 2026-05-26 |
 
 ---
 
@@ -47,20 +54,17 @@
 - Onay geldikten sonra gercek numara eklenecek ve `META_PHONE_NUMBER_ID` production degeriyle guncellenecek.
 - Test numarasi `+1 555-647-0488` (ID: `1108414422357698`) gecici olarak yeterli.
 
-### 2. Meta App Review / Basic Settings tamamlama
+### 2. Meta User Data Deletion URL (manuel girilmeli)
 
-- App icon hazir: [docs/kentos-app-icon.png](/C:/Users/Shadow/Desktop/chatbot/docs/kentos-app-icon.png)
-- Privacy policy sayfasi hazir: `/privacy-policy`
-- Repo tarafi kategori onerisi: `Government`
-- Meta panelindeki `Basic Settings` alanlari insan eliyle doldurulmali:
-  - app icon upload
-  - privacy policy URL girisi
-  - category secimi
+- Meta Basic Settings diger alanlari tamamlandi (icon, privacy, ToS, category, app domains).
+- **Sadece** `User data deletion` URL alani Meta'nin React formu nedeniyle otomasyonla girilemedi (native setter + React onChange + form_input hepsi denendi).
+- Elle girilmesi gereken deger: `https://cebtecep.com/data-deletion/`
 - Meta URL: [App Settings Basic](https://developers.facebook.com/apps/1473102857894676/settings/basic/)
+- **DKIM DNS kaydi Google DNS (8.8.8.8) uzerinden dogru donuyor, Postmark resolver'i henuz guncellenmemis.**
 
 ### 3. Postmark production onayi
 
-- Domain kayitlari hazir.
+- Domain kayitlari hazir (DKIM DNS doğru, propagasyon bekleniyor).
 - Hesap halen review asamasinda; production outbound icin Postmark tarafinin onayi bekleniyor.
 
 ---
