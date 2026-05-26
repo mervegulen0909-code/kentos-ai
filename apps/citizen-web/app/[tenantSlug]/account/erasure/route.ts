@@ -34,11 +34,12 @@ export async function POST(
     return NextResponse.json({ error: 'Silme islemi basarisiz oldu.' }, { status: 500 });
   }
 
+  // Path must match the path used when the cookie was set (/${tenantSlug})
   cookieStore.set(`citizen_session_${tenantSlug}`, '', {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
-    path: '/',
+    path: `/${tenantSlug}`,
     maxAge: 0,
   });
 

@@ -174,10 +174,11 @@ try {
 
 section('user management');
 const userList = await request('/users', { token });
-assert(Array.isArray(userList.body), 'GET /users should return an array.');
-assert(userList.body.length > 0, 'GET /users should return at least the seeded admin user.');
-assert(userList.body.every((u) => u.id && u.email && u.fullName && u.role), 'User list items missing required fields.');
-console.log('user_list', userList.status, `${userList.body.length} kullanici`);
+assert(Array.isArray(userList.body.data), 'GET /users should return a paginated data array.');
+assert(userList.body.data.length > 0, 'GET /users should return at least the seeded admin user.');
+assert(userList.body.data.every((u) => u.id && u.email && u.fullName && u.role), 'User list items missing required fields.');
+assert(typeof userList.body.total === 'number' && typeof userList.body.page === 'number', 'GET /users pagination metadata missing.');
+console.log('user_list', userList.status, `${userList.body.data.length} kullanici`);
 
 const createdUser = await request('/users', {
   method: 'POST',
@@ -1120,5 +1121,37 @@ const mergedRecord = await prisma.citizen.findUnique({ where: { id: mergeSource.
 assert(mergedRecord?.mergedIntoCitizenId === mergeTarget.id, 'Merge did not set mergedIntoCitizenId');
 assert(mergedRecord?.mergedAt !== null, 'Merge did not set mergedAt');
 console.log('citizen_merge', true);
+
+// ── Firebase Auth + KVKK Erasure (public endpoints) ─────────────────────────
+section('firebase_auth_erasure');
+
+// 1. Geçersiz Firebase token → 401 beklenir
+await expectStatus(`/public/demo-belediye/auth/firebase`, 401, {
+  method: 'POST',
+  body: JSON.stringify({ idToken: 'invalid-token-smoke-test' }),
+});
+console.log('firebase_auth_invalid_token_401', true);
+
+// 2. Geçersiz/eksik sessionToken ile erasure → 401 beklenir
+await expectStatus(`/public/demo-belediye/citizen/erasure`, 401, {
+  method: 'POST',
+  body: JSON.stringify({ sessionToken: 'invalid-session-token' }),
+});
+console.log('erasure_invalid_session_401', true);
+
+// 3. Eksik body ile erasure → 400 beklenir
+await expectStatus(`/public/demo-belediye/citizen/erasure`, 400, {
+  method: 'POST',
+  body: JSON.stringify({}),
+});
+console.log('erasure_missing_body_400', true);
+
+// 4. Geçersiz tenantSlug ile Firebase auth → 404 veya 401 beklenir
+const invalidTenantRes = await request(`/public/nonexistent-tenant-slug-xyz/auth/firebase`, {
+  method: 'POST',
+  body: JSON.stringify({ idToken: 'any' }),
+});
+assert([401, 404].includes(invalidTenantRes.status), `Expected 401 or 404 for invalid tenant, got ${invalidTenantRes.status}`);
+console.log('firebase_auth_invalid_tenant_4xx', true);
 
 await prisma.$disconnect();

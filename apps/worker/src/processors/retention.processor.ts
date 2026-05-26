@@ -54,6 +54,11 @@ export async function runRetentionJob(job: { name: string; data: RetentionJobDat
   const explicitDays = job.data?.retentionDays;
   const dryRun = job.data?.dryRun ?? process.env.RETENTION_DRY_RUN !== 'false';
   const deleteAttachmentObjectsFlag = job.data?.deleteAttachmentObjects ?? process.env.RETENTION_DELETE_ATTACHMENT_OBJECTS === 'true';
+
+  // Üretimde dry-run açıksa uyar — veri GERÇEKTEN silinmiyor, KVKK yükümlülüğü yerine getirilmiyor
+  if (dryRun && process.env.NODE_ENV === 'production') {
+    console.warn('[retention] ⚠️  RETENTION_DRY_RUN=true — hiçbir veri silinmeyecek. KVKK/saklama penceresi yükümlülükleri yerine getirilmiyor. Canlıda silme için RETENTION_DRY_RUN=false ayarlayın.');
+  }
   const prisma = deps.prisma;
 
   const overrides = tenantId ? await loadTenantOverrides(prisma, tenantId) : {};

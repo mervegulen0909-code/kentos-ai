@@ -44,6 +44,13 @@ export async function DELETE(
 ) {
   const { tenantSlug } = await params;
   const cookieStore = await cookies();
-  cookieStore.delete(`citizen_session_${tenantSlug}`);
+  // Path must match the path used when the cookie was set (/${tenantSlug})
+  cookieStore.set(`citizen_session_${tenantSlug}`, '', {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    path: `/${tenantSlug}`,
+    maxAge: 0,
+  });
   return NextResponse.json({ ok: true });
 }
