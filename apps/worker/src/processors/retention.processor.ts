@@ -1,5 +1,6 @@
 import { OutboundDeliveryState } from '@kentos/database';
 import { DeleteObjectsCommand, S3Client } from '@aws-sdk/client-s3';
+import { logger } from '../logger.js';
 import {
   DEFAULT_RETENTION_DAYS,
   MAX_RETENTION_DAYS,
@@ -53,6 +54,11 @@ export async function runRetentionJob(job: { name: string; data: RetentionJobDat
   const explicitDays = job.data?.retentionDays;
   const dryRun = job.data?.dryRun ?? process.env.RETENTION_DRY_RUN !== 'false';
   const deleteAttachmentObjectsFlag = job.data?.deleteAttachmentObjects ?? process.env.RETENTION_DELETE_ATTACHMENT_OBJECTS === 'true';
+
+  // Üretimde dry-run açıksa uyar — veri GERÇEKTEN silinmiyor, KVKK yükümlülüğü yerine getirilmiyor
+  if (dryRun && process.env.NODE_ENV === 'production') {
+    console.warn('[retention] ⚠️  RETENTION_DRY_RUN=true — hiçbir veri silinmeyecek. KVKK/saklama penceresi yükümlülükleri yerine getirilmiyor. Canlıda silme için RETENTION_DRY_RUN=false ayarlayın.');
+  }
   const prisma = deps.prisma;
 
   const overrides = tenantId ? await loadTenantOverrides(prisma, tenantId) : {};
@@ -104,20 +110,41 @@ export async function runRetentionJob(job: { name: string; data: RetentionJobDat
         select: { id: true, storageKey: true },
         orderBy: { createdAt: 'asc' },
       });
-      attachmentStorageKeys.push(...attachments.map((attachment) => attachment.storageKey).filter(Boolean));
+      const keys = attachments.map((attachment) => attachment.storageKey).filter(Boolean);
+      attachmentStorageKeys.push(...keys);
       totals.attachments = attachments.length;
+      totals.attachmentObjectsDeleted = totals.attachmentObjectsDeleted ?? 0;
 
       if (!dryRun && attachments.length) {
+        // S3 deletion FIRST — prevents orphaned blobs if DB deletion succeeds but S3 fails.
+        if (deleteAttachmentObjectsFlag && keys.length) {
+          try {
+            const objectResult = await deps.deleteAttachmentObjects?.(keys);
+            totals.attachmentObjectsDeleted = objectResult?.deleted ?? 0;
+            const s3Errors = objectResult?.errors ?? [];
+            if (s3Errors.length) {
+              logger.error('[retention] S3 deletion errors — skipping DB attachment deletion to avoid orphaned blobs', {
+                count: keys.length,
+                errorCount: s3Errors.length,
+                errors: s3Errors.slice(0, 10),
+              });
+              objectDeleteErrors.push(...s3Errors);
+              totals.attachments = 0; // nothing deleted from DB this run
+              continue;
+            }
+          } catch (err) {
+            logger.error('[retention] S3 deletion threw — skipping DB attachment deletion', {
+              count: keys.length,
+              error: String(err),
+            });
+            objectDeleteErrors.push(String(err));
+            totals.attachments = 0;
+            continue;
+          }
+        }
+
         const result = await prisma.attachment.deleteMany({ where });
         totals.attachments = result.count;
-      }
-
-      if (!dryRun && deleteAttachmentObjectsFlag && attachmentStorageKeys.length) {
-        const objectResult = await deps.deleteAttachmentObjects?.(attachmentStorageKeys);
-        totals.attachmentObjectsDeleted = objectResult?.deleted ?? 0;
-        objectDeleteErrors.push(...(objectResult?.errors ?? []));
-      } else {
-        totals.attachmentObjectsDeleted = totals.attachmentObjectsDeleted ?? 0;
       }
     }
   }

@@ -7,11 +7,15 @@ test('admin login redirects to dashboard with seeded tenant admin', async ({ pag
   await page.goto(`${adminBaseURL}/login`);
 
   await expect(page.getByRole('heading', { name: 'Operasyon paneline giris' })).toBeVisible();
+  await expect(page.locator('div[aria-live="polite"][title]')).toHaveCount(0);
+  await page.getByLabel('Belediye kodu').fill('demo-belediye');
+  await page.getByLabel('E-posta').fill('admin@demo.local');
   await page.getByLabel('Sifre').fill('ChangeMe123!');
   await page.getByRole('button', { name: 'Guvenli giris yap' }).click();
 
   await page.waitForURL(`${adminBaseURL}/`, { timeout: 30_000 });
   await expect(page.locator('.sidebar-status')).toContainText('TENANT_ADMIN oturumu', { timeout: 30_000 });
+  await expect(page.locator('div[aria-live="polite"][title]')).toHaveCount(1);
   await expect(page.getByRole('heading', { name: /Yetkili ekiplerin talep yuku/i })).toBeVisible({ timeout: 30_000 });
   await expect(page.getByRole('link', { name: 'Talepler' })).toBeVisible();
   await expect(page.getByText(/Dashboard verisi alinamadi\./i)).toHaveCount(0);

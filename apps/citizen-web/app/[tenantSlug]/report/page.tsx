@@ -1,5 +1,20 @@
+import { cookies } from 'next/headers';
 import { createReportAction } from './actions';
+import { LogoutButton } from './logout-button';
 import { ReportLocationPicker } from './report-location-picker';
+
+type CitizenSession = { citizenId: string; displayName: string | null; email: string | null; phone: string | null } | null;
+
+async function getCitizenSession(tenantSlug: string): Promise<CitizenSession> {
+  try {
+    const cookieStore = await cookies();
+    const raw = cookieStore.get(`citizen_session_${tenantSlug}`)?.value;
+    if (!raw) return null;
+    return JSON.parse(raw) as CitizenSession;
+  } catch {
+    return null;
+  }
+}
 
 const errorCopy: Record<string, { title: string; detail: string }> = {
   description: {
@@ -31,6 +46,7 @@ export default async function ReportPage({
   const { error, field, draft, source } = await searchParams;
   const errorMessage = error ? (errorCopy[error] ?? errorCopy.api) : null;
   const action = createReportAction.bind(null, tenantSlug);
+  const session = await getCitizenSession(tenantSlug);
   const normalizedDraft = typeof draft === 'string' ? draft.trim() : '';
   const assistantPreviewSource = source === 'assistant-preview';
 
@@ -50,6 +66,26 @@ export default async function ReportPage({
           </div>
         </div>
         <form action={action} className="card report-card">
+          {session ? (
+            <div className="notice" role="status" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span>
+                <strong>{session.displayName ?? session.email ?? session.phone ?? 'Vatandaş'}</strong> olarak giriş yapıldı.
+              </span>
+              <span style={{ display: 'flex', gap: '1rem' }}>
+                <a href={`/${tenantSlug}/account`} style={{ fontSize: '0.8rem', color: 'var(--muted)' }}>
+                  Hesabım
+                </a>
+                <LogoutButton tenantSlug={tenantSlug} />
+              </span>
+            </div>
+          ) : (
+            <div className="notice" role="note">
+              <a href={`/${tenantSlug}/login?redirect=/${tenantSlug}/report`}>
+                Google veya telefon ile giriş yapın
+              </a>
+              {' '}— başvurularınızı daha sonra takip edebilirsiniz.
+            </div>
+          )}
           {assistantPreviewSource ? (
             <div className="notice" role="status">
               <strong>Asistan önizlemesinden geldiniz.</strong>
@@ -84,16 +120,16 @@ export default async function ReportPage({
           <ReportLocationPicker />
           <div className="field">
             <label htmlFor="displayName">Ad soyad</label>
-            <input id="displayName" name="displayName" placeholder="İsteğinize bağlı" autoComplete="name" />
+            <input id="displayName" name="displayName" placeholder="İsteğinize bağlı" autoComplete="name" defaultValue={session?.displayName ?? ''} />
           </div>
           <div className={`field ${field === 'phone' ? 'field-error' : ''}`}>
             <label htmlFor="phone">Telefon</label>
-            <input id="phone" name="phone" placeholder="+905551112233" autoComplete="tel" inputMode="tel" aria-invalid={field === 'phone'} aria-describedby="phone-help" />
+            <input id="phone" name="phone" placeholder="+905551112233" autoComplete="tel" inputMode="tel" aria-invalid={field === 'phone'} aria-describedby="phone-help" defaultValue={session?.phone ?? ''} />
             <small id="phone-help">İsteğe bağlıdır. Girerseniz belediye gerektiğinde sizi arayabilir.</small>
           </div>
           <div className={`field ${field === 'email' ? 'field-error' : ''}`}>
             <label htmlFor="email">E-posta</label>
-            <input id="email" name="email" type="email" placeholder="ornek@posta.com" autoComplete="email" aria-invalid={field === 'email'} aria-describedby="email-help" />
+            <input id="email" name="email" type="email" placeholder="ornek@posta.com" autoComplete="email" aria-invalid={field === 'email'} aria-describedby="email-help" defaultValue={session?.email ?? ''} />
             <small id="email-help">İsteğe bağlıdır. Girerseniz süreç güncellemeleri bu kanaldan da paylaşılabilir.</small>
           </div>
           <div className="field">

@@ -15,6 +15,19 @@ const REPO_ROOT = path.resolve(
 );
 const outputPath = path.join(REPO_ROOT, ".env.production.local");
 const args = process.argv.slice(2);
+if (args.includes("--help") || args.includes("-h")) {
+  console.log(`KentOS production env bootstrap
+
+Usage:
+  node scripts/bootstrap-prod-env.mjs --municipality-domain www.example.com --api-domain api.example.com
+  node scripts/bootstrap-prod-env.mjs --force
+
+Root aliases:
+  pnpm infra:prod:bootstrap -- --municipality-domain www.example.com ...
+  npm run infra:prod:bootstrap -- --municipality-domain www.example.com ...
+`);
+  process.exit(0);
+}
 const force = args.includes("--force");
 
 const options = readOptions(args);
@@ -41,7 +54,9 @@ const s3AccessKey = `kentos${randomBytes(8).toString("hex")}`;
 const s3SecretKey = randomSecret(48);
 const jwtAccessSecret = randomSecret(48);
 const jwtRefreshSecret = randomSecret(48);
+const citizenSessionSecret = randomSecret(48);
 const internalApiKey = randomSecret(48);
+const internalEventsKey = randomSecret(48);
 const metaWebhookVerifyToken = randomSecret(32);
 
 const lines = [
@@ -71,7 +86,11 @@ const lines = [
   "",
   `JWT_ACCESS_SECRET=${jwtAccessSecret}`,
   `JWT_REFRESH_SECRET=${jwtRefreshSecret}`,
+  `CITIZEN_SESSION_SECRET=${citizenSessionSecret}`,
   `INTERNAL_API_KEY=${internalApiKey}`,
+  `INTERNAL_EVENTS_KEY=${internalEventsKey}`,
+  "AUTH_LOGIN_THROTTLE_TTL_MS=60000",
+  "AUTH_LOGIN_THROTTLE_LIMIT=5",
   "",
   "S3_ENDPOINT=http://minio:9000",
   `S3_ACCESS_KEY=${s3AccessKey}`,
@@ -87,6 +106,15 @@ const lines = [
   "CLAMAV_HOST=clamav",
   "CLAMAV_PORT=3310",
   "CLAMAV_TIMEOUT_MS=15000",
+  "",
+  "NEXT_PUBLIC_FIREBASE_API_KEY=",
+  "NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=",
+  "NEXT_PUBLIC_FIREBASE_PROJECT_ID=",
+  "NEXT_PUBLIC_FIREBASE_APP_ID=",
+  "FIREBASE_PROJECT_ID=",
+  "FIREBASE_SERVICE_ACCOUNT_BASE64=",
+  "FCM_PROJECT_ID=",
+  "FCM_SERVER_KEY=",
   "",
   "RETENTION_DRY_RUN=true",
   "RETENTION_DELETE_ATTACHMENT_OBJECTS=false",

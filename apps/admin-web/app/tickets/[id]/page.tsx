@@ -2,7 +2,9 @@ import { adminApi, formatMissingFieldLabel, type AuditLogItem, type UserSummary 
 import { canAssignTickets, canMutateTickets, isReadOnlyRole, resolveAdminSession } from '../../../lib/session';
 import { AdminShell } from '../../components/admin-shell';
 import { PendingFieldset, PendingSubmitButton } from '../../components/form-controls';
+import { TicketLiveRefresh } from '../../components/ticket-live-refresh';
 import { addInternalNoteAction, addPublicMessageAction, assignTicketAction, updateStatusAction } from '../actions';
+import { SuggestReplyPanel } from './suggest-reply-panel';
 
 const transitions: Record<string, string[]> = {
   NEW: ['TRIAGED', 'ASSIGNED', 'REJECTED'],
@@ -149,7 +151,7 @@ export default async function TicketDetailPage({
         adminApi.ticket(token, id).catch(() => null),
         adminApi.auditLog(token, id).catch(() => emptyAuditLog),
         adminApi.departments(token).catch(() => []),
-        adminApi.users(token, true).catch(() => emptyUsers),
+        adminApi.users(token, { limit: 100 }).then((result) => result.data).catch(() => emptyUsers),
       ])
     : [null, emptyAuditLog, [], emptyUsers];
   const statusOptions = ticket ? [ticket.status, ...(transitions[ticket.status] ?? [])] : [];
@@ -162,6 +164,7 @@ export default async function TicketDetailPage({
 
   return (
     <AdminShell hasSession={hasSession} role={role}>
+      {token && <TicketLiveRefresh ticketId={id} />}
       <p className="badge">Talep detayi - {ticket?.ticketNo ?? id}</p>
       <h1>{ticket?.title ?? 'Talep detayi icin giris yapin'}</h1>
       {token && ticket ? (
@@ -307,6 +310,14 @@ export default async function TicketDetailPage({
               <PendingSubmitButton type="submit" disabled={!canUpdateTicket} idleLabel="Notu kaydet" pendingLabel="Kaydediliyor..." />
             </PendingFieldset>
           </form>
+        </section>
+        <section className="card">
+          <h2>AI Yanit Onerisi</h2>
+          {canUpdateTicket && ticket ? (
+            <SuggestReplyPanel ticketId={ticket.id} disabled={!canUpdateTicket} />
+          ) : (
+            <p style={{ color: 'var(--muted)' }}>{hasSession ? 'AI yanit onerisi icin talep guncelleme yetkisi gerekli.' : 'AI yanit onerisi icin oturum gerekli.'}</p>
+          )}
         </section>
         <section className="card">
           <h2>Vatandas mesaji</h2>

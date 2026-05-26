@@ -21,11 +21,11 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
         ) : null}
         <label style={{ display: 'grid', gap: 8, marginBottom: 14 }}>
           Belediye kodu
-          <input name="tenantSlug" defaultValue="demo-belediye" autoComplete="organization" />
+          <input name="tenantSlug" autoComplete="organization" placeholder="belediye-kodu" />
         </label>
         <label style={{ display: 'grid', gap: 8, marginBottom: 14 }}>
           E-posta
-          <input name="email" type="email" defaultValue="admin@demo.local" autoComplete="email" />
+          <input name="email" type="email" autoComplete="email" placeholder="ornek@belediye.gov.tr" />
         </label>
         <label style={{ display: 'grid', gap: 8, marginBottom: 18 }}>
           Sifre

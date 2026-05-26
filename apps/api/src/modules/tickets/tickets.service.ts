@@ -1,18 +1,25 @@
-import { ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { AuditActorType, ChannelType, MessageVisibility, TicketStatus, UserRole } from '@kentos/database';
+import { BadRequestException, ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { AuditActorType, ChannelType, MessageVisibility, OutboundDeliveryState, TicketStatus, UserRole } from '@kentos/database';
 import type { Prisma } from '@kentos/database';
+import { intakeClassificationSchema } from '@kentos/shared';
 import type { IntakeClassification } from '@kentos/shared';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import { AttachmentsService } from '../attachments/attachments.service.js';
+import { CsatQueueService } from './csat-queue.service.js';
+import { NeighborhoodRoutingService } from './neighborhood-routing.service.js';
 import { NotificationQueueService } from './notification-queue.service.js';
 import { NotificationTemplateService } from './notification-template.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { AssignTicketDto } from './dto/assign-ticket.dto.js';
 import { CreateTicketMessageDto } from './dto/create-ticket-message.dto.js';
 import { CreateTicketDto } from './dto/create-ticket.dto.js';
+import { SuggestReplyDto } from './dto/suggest-reply.dto.js';
 import { UpdateTicketStatusDto } from './dto/update-ticket-status.dto.js';
+import { FcmPushService } from './fcm-push.service.js';
 import { SlaService } from './sla.service.js';
+import { TicketAiService } from './ticket-ai.service.js';
 import { TicketNumberService } from './ticket-number.service.js';
+import { EventsService } from '../events/events.service.js';
 
 @Injectable()
 export class TicketsService {
@@ -23,7 +30,16 @@ export class TicketsService {
     @Inject(SlaService) private readonly sla: SlaService,
     @Inject(TicketNumberService) private readonly ticketNumbers: TicketNumberService,
     @Inject(AttachmentsService) private readonly attachments: AttachmentsService,
+    @Inject(CsatQueueService) private readonly csatQueue: CsatQueueService,
+    @Inject(NeighborhoodRoutingService) private readonly neighborhoodRouting: NeighborhoodRoutingService,
+    @Inject(EventsService) private readonly eventsService: EventsService,
+    @Inject(TicketAiService) private readonly ticketAi: TicketAiService,
+    @Inject(FcmPushService) private readonly fcmPush: FcmPushService,
   ) {}
+
+  suggestReply(user: AuthenticatedUser, ticketId: string, dto: SuggestReplyDto) {
+    return this.ticketAi.suggestReply(user.tenantId, ticketId, dto.operatorNote);
+  }
 
   async list(
     user: AuthenticatedUser,
@@ -33,43 +49,84 @@ export class TicketsService {
       categoryId?: string;
       assignedToId?: string;
       q?: string;
+      page?: number;
+      limit?: number;
     } = {},
   ) {
-    const departmentScope = await this.departmentScope(user);
-    const tickets = await this.prisma.ticket.findMany({
-      where: {
-        tenantId: user.tenantId,
-        status: filters.status,
-        departmentId: this.scopedDepartmentFilter(departmentScope, filters.departmentId),
-        categoryId: filters.categoryId,
-        assignedToId: filters.assignedToId,
-        OR: filters.q
-          ? [
-              { ticketNo: { contains: filters.q, mode: 'insensitive' } },
-              { publicTrackingToken: { contains: filters.q, mode: 'insensitive' } },
-              { title: { contains: filters.q, mode: 'insensitive' } },
-              { description: { contains: filters.q, mode: 'insensitive' } },
-              { addressText: { contains: filters.q, mode: 'insensitive' } },
-            ]
-          : undefined,
-      },
-      include: { department: true, category: true, assignedTo: true, citizen: true },
-      orderBy: [{ createdAt: 'desc' }, { resolutionDueAt: 'asc' }],
-      take: 100,
-    });
+    const page = Math.max(1, filters.page ?? 1);
+    const limit = Math.min(200, Math.max(1, filters.limit ?? 50));
+    const skip = (page - 1) * limit;
 
-    return tickets.map((ticket) => ({ ...ticket, slaState: this.slaState(ticket.resolutionDueAt) }));
+    const departmentScope = await this.departmentScope(user);
+    const where = {
+      tenantId: user.tenantId,
+      status: filters.status,
+      departmentId: this.scopedDepartmentFilter(departmentScope, filters.departmentId),
+      categoryId: filters.categoryId,
+      assignedToId: filters.assignedToId,
+      OR: filters.q
+        ? [
+            { ticketNo: { contains: filters.q, mode: 'insensitive' as const } },
+            { publicTrackingToken: { contains: filters.q, mode: 'insensitive' as const } },
+            { title: { contains: filters.q, mode: 'insensitive' as const } },
+            { description: { contains: filters.q, mode: 'insensitive' as const } },
+            { addressText: { contains: filters.q, mode: 'insensitive' as const } },
+          ]
+        : undefined,
+    };
+
+    const [tickets, total] = await Promise.all([
+      this.prisma.ticket.findMany({
+        where,
+        include: { department: true, category: true, assignedTo: true, citizen: true },
+        orderBy: [{ createdAt: 'desc' }, { resolutionDueAt: 'asc' }],
+        skip,
+        take: limit,
+      }),
+      this.prisma.ticket.count({ where }),
+    ]);
+
+    return {
+      data: tickets.map((ticket) => ({ ...ticket, slaState: this.slaState(ticket.resolutionDueAt) })),
+      meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
+    };
   }
 
   async create(user: AuthenticatedUser, dto: CreateTicketDto) {
+    if (!Object.values(ChannelType).includes(dto.channel)) {
+      throw new BadRequestException('Kanal degeri gecersiz.');
+    }
+    if (typeof dto.title !== 'string' || dto.title.trim().length < 3) {
+      throw new BadRequestException('Baslik en az 3 karakter olmalidir.');
+    }
+    if (typeof dto.description !== 'string' || dto.description.trim().length < 10) {
+      throw new BadRequestException('Aciklama en az 10 karakter olmalidir.');
+    }
+
     const relations = await this.validateTicketRelations(user.tenantId, dto);
-    await this.requireDepartmentScope(user, relations.departmentId);
+
+    // F4: GIS routing — if lat/lon provided and no explicit departmentId, resolve via polygon
+    let resolvedDepartmentId = relations.departmentId;
+    let resolvedNeighborhoodId: string | undefined;
+    if (dto.latitude != null && dto.longitude != null && !relations.departmentId) {
+      const match = await this.neighborhoodRouting.resolveNeighborhood(
+        Number(dto.latitude),
+        Number(dto.longitude),
+        user.tenantId,
+      );
+      if (match) {
+        resolvedNeighborhoodId = match.id;
+        if (match.departmentId) resolvedDepartmentId = match.departmentId;
+      }
+    }
+
+    await this.requireDepartmentScope(user, resolvedDepartmentId);
 
     const priority = dto.priority ?? 'NORMAL';
     const deadlines = await this.sla.calculateDeadlines({
       tenantId: user.tenantId,
       priority,
-      departmentId: relations.departmentId,
+      departmentId: resolvedDepartmentId,
       categoryId: relations.categoryId,
     });
 
@@ -82,7 +139,8 @@ export class TicketsService {
         description: dto.description,
         priority,
         categoryId: relations.categoryId,
-        departmentId: relations.departmentId,
+        departmentId: resolvedDepartmentId,
+        neighborhoodId: resolvedNeighborhoodId,
         citizenId: relations.citizenId,
         addressText: dto.addressText,
         latitude: dto.latitude,
@@ -94,7 +152,7 @@ export class TicketsService {
             actorType: AuditActorType.USER,
             actorUserId: user.id,
             action: 'ticket.created',
-            after: { ...dto },
+            after: { ...dto, _gisRouted: !!resolvedNeighborhoodId },
           },
         },
       },
@@ -102,7 +160,48 @@ export class TicketsService {
     });
 
     await this.attachments.attachAdminToTicket(user, ticket.id, dto.attachmentIds);
+
+    this.eventsService.emit({
+      type: 'ticket.created',
+      tenantId: user.tenantId,
+      payload: { ticketId: ticket.id, ticketNo: ticket.ticketNo, status: ticket.status, priority: ticket.priority },
+    });
+
+    // F9: Duplicate detection — link to an existing open ticket from the same citizen if similar title in last 48h
+    if (relations.citizenId) {
+      const since48h = new Date(Date.now() - 48 * 60 * 60 * 1000);
+      const duplicate = await this.prisma.ticket.findFirst({
+        where: {
+          tenantId: user.tenantId,
+          citizenId: relations.citizenId,
+          id: { not: ticket.id },
+          createdAt: { gte: since48h },
+          status: { notIn: [TicketStatus.CLOSED, TicketStatus.REJECTED] },
+        },
+        select: { id: true, title: true },
+        orderBy: { createdAt: 'desc' },
+      });
+      if (duplicate && this.isSimilarTitle(ticket.title, duplicate.title)) {
+        await this.prisma.ticket.update({
+          where: { id: ticket.id },
+          data: { duplicateOfTicketId: duplicate.id },
+        });
+      }
+    }
+
     return ticket;
+  }
+
+  private isSimilarTitle(a: string, b: string): boolean {
+    // Simple word-overlap similarity: > 60% shared words → probable duplicate
+    const words = (s: string) => new Set(s.toLowerCase().split(/\s+/).filter((w) => w.length > 2));
+    const wa = words(a);
+    const wb = words(b);
+    if (wa.size === 0 || wb.size === 0) return false;
+    let overlap = 0;
+    for (const w of wa) { if (wb.has(w)) overlap++; }
+    const similarity = overlap / Math.max(wa.size, wb.size);
+    return similarity >= 0.6;
   }
 
   async get(user: AuthenticatedUser, id: string) {
@@ -132,7 +231,8 @@ export class TicketsService {
       ...ticket,
       aiSummary: {
         confidence: ticket.aiConfidence ? Number(ticket.aiConfidence) : null,
-        classification: (ticket.aiClassification as IntakeClassification | null) ?? null,
+        // safeParse ile DB'den gelen JSON'ı doğrula — geçersiz veri null döner
+        classification: intakeClassificationSchema.safeParse(ticket.aiClassification).data ?? null,
         contactSignals: contactSignals
           ? {
               hasPhone: Boolean(contactSignals.hasPhone),
@@ -190,6 +290,13 @@ export class TicketsService {
 
     const latestPublicMessageId = routedMessage ? updatedTicket.messages?.[0]?.id : undefined;
     if (latestPublicMessageId) await this.notifications.enqueueMessage(latestPublicMessageId);
+
+    this.eventsService.emit({
+      type: 'ticket.assigned',
+      tenantId: user.tenantId,
+      payload: { ticketId: id, departmentId: dto.departmentId, assignedToId: dto.assignedToId ?? null },
+    });
+
     return updatedTicket;
   }
 
@@ -210,6 +317,13 @@ export class TicketsService {
 
     await this.audit(user, id, 'ticket.internal_note_added', undefined, { messageId: message.id });
     await this.attachments.attachAdminToMessage(user, id, message.id, dto.attachmentIds);
+
+    this.eventsService.emit({
+      type: 'ticket.message_added',
+      tenantId: user.tenantId,
+      payload: { ticketId: id, messageId: message.id, visibility: 'INTERNAL' },
+    });
+
     return message;
   }
 
@@ -232,6 +346,13 @@ export class TicketsService {
     await this.audit(user, id, 'ticket.public_message_added', undefined, { messageId: message.id });
     await this.attachments.attachAdminToMessage(user, id, message.id, dto.attachmentIds);
     await this.notifications.enqueueMessage(message.id);
+
+    this.eventsService.emit({
+      type: 'ticket.message_added',
+      tenantId: user.tenantId,
+      payload: { ticketId: id, messageId: message.id, visibility: 'PUBLIC' },
+    });
+
     return message;
   }
 
@@ -289,6 +410,19 @@ export class TicketsService {
 
     const latestPublicMessageId = shouldCreatePublicMessage ? updated.messages?.[0]?.id : undefined;
     if (latestPublicMessageId) await this.notifications.enqueueMessage(latestPublicMessageId);
+    if (dto.status === TicketStatus.RESOLVED) {
+      void this.csatQueue.enqueueCsat(id, user.tenantId);
+    }
+
+    this.eventsService.emit({
+      type: 'ticket.updated',
+      tenantId: user.tenantId,
+      payload: { ticketId: id, status: dto.status },
+    });
+
+    // FCM push notification — fire-and-forget, does not block response
+    void this.sendStatusPush(ticket, dto.status);
+
     return updated;
   }
 
@@ -524,6 +658,31 @@ export class TicketsService {
     return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
   }
 
+  private async sendStatusPush(ticket: { id: string; tenantId: string; title: string; citizenId: string | null }, newStatus: string) {
+    if (!ticket.citizenId) return;
+    const statusNotifyMap: Record<string, string> = {
+      RESOLVED: 'Talebiniz cozuldu',
+      CLOSED: 'Talebiniz kapatildi',
+      IN_PROGRESS: 'Talebiniz isleme alindi',
+      WAITING_INFO: 'Talebiniz icin bilgi bekleniyor',
+    };
+    const title = statusNotifyMap[newStatus];
+    if (!title) return;
+
+    try {
+      const deviceTokens = await (this.prisma as unknown as {
+        citizenDeviceToken: {
+          findMany(args: unknown): Promise<Array<{ token: string }>>;
+        };
+      }).citizenDeviceToken.findMany({
+        where: { tenantId: ticket.tenantId, citizenId: ticket.citizenId, isActive: true },
+        select: { token: true },
+      });
+      const tokens = deviceTokens.map((dt) => dt.token);
+      await this.fcmPush.sendToMany(tokens, title, ticket.title, { ticketId: ticket.id, status: newStatus });
+    } catch { /* push failure must never break the response */ }
+  }
+
   private toHandoffSummary(conversation: {
     id: string;
     channel: string;
@@ -690,5 +849,116 @@ export class TicketsService {
     };
 
     return templateKeys[status] ?? null;
+  }
+
+  async bulkAssign(user: AuthenticatedUser, dto: { ticketIds: string[]; assignedToId: string }) {
+    // Validate assignedToId belongs to same tenant
+    const assignee = await this.prisma.user.findFirst({
+      where: { id: dto.assignedToId, tenantId: user.tenantId, isActive: true },
+    });
+    if (!assignee) throw new NotFoundException(`User ${dto.assignedToId} not found in tenant`);
+
+    // Only operate on tickets belonging to this tenant
+    const tickets = await this.prisma.ticket.findMany({
+      where: { id: { in: dto.ticketIds }, tenantId: user.tenantId },
+      select: { id: true, assignedToId: true },
+    });
+
+    const ids = tickets.map((t) => t.id);
+    if (ids.length === 0) return { updated: 0, skipped: dto.ticketIds.length };
+
+    await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+      await tx.ticket.updateMany({
+        where: { id: { in: ids }, tenantId: user.tenantId },
+        data: { assignedToId: dto.assignedToId, status: 'ASSIGNED' as TicketStatus },
+      });
+      await tx.auditLog.createMany({
+        data: ids.map((ticketId: string) => ({
+          tenantId: user.tenantId,
+          ticketId,
+          actorType: AuditActorType.USER,
+          actorUserId: user.id,
+          action: 'ticket.bulk_assigned',
+          after: { assignedToId: dto.assignedToId },
+        })),
+      });
+    });
+
+    return { updated: ids.length, skipped: dto.ticketIds.length - ids.length };
+  }
+
+  async bulkUpdateStatus(user: AuthenticatedUser, dto: { ticketIds: string[]; status: TicketStatus }) {
+    const tickets = await this.prisma.ticket.findMany({
+      where: { id: { in: dto.ticketIds }, tenantId: user.tenantId },
+      select: { id: true, status: true },
+    });
+
+    const ids = tickets.map((t) => t.id);
+    if (ids.length === 0) return { updated: 0, skipped: dto.ticketIds.length };
+
+    const now = new Date();
+    const extraData: Record<string, unknown> = {};
+    if (dto.status === 'RESOLVED') extraData.resolvedAt = now;
+    if (dto.status === 'CLOSED') extraData.closedAt = now;
+
+    await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+      await tx.ticket.updateMany({
+        where: { id: { in: ids }, tenantId: user.tenantId },
+        data: { status: dto.status, ...extraData },
+      });
+      await tx.auditLog.createMany({
+        data: ids.map((ticketId: string) => ({
+          tenantId: user.tenantId,
+          ticketId,
+          actorType: AuditActorType.USER,
+          actorUserId: user.id,
+          action: 'ticket.bulk_status_changed',
+          after: { status: dto.status },
+        })),
+      });
+    });
+
+    return { updated: ids.length, skipped: dto.ticketIds.length - ids.length };
+  }
+
+  async scheduleMessage(user: AuthenticatedUser, ticketId: string, dto: { body: string; scheduledAt?: string }) {
+    const ticket = await this.prisma.ticket.findFirst({
+      where: { id: ticketId, tenantId: user.tenantId },
+      include: { citizen: true },
+    });
+    if (!ticket) throw new NotFoundException('Ticket bulunamadı');
+
+    const scheduledDate = dto.scheduledAt ? new Date(dto.scheduledAt) : undefined;
+    const delay = scheduledDate && scheduledDate.getTime() > Date.now()
+      ? scheduledDate.getTime() - Date.now()
+      : 0;
+
+    // Create an outbound delivery record
+    const delivery = await this.prisma.outboundDelivery.create({
+      data: {
+        tenantId: user.tenantId,
+        conversationId: ticketId,
+        channel: 'WHATSAPP',
+        state: OutboundDeliveryState.PENDING,
+        recipientPhone: ticket.citizen?.phone ?? null,
+        body: dto.body,
+      },
+    });
+
+    // Enqueue via notification queue with optional delay
+    await this.notifications.enqueueScheduledDelivery(delivery.id, delay);
+
+    await this.prisma.auditLog.create({
+      data: {
+        tenantId: user.tenantId,
+        ticketId,
+        actorType: AuditActorType.USER,
+        actorUserId: user.id,
+        action: 'ticket.message_scheduled',
+        after: { body: dto.body, scheduledAt: dto.scheduledAt ?? 'immediate', deliveryId: delivery.id },
+      },
+    });
+
+    return { deliveryId: delivery.id, scheduledAt: dto.scheduledAt ?? null, delay };
   }
 }

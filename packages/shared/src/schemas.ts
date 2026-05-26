@@ -15,8 +15,9 @@ export const intakeClassificationSchema = z.object({
   neighborhoodName: z.string().nullable(),
   location: z
     .object({
-      latitude: z.number(),
-      longitude: z.number(),
+      // Prisma Decimal(10,7) ile uyumlu: -90..90 / -180..180, max 7 ondalık basamak
+      latitude: z.number().min(-90).max(90),
+      longitude: z.number().min(-180).max(180),
       accuracyMeters: z.number().int().nonnegative().nullable(),
     })
     .nullable(),
@@ -59,7 +60,7 @@ export const intakeChannelSchema = z.enum([
 ]);
 
 export const intakeCitizenContactSchema = z.object({
-  phone: z.string().nullable().optional(),
+  phone: z.string().regex(/^\+?[1-9]\d{6,14}$/, 'Geçersiz telefon formatı').nullable().optional(),
   email: z.string().email().nullable().optional(),
   displayName: z.string().nullable().optional(),
 });
@@ -105,10 +106,15 @@ export const channelOutboundEnvelopeSchema = z.object({
   recipient: z.object({
     phone: z.string().min(1).optional(),
     email: z.string().email().optional(),
-  }),
+  }).refine((r) => r.phone || r.email, { message: 'recipient.phone veya recipient.email gerekli' }),
   text: z.string().min(1),
   templateKey: z.string().optional(),
   scheduledAt: z.string().datetime().optional(),
+  media: z.array(z.object({
+    url: z.string().url(),
+    mimeType: z.string().min(1),
+    filename: z.string().optional(),
+  })).optional(),
 });
 
 export const intakePromptEnvelopeSchema = z.object({

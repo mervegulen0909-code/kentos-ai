@@ -109,12 +109,15 @@ model Tenant {
   citizens             Citizen[]
   conversations        Conversation[]
   departments          Department[]
+  managerReports       ManagerReport[]
   messageTemplates     MessageTemplate[]
   outboundDeliveries   OutboundDelivery[]
   neighborhoods        Neighborhood[]
   slaPolicies          SlaPolicy[]
   tickets              Ticket[]
   users                User[]
+  webhooks             TenantWebhook[]
+  deviceTokens         CitizenDeviceToken[]
 }
 
 model Department {
@@ -127,11 +130,12 @@ model Department {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  categories  Category[]
-  slaPolicies SlaPolicy[]
-  tickets     Ticket[]
-  users       UserDepartment[]
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  categories    Category[]
+  neighborhoods Neighborhood[]
+  slaPolicies   SlaPolicy[]
+  tickets       Ticket[]
+  users         UserDepartment[]
 
   @@unique([tenantId, code])
   @@index([tenantId, isActive])
@@ -165,15 +169,18 @@ model Neighborhood {
   name           String
   code           String?
   polygonGeoJson Json?
+  departmentId   String?
   isActive       Boolean @default(true)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  tenant         Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant         Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  department     Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
   tickets        Ticket[]
 
   @@unique([tenantId, name])
   @@index([tenantId, isActive])
+  @@index([tenantId, departmentId])
 }
 
 model SlaPolicy {
@@ -204,9 +211,11 @@ model MessageTemplate {
   channel   ChannelType?
   locale    String       @default("tr-TR")
   body      String
-  isActive  Boolean      @default(true)
-  createdAt DateTime     @default(now())
-  updatedAt DateTime     @updatedAt
+  isActive             Boolean      @default(true)
+  whatsappTemplateId   String?
+  whatsappTemplateName String?
+  createdAt            DateTime     @default(now())
+  updatedAt            DateTime     @updatedAt
 
   tenant    Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
@@ -250,6 +259,7 @@ model Citizen {
   displayName         String?
   phone               String?
   email               String?
+  firebaseUid         String?
   kvkkConsentAt       DateTime?
   mergedIntoCitizenId String?
   mergedAt            DateTime?
@@ -262,7 +272,9 @@ model Citizen {
   identifiers         CitizenIdentifier[]
   conversations       Conversation[]
   tickets             Ticket[]
+  deviceTokens        CitizenDeviceToken[]
 
+  @@unique([tenantId, firebaseUid])
   @@index([tenantId, phone])
   @@index([tenantId, email])
   @@index([tenantId, mergedIntoCitizenId])
@@ -309,6 +321,9 @@ model Ticket {
   locationAccuracyMeters Int?
   firstResponseDueAt     DateTime?
   resolutionDueAt        DateTime?
+  slaBreachedAt          DateTime?
+  csatScore              Int?
+  csatRespondedAt        DateTime?
   firstRespondedAt       DateTime?
   resolvedAt             DateTime?
   closedAt               DateTime?
@@ -335,7 +350,12 @@ model Ticket {
   @@unique([tenantId, publicTrackingToken])
   @@index([tenantId, status, priority])
   @@index([tenantId, departmentId, status])
+  @@index([tenantId, categoryId, status])
+  @@index([tenantId, assignedToId, status])
   @@index([tenantId, resolutionDueAt])
+  @@index([tenantId, status, resolutionDueAt])
+  @@index([tenantId, status, resolvedAt])
+  @@index([tenantId, slaBreachedAt])
   @@index([tenantId, createdAt])
 }
 
@@ -441,6 +461,7 @@ model OutboundDelivery {
   templateKey            String?
   body                   String
   attempts               Int                   @default(0)
+  lastAttemptAt          DateTime?
   lastError              String?
   dispatchedAt           DateTime?
   deliveredAt            DateTime?
@@ -472,6 +493,39 @@ model AuditLog {
 
   @@index([tenantId, ticketId, createdAt])
   @@index([tenantId, action, createdAt])
+  @@index([tenantId, actorUserId, createdAt])
+}
+
+model TenantWebhook {
+  id         String   @id @default(cuid())
+  tenantId   String
+  url        String
+  secret     String
+  events     Json     // string[] of event names
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, isActive])
+}
+
+model CitizenDeviceToken {
+  id         String   @id @default(cuid())
+  tenantId   String
+  citizenId  String
+  platform   String   // 'ios' | 'android'
+  token      String
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  citizen    Citizen  @relation(fields: [citizenId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, token])
+  @@index([tenantId, citizenId])
 }
 
 model AiRun {
@@ -501,3 +555,17 @@ model AiRun {
   @@index([tenantId, createdAt])
 }
 
+model ManagerReport {
+  id          String   @id @default(cuid())
+  tenantId    String
+  type        String
+  periodStart DateTime
+  periodEnd   DateTime
+  summary     String
+  metrics     Json
+  createdAt   DateTime @default(now())
+
+  tenant      Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, type, periodStart])
+}

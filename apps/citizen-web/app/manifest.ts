@@ -15,6 +15,12 @@ export default function manifest(): MetadataRoute.Manifest {
     categories: ['government', 'utilities', 'productivity'],
     icons: [
       {
+        src: '/icon',
+        sizes: '1024x1024',
+        type: 'image/png',
+        purpose: 'any',
+      },
+      {
         src: '/icon.svg',
         sizes: 'any',
         type: 'image/svg+xml',

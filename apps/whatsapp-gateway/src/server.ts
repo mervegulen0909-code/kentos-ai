@@ -1,9 +1,10 @@
 import http from 'node:http';
 import { URL } from 'node:url';
 import { handleChannelOutbound, handleChannelWebhook, handleOutbound, handleWebhook } from './main.js';
+import { logger } from './logger.js';
 import { verifyMetaWebhookSignature, verifyPostmarkBasicAuth, verifyTwilioWebhookSignature } from './webhook-signatures.js';
 
-const PORT = Number(process.env.PORT ?? 3120);
+const PORT = Number(process.env.PORT) || 3120;
 const META_APP_SECRET = process.env.META_APP_SECRET ?? '';
 const META_WEBHOOK_VERIFY_TOKEN = process.env.META_WEBHOOK_VERIFY_TOKEN ?? '';
 const TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN ?? '';
@@ -22,26 +23,41 @@ const routes: Record<string, RouteHandler> = {
   'GET /webhooks/instagram': async (_req, _body, url) => verifyMetaWebhookChallenge(url),
   'GET /webhooks/facebook': async (_req, _body, url) => verifyMetaWebhookChallenge(url),
   'POST /webhooks/whatsapp': async (req, body) => {
-    if (META_APP_SECRET && !verifyMetaWebhookSignature(body, readHeader(req, 'x-hub-signature-256'), META_APP_SECRET)) {
+    if (!META_APP_SECRET) {
+      return { status: 503, body: { error: 'meta-app-secret-not-configured' } };
+    }
+    if (!verifyMetaWebhookSignature(body, readHeader(req, 'x-hub-signature-256'), META_APP_SECRET)) {
       return { status: 401, body: { error: 'meta-signature-invalid' } };
     }
-    const payload = body ? JSON.parse(body) : {};
+    let payload: unknown;
+    try { payload = body ? JSON.parse(body) : {}; }
+    catch { return { status: 400, body: { error: 'invalid-json' } }; }
     const result = await handleWebhook(payload);
     return { status: 200, body: result };
   },
   'POST /webhooks/instagram': async (req, body) => {
-    if (META_APP_SECRET && !verifyMetaWebhookSignature(body, readHeader(req, 'x-hub-signature-256'), META_APP_SECRET)) {
+    if (!META_APP_SECRET) {
+      return { status: 503, body: { error: 'meta-app-secret-not-configured' } };
+    }
+    if (!verifyMetaWebhookSignature(body, readHeader(req, 'x-hub-signature-256'), META_APP_SECRET)) {
       return { status: 401, body: { error: 'meta-signature-invalid' } };
     }
-    const payload = body ? JSON.parse(body) : {};
+    let payload: unknown;
+    try { payload = body ? JSON.parse(body) : {}; }
+    catch { return { status: 400, body: { error: 'invalid-json' } }; }
     const result = await handleChannelWebhook('INSTAGRAM', payload);
     return { status: 200, body: result };
   },
   'POST /webhooks/facebook': async (req, body) => {
-    if (META_APP_SECRET && !verifyMetaWebhookSignature(body, readHeader(req, 'x-hub-signature-256'), META_APP_SECRET)) {
+    if (!META_APP_SECRET) {
+      return { status: 503, body: { error: 'meta-app-secret-not-configured' } };
+    }
+    if (!verifyMetaWebhookSignature(body, readHeader(req, 'x-hub-signature-256'), META_APP_SECRET)) {
       return { status: 401, body: { error: 'meta-signature-invalid' } };
     }
-    const payload = body ? JSON.parse(body) : {};
+    let payload: unknown;
+    try { payload = body ? JSON.parse(body) : {}; }
+    catch { return { status: 400, body: { error: 'invalid-json' } }; }
     const result = await handleChannelWebhook('FACEBOOK', payload);
     return { status: 200, body: result };
   },
@@ -65,45 +81,65 @@ const routes: Record<string, RouteHandler> = {
   },
   'POST /webhooks/sms': async (req, body, url) => {
     const params = parseFormBody(body);
-    const fullUrl = `${process.env.PUBLIC_GATEWAY_BASE_URL?.replace(/\/$/, '') ?? `http://localhost:${PORT}`}${url.pathname}`;
-    if (TWILIO_AUTH_TOKEN && !verifyTwilioWebhookSignature({
-      fullUrl,
-      formParams: params,
-      signatureHeader: readHeader(req, 'x-twilio-signature'),
-      authToken: TWILIO_AUTH_TOKEN,
-    })) {
-      return { status: 401, body: { error: 'twilio-signature-invalid' } };
+    const isProduction = process.env.NODE_ENV === 'production';
+    if (!TWILIO_AUTH_TOKEN) {
+      if (isProduction) {
+        logger.warn('[SMS] TWILIO_AUTH_TOKEN not set in production — inbound SMS request rejected');
+        return { status: 503, body: { error: 'gateway-misconfigured' } };
+      }
+      // Development: log warning but allow through
+      logger.warn('[SMS] TWILIO_AUTH_TOKEN not set — skipping signature verification (development only)');
+    } else {
+      const fullUrl = `${process.env.PUBLIC_GATEWAY_BASE_URL?.replace(/\/$/, '') ?? `http://localhost:${PORT}`}${url.pathname}`;
+      if (!verifyTwilioWebhookSignature({
+        fullUrl,
+        formParams: params,
+        signatureHeader: readHeader(req, 'x-twilio-signature'),
+        authToken: TWILIO_AUTH_TOKEN,
+      })) {
+        return { status: 401, body: { error: 'twilio-signature-invalid' } };
+      }
     }
     const result = await handleChannelWebhook('SMS', params);
     return { status: 200, body: result };
   },
   'POST /internal/whatsapp/outbound': async (req, body) => {
     const internalKey = readHeader(req, 'x-kentos-internal-key');
-    const payload = body ? JSON.parse(body) : {};
+    let payload: unknown;
+    try { payload = body ? JSON.parse(body) : {}; }
+    catch { return { status: 400, body: { error: 'invalid-json' } }; }
     const result = await handleOutbound(payload, internalKey);
     return { status: result.accepted ? 200 : 400, body: result };
   },
   'POST /internal/instagram/outbound': async (req, body) => {
     const internalKey = readHeader(req, 'x-kentos-internal-key');
-    const payload = body ? JSON.parse(body) : {};
+    let payload: unknown;
+    try { payload = body ? JSON.parse(body) : {}; }
+    catch { return { status: 400, body: { error: 'invalid-json' } }; }
     const result = await handleChannelOutbound('INSTAGRAM', payload, internalKey);
     return { status: result.accepted ? 200 : 400, body: result };
   },
   'POST /internal/facebook/outbound': async (req, body) => {
     const internalKey = readHeader(req, 'x-kentos-internal-key');
-    const payload = body ? JSON.parse(body) : {};
+    let payload: unknown;
+    try { payload = body ? JSON.parse(body) : {}; }
+    catch { return { status: 400, body: { error: 'invalid-json' } }; }
     const result = await handleChannelOutbound('FACEBOOK', payload, internalKey);
     return { status: result.accepted ? 200 : 400, body: result };
   },
   'POST /internal/sms/outbound': async (req, body) => {
     const internalKey = readHeader(req, 'x-kentos-internal-key');
-    const payload = body ? JSON.parse(body) : {};
+    let payload: unknown;
+    try { payload = body ? JSON.parse(body) : {}; }
+    catch { return { status: 400, body: { error: 'invalid-json' } }; }
     const result = await handleChannelOutbound('SMS', payload, internalKey);
     return { status: result.accepted ? 200 : 400, body: result };
   },
   'POST /internal/email/outbound': async (req, body) => {
     const internalKey = readHeader(req, 'x-kentos-internal-key');
-    const payload = body ? JSON.parse(body) : {};
+    let payload: unknown;
+    try { payload = body ? JSON.parse(body) : {}; }
+    catch { return { status: 400, body: { error: 'invalid-json' } }; }
     const result = await handleChannelOutbound('EMAIL', payload, internalKey);
     return { status: result.accepted ? 200 : 400, body: result };
   },
@@ -159,7 +195,7 @@ const server = http.createServer(async (req, res) => {
     res.end(contentType === 'application/json' ? JSON.stringify(result.body) : String(result.body));
   } catch (error) {
     const message = error instanceof Error ? error.message : 'unknown-error';
-    console.error(`[Gateway] istek hatasi: ${message}`);
+    logger.error('[Gateway] request error', { error: message, url: req.url, method: req.method });
     res.writeHead(500, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'internal', detail: message.slice(0, 200) }));
   }
@@ -167,7 +203,7 @@ const server = http.createServer(async (req, res) => {
 
 if (process.env.GATEWAY_HTTP_AUTOSTART !== 'false') {
   server.listen(PORT, () => {
-    console.log(`KentOS channel gateway listening on http://0.0.0.0:${PORT}`);
+    logger.info(`KentOS channel gateway listening`, { port: PORT });
   });
 }
 

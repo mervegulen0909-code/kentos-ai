@@ -33,6 +33,26 @@ Worker evidence notes for the current local verification baseline:
 docker compose -f infra/docker-compose.yml up -d
 ```
 
+## Start the full Docker dev stack
+
+Use this when the whole repo should run inside Docker instead of starting each app in separate terminals:
+
+```bash
+pnpm docker:dev
+pnpm docker:dev:logs
+pnpm docker:dev:down
+```
+
+The full stack uses `infra/docker-compose.dev.yml` and starts Postgres, Redis, MinIO, ClamAV, API, worker, admin web, citizen web, and the WhatsApp gateway. The `migrate` service runs `pnpm db:generate`, `pnpm db:deploy`, and `pnpm db:seed` before the app services come up.
+
+Local Docker endpoints:
+
+- API: `http://localhost:3100/api/v1`
+- Admin web: `http://localhost:3101`
+- Citizen web: `http://localhost:3102`
+- WhatsApp gateway: `http://localhost:3120`
+- MinIO console: `http://localhost:9001`
+
 ## Docker Desktop blocker
 
 If Docker Desktop or the Docker daemon is not running, local API smoke cannot be marked as passed. Treat this as **blocked**, not failed and not passed.

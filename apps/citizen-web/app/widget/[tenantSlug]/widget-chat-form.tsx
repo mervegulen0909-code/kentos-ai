@@ -37,7 +37,7 @@ export function WidgetChatForm({ tenantSlug, trackHref }: { tenantSlug: string; 
   return (
     <form action={formAction} className="widget-composer">
       <label htmlFor="widget-draft" className="widget-composer-label">
-        Vatandasin ilk mesaji
+        {state.conversationId && !state.trackingToken ? 'Vatandasin ek bilgisi' : 'Vatandasin ilk mesaji'}
       </label>
       <textarea
         id="widget-draft"
@@ -45,7 +45,7 @@ export function WidgetChatForm({ tenantSlug, trackHref }: { tenantSlug: string; 
         rows={4}
         className="widget-composer-input"
         placeholder="Orn. Belediye binasi yanindaki kaldirim taslari dagilmis, yaslilar yurumekte zorlaniyor."
-        defaultValue="Ataturk Mahallesi 12. Sokak'ta kaldirim coktu, bebek arabasi gecemiyor."
+        defaultValue={state.conversationId && !state.trackingToken ? '' : "Ataturk Mahallesi 12. Sokak'ta kaldirim coktu, bebek arabasi gecemiyor."}
         required
       />
       <div className="widget-contact-grid">

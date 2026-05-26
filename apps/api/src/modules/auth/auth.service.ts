@@ -1,13 +1,27 @@
+import { randomUUID } from 'node:crypto';
 import { Inject, Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import bcrypt from 'bcryptjs';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { JwtBlacklistService } from './jwt-blacklist.service.js';
 import { LoginDto } from './dto/login.dto.js';
 import { RefreshDto } from './dto/refresh.dto.js';
 
 type TokenType = 'access' | 'refresh';
-type AuthTokenPayload = { sub: string; tenantId: string; email: string; role: string; typ: TokenType };
+type AuthTokenPayload = {
+  sub: string;
+  tenantId: string;
+  email: string;
+  role: string;
+  typ: TokenType;
+  jti: string;
+  exp?: number;
+};
+
+// TTL constants aligned with token expiresIn
+const ACCESS_TTL_S = 15 * 60;       // 15 min
+const REFRESH_TTL_S = 7 * 24 * 3600; // 7 days
 
 @Injectable()
 export class AuthService {
@@ -15,6 +29,7 @@ export class AuthService {
     @Inject(PrismaService) private readonly prisma: PrismaService,
     @Inject(JwtService) private readonly jwt: JwtService,
     @Inject(ConfigService) private readonly config: ConfigService,
+    @Inject(JwtBlacklistService) private readonly blacklist: JwtBlacklistService,
   ) {}
 
   async login(dto: LoginDto) {
@@ -31,14 +46,18 @@ export class AuthService {
       throw new UnauthorizedException('Gecersiz kullanici bilgileri.');
     }
 
-    const payload = { sub: user.id, tenantId: user.tenantId, email: user.email, role: user.role };
-
-    return {
-      accessToken: await this.jwt.signAsync({ ...payload, typ: 'access' satisfies TokenType }),
-      refreshToken: await this.jwt.signAsync(
-        { ...payload, typ: 'refresh' satisfies TokenType },
+    const basePayload = { sub: user.id, tenantId: user.tenantId, email: user.email, role: user.role };
+    const [accessToken, refreshToken] = await Promise.all([
+      this.jwt.signAsync({ ...basePayload, typ: 'access' satisfies TokenType, jti: randomUUID() }),
+      this.jwt.signAsync(
+        { ...basePayload, typ: 'refresh' satisfies TokenType, jti: randomUUID() },
         { expiresIn: '7d', secret: this.refreshSecret() },
       ),
+    ]);
+
+    return {
+      accessToken,
+      refreshToken,
       user: {
         id: user.id,
         tenantId: user.tenantId,
@@ -51,35 +70,83 @@ export class AuthService {
   }
 
   async refresh(dto: RefreshDto) {
+    let payload: AuthTokenPayload;
     try {
-      const payload = await this.jwt.verifyAsync<AuthTokenPayload>(dto.refreshToken, { secret: this.refreshSecret() });
-      if (payload.typ !== 'refresh') throw new UnauthorizedException('Gecersiz yenileme anahtari.');
-
-      const user = await this.prisma.user.findFirst({
-        where: { id: payload.sub, isActive: true, tenant: { status: 'ACTIVE' } },
+      payload = await this.jwt.verifyAsync<AuthTokenPayload>(dto.refreshToken, {
+        secret: this.refreshSecret(),
       });
-      if (!user) throw new UnauthorizedException('Gecersiz yenileme anahtari.');
-
-      return {
-        accessToken: await this.jwt.signAsync({
-          sub: user.id,
-          tenantId: user.tenantId,
-          email: user.email,
-          role: user.role,
-          typ: 'access' satisfies TokenType,
-        }),
-      };
     } catch {
       throw new UnauthorizedException('Gecersiz yenileme anahtari.');
     }
+
+    if (payload.typ !== 'refresh') {
+      throw new UnauthorizedException('Gecersiz yenileme anahtari.');
+    }
+
+    // Check if the refresh token has been revoked (e.g., from a previous logout)
+    if (await this.blacklist.isRevoked(payload.jti)) {
+      throw new UnauthorizedException('Oturum sonlandirildi. Lutfen yeniden giris yapin.');
+    }
+
+    const user = await this.prisma.user.findFirst({
+      where: { id: payload.sub, isActive: true, tenant: { status: 'ACTIVE' } },
+    });
+    if (!user) throw new UnauthorizedException('Gecersiz yenileme anahtari.');
+
+    // Revoke old refresh token immediately (one-time use rotation)
+    const oldExp = payload.exp ?? 0;
+    const remainingTtl = Math.max(0, oldExp - Math.floor(Date.now() / 1000));
+    await this.blacklist.revoke(payload.jti, remainingTtl);
+
+    // Issue fresh access + refresh token pair
+    const basePayload = { sub: user.id, tenantId: user.tenantId, email: user.email, role: user.role };
+    const [accessToken, refreshToken] = await Promise.all([
+      this.jwt.signAsync({ ...basePayload, typ: 'access' satisfies TokenType, jti: randomUUID() }),
+      this.jwt.signAsync(
+        { ...basePayload, typ: 'refresh' satisfies TokenType, jti: randomUUID() },
+        { expiresIn: '7d', secret: this.refreshSecret() },
+      ),
+    ]);
+
+    return { accessToken, refreshToken };
   }
 
-  logout() {
+  async logout(accessToken: string | undefined, refreshToken: string | undefined) {
+    const revocations: Promise<void>[] = [];
+
+    if (accessToken) {
+      try {
+        const payload = this.jwt.decode<AuthTokenPayload>(accessToken);
+        if (payload?.jti) {
+          const ttl = Math.max(0, (payload.exp ?? 0) - Math.floor(Date.now() / 1000));
+          revocations.push(this.blacklist.revoke(payload.jti, ttl || ACCESS_TTL_S));
+        }
+      } catch { /* ignore decode errors */ }
+    }
+
+    if (refreshToken) {
+      try {
+        const payload = this.jwt.decode<AuthTokenPayload>(refreshToken);
+        if (payload?.jti) {
+          const ttl = Math.max(0, (payload.exp ?? 0) - Math.floor(Date.now() / 1000));
+          revocations.push(this.blacklist.revoke(payload.jti, ttl || REFRESH_TTL_S));
+        }
+      } catch { /* ignore decode errors */ }
+    }
+
+    await Promise.allSettled(revocations);
     return { ok: true };
   }
 
-  private refreshSecret() {
-    const accessSecret = this.config.get<string>('JWT_ACCESS_SECRET') ?? 'development-only-secret';
-    return this.config.get<string>('JWT_REFRESH_SECRET') ?? `${accessSecret}:refresh`;
+  private refreshSecret(): string {
+    const refresh = this.config.get<string>('JWT_REFRESH_SECRET');
+    if (!refresh) {
+      throw new Error('JWT_REFRESH_SECRET must be set in environment variables');
+    }
+    const access = this.config.get<string>('JWT_ACCESS_SECRET');
+    if (refresh === access) {
+      throw new Error('JWT_REFRESH_SECRET must be different from JWT_ACCESS_SECRET');
+    }
+    return refresh;
   }
 }

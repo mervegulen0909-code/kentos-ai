@@ -1,10 +1,17 @@
+import { createServer } from 'node:http';
+import { logger } from './logger.js';
+import { initSentry } from './sentry.js';
+import { processCsatJob } from './processors/csat.processor.js';
 import { processMediaJob } from './processors/media.processor.js';
 import { processNotificationJob } from './processors/notifications.processor.js';
 import { processOutboundJob } from './processors/outbound.processor.js';
 import { processRetentionJob } from './processors/retention.processor.js';
 import { processSlaJob } from './processors/sla.processor.js';
+import { processWebhookJob } from './processors/webhook-delivery.processor.js';
 import { createWorker } from './queues/create-worker.js';
 import { queueNames } from './queues/queue-names.js';
+
+await initSentry(process.env.SENTRY_DSN, process.env.NODE_ENV ?? 'development');
 
 const workers = [
   createWorker(queueNames.sla, processSlaJob),
@@ -12,22 +19,46 @@ const workers = [
   createWorker(queueNames.media, processMediaJob),
   createWorker(queueNames.retention, processRetentionJob),
   createWorker(queueNames.outbound, processOutboundJob),
+  createWorker(queueNames.webhooks, processWebhookJob),
+  createWorker(queueNames.csat, processCsatJob),
 ];
 
-console.log('KentOS worker ready for SLA, notification, reporting and media queues.');
-console.log(`Registered queues: ${workers.map((worker) => worker.name).join(', ')}`);
+logger.info('KentOS worker ready', { queues: workers.map((w) => w.name) });
 
 for (const worker of workers) {
   worker.on('completed', (job, result) => {
-    console.log(`[${worker.name}] completed`, job.id, result);
+    logger.info(`[${worker.name}] job completed`, { jobId: job.id, result });
   });
   worker.on('failed', (job, error) => {
-    console.error(`[${worker.name}] failed`, job?.id, error);
+    logger.error(`[${worker.name}] job failed`, {
+      jobId: job?.id,
+      error: error instanceof Error ? error.message : String(error),
+    });
   });
 }
 
+// ── Health check HTTP server ──────────────────────────────────────────────────
+const healthPort = Number(process.env.WORKER_HEALTH_PORT ?? 3130);
+const healthServer = createServer((req, res) => {
+  if (req.url === '/health') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({
+      ok: true,
+      workers: workers.map((w) => w.name),
+      ts: new Date().toISOString(),
+    }));
+  } else {
+    res.writeHead(404);
+    res.end();
+  }
+});
+healthServer.listen(healthPort, () => {
+  logger.info('Worker health endpoint listening', { port: healthPort, path: '/health' });
+});
+
 async function shutdown(signal: string) {
-  console.log(`Shutting down worker on ${signal}...`);
+  logger.info(`Shutting down worker`, { signal });
+  healthServer.close();
   await Promise.all(workers.map((worker) => worker.close()));
   process.exit(0);
 }

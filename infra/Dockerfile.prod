@@ -1,4 +1,4 @@
-FROM node:22-bookworm-slim AS base
+FROM node:22.15.0-bookworm-slim AS base
 
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
@@ -12,9 +12,17 @@ RUN apt-get update \
 ARG NEXT_PUBLIC_API_BASE_URL=http://localhost:3100/api/v1
 ARG NEXT_PUBLIC_PUBLIC_API_BASE_URL=http://localhost:3100/api/v1
 ARG NEXT_PUBLIC_CITIZEN_WEB_BASE_URL=http://localhost:3102
+ARG NEXT_PUBLIC_FIREBASE_API_KEY
+ARG NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
+ARG NEXT_PUBLIC_FIREBASE_PROJECT_ID
+ARG NEXT_PUBLIC_FIREBASE_APP_ID
 ENV NEXT_PUBLIC_API_BASE_URL=$NEXT_PUBLIC_API_BASE_URL
 ENV NEXT_PUBLIC_PUBLIC_API_BASE_URL=$NEXT_PUBLIC_PUBLIC_API_BASE_URL
 ENV NEXT_PUBLIC_CITIZEN_WEB_BASE_URL=$NEXT_PUBLIC_CITIZEN_WEB_BASE_URL
+ENV NEXT_PUBLIC_FIREBASE_API_KEY=$NEXT_PUBLIC_FIREBASE_API_KEY
+ENV NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=$NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
+ENV NEXT_PUBLIC_FIREBASE_PROJECT_ID=$NEXT_PUBLIC_FIREBASE_PROJECT_ID
+ENV NEXT_PUBLIC_FIREBASE_APP_ID=$NEXT_PUBLIC_FIREBASE_APP_ID
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json ./
 COPY apps ./apps
@@ -24,7 +32,7 @@ RUN pnpm install --frozen-lockfile
 RUN pnpm db:generate
 RUN pnpm build
 
-FROM node:22-bookworm-slim AS runtime
+FROM node:22.15.0-bookworm-slim AS runtime
 
 ENV NODE_ENV=production
 ENV PNPM_HOME="/pnpm"
@@ -36,6 +44,12 @@ RUN apt-get update \
   && apt-get install -y --no-install-recommends openssl \
   && rm -rf /var/lib/apt/lists/*
 
+# Non-root user: container escape riskini azalt
+RUN useradd -m -u 1001 -s /bin/sh nodeuser
+
 COPY --from=base /app /app
+RUN chown -R nodeuser:nodeuser /app
+
+USER nodeuser
 
 CMD ["node", "-e", "console.error('Set a service command in docker-compose.prod.yml'); process.exit(1)"]

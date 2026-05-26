@@ -1,4 +1,5 @@
 import type { ChannelProvider, GenericInboundMessage, GenericSendInput, SendMessageResult } from '@kentos/shared';
+import { logger } from '../logger.js';
 
 const PROVIDER_NAME_DEFAULT = 'smtp-email';
 const TENANT_ENV_FALLBACK = 'EMAIL_DEFAULT_TENANT_ID';
@@ -59,7 +60,7 @@ export class EmailProvider implements ChannelProvider {
 
   async sendText(input: GenericSendInput): Promise<SendMessageResult> {
     if (process.env.EMAIL_OUTBOUND_LIVE !== 'true') {
-      console.log(`[EMAIL] dry-run → ${input.to}: "${input.text.slice(0, 60)}"`);
+      logger.info('[EMAIL] dry-run', { to: input.to, textPreview: input.text.slice(0, 60) });
       return {
         provider: this.providerName,
         externalMessageId: `email-dry-${Date.now()}`,

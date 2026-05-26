@@ -2,7 +2,7 @@
 
 import { redirect } from 'next/navigation';
 import { apiFetch } from '../../lib/api';
-import { clearSessionToken, setAdminSession } from '../../lib/session';
+import { clearSessionToken, getAdminSession, setAdminSession } from '../../lib/session';
 
 type LoginResponse = {
   accessToken: string;
@@ -45,6 +45,17 @@ export async function loginAction(formData: FormData) {
 }
 
 export async function logoutAction() {
+  // Revoke both tokens on the API before clearing cookies
+  const session = await getAdminSession();
+  if (session) {
+    await apiFetch('/auth/logout', {
+      method: 'POST',
+      body: JSON.stringify({
+        accessToken: session.accessToken,
+        refreshToken: session.refreshToken,
+      }),
+    }).catch(() => undefined); // Non-fatal: still clear cookies even if API unreachable
+  }
   await clearSessionToken();
   redirect('/login');
 }

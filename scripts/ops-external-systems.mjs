@@ -19,6 +19,10 @@ const REPO_ROOT = path.resolve(
   "..",
 );
 const args = process.argv.slice(2);
+if (args.includes("--help") || args.includes("-h")) {
+  printHelp();
+  process.exit(0);
+}
 const flags = new Set(args.filter((arg) => arg.startsWith("--")));
 const options = readOptions(args);
 
@@ -33,6 +37,7 @@ const applyDeploy = flags.has("--apply-deploy");
 const deployAccepted = flags.has("--i-accept-production-deploy");
 const allowLive = flags.has("--allow-live");
 const allowRetentionDelete = flags.has("--allow-retention-delete");
+const strictLaunch = flags.has("--strict-launch");
 const expectedServerIp =
   options.expectedServerIp ?? process.env.EXPECTED_SERVER_IP;
 
@@ -119,6 +124,21 @@ if (json) {
 
 process.exit(summary.blocked > 0 || summary.failed > 0 ? 1 : 0);
 
+function printHelp() {
+  console.log(`KentOS ops external
+
+Usage:
+  node scripts/ops-external-systems.mjs --env-file .env.production.local
+  node scripts/ops-external-systems.mjs --compose --json
+  node scripts/ops-external-systems.mjs --strict-launch --skip-network --json
+  node scripts/ops-external-systems.mjs --compose --apply-deploy --i-accept-production-deploy
+
+Root aliases:
+  pnpm ops:external
+  npm run ops:external
+`);
+}
+
 function addRequiredEnvChecks() {
   const required = [
     "API_DOMAIN",
@@ -135,7 +155,9 @@ function addRequiredEnvChecks() {
     "REDIS_PASSWORD",
     "JWT_ACCESS_SECRET",
     "JWT_REFRESH_SECRET",
+    "CITIZEN_SESSION_SECRET",
     "INTERNAL_API_KEY",
+    "INTERNAL_EVENTS_KEY",
     "S3_BUCKET",
     "S3_ACCESS_KEY",
     "S3_SECRET_KEY",
@@ -190,6 +212,48 @@ function addRequiredEnvChecks() {
 }
 
 function addProviderReadinessChecks() {
+  const firebaseMissing = [
+    "NEXT_PUBLIC_FIREBASE_API_KEY",
+    "NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN",
+    "NEXT_PUBLIC_FIREBASE_PROJECT_ID",
+    "NEXT_PUBLIC_FIREBASE_APP_ID",
+    "FIREBASE_PROJECT_ID",
+  ].filter((name) => !readEnv(name));
+  if (
+    !readEnv("FIREBASE_SERVICE_ACCOUNT_BASE64") &&
+    !readEnv("GOOGLE_APPLICATION_CREDENTIALS")
+  ) {
+    firebaseMissing.push(
+      "FIREBASE_SERVICE_ACCOUNT_BASE64 or GOOGLE_APPLICATION_CREDENTIALS",
+    );
+  }
+  addCheck({
+    id: "citizen-firebase-auth",
+    status: firebaseMissing.length ? "blocked" : "passed",
+    summary: firebaseMissing.length
+      ? `Citizen Firebase auth configuration is missing: ${firebaseMissing.join(", ")}`
+      : "Citizen Firebase auth client and API verifier configuration are present.",
+    detail:
+      "Login, account and erasure flows require Firebase configuration plus the signed citizen session secret.",
+  });
+
+  const operationsMissing = ["SENTRY_DSN", "BULL_BOARD_USER", "BULL_BOARD_PASS"].filter(
+    (name) => !readEnv(name),
+  );
+  addCheck({
+    id: "operations-observability",
+    status: operationsMissing.length
+      ? strictLaunch
+        ? "blocked"
+        : "warning"
+      : "passed",
+    summary: operationsMissing.length
+      ? `Operational monitoring values are missing: ${operationsMissing.join(", ")}`
+      : "Operational monitoring and protected queue access values are configured.",
+    detail:
+      "Use --strict-launch when making a production readiness decision.",
+  });
+
   const aiProvider = readEnv("AI_PROVIDER") || "stub";
   const aiMissing = [];
   if (aiProvider === "anthropic") {
@@ -237,13 +301,18 @@ function addProviderReadinessChecks() {
   ]) {
     if (!readEnv(name)) emailMissing.push(name);
   }
+  const emailInboundOrigin =
+    readEnv("PUBLIC_GATEWAY_BASE_URL") ||
+    (readEnv("GATEWAY_DOMAIN") ? `https://${readEnv("GATEWAY_DOMAIN")}` : "");
   addCheck({
     id: "email-provider",
     status: emailMissing.length ? "warning" : "passed",
     summary: emailMissing.length
       ? `Email provider/inbound values need review: ${unique(emailMissing).join(", ")}`
       : `Email provider readiness satisfied for EMAIL_PROVIDER=${emailProvider}.`,
-    detail: `Postmark inbound URL: ${readEnv("PUBLIC_GATEWAY_BASE_URL") || `https://${readEnv("GATEWAY_DOMAIN")}`}/webhooks/email`,
+    detail: emailInboundOrigin
+      ? `Postmark inbound URL: ${emailInboundOrigin}/webhooks/email`
+      : "Postmark inbound URL is unavailable until PUBLIC_GATEWAY_BASE_URL or GATEWAY_DOMAIN is configured.",
   });
 
   const metaMissing = [];
@@ -294,7 +363,9 @@ function addProviderReadinessChecks() {
       ? "blocked"
       : scanProvider === "clamav"
         ? "passed"
-        : "warning",
+        : strictLaunch
+          ? "blocked"
+          : "warning",
     summary: clamavMissing.length
       ? `ClamAV scan provider is selected but missing: ${clamavMissing.join(", ")}`
       : scanProvider === "clamav"
@@ -303,7 +374,9 @@ function addProviderReadinessChecks() {
     detail:
       scanProvider === "clamav"
         ? "Compose provides clamav:3310; use --compose on the VPS to verify container health."
-        : "Switch ATTACHMENT_SCAN_PROVIDER=clamav after the ClamAV service is healthy.",
+        : strictLaunch
+          ? "Launch readiness requires ATTACHMENT_SCAN_PROVIDER=clamav and verified service health."
+          : "Switch ATTACHMENT_SCAN_PROVIDER=clamav after the ClamAV service is healthy.",
   });
 }
 

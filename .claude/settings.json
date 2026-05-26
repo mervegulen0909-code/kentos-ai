@@ -1,9 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(KENTOS_API_BASE_URL='http://127.0.0.1:3110/api/v1' pnpm smoke:api)",
-      "Bash(pnpm --filter @kentos/api typecheck)",
-      "Bash(docker info *)"
-    ]
-  }
-}

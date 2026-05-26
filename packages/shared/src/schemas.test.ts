@@ -1,4 +1,4 @@
-import { channelIntakeEnvelopeSchema, publicTicketAiIntakeRequestSchema, publicTicketAiIntakeResultSchema } from './schemas.js';
+import { channelIntakeEnvelopeSchema, channelOutboundEnvelopeSchema, intakeCitizenContactSchema, publicTicketAiIntakeRequestSchema, publicTicketAiIntakeResultSchema } from './schemas.js';
 import type { PublicTicketAiIntakeRequest, PublicTicketAiIntakeResult } from './types.js';
 
 function buildValidRequest(): PublicTicketAiIntakeRequest {
@@ -159,6 +159,65 @@ function testEmailChannelEnvelopeSchema() {
   assert(parsed.success, 'EMAIL channel envelope should parse');
 }
 
+function testRecipientRequiresPhoneOrEmail() {
+  // Both missing → refine should reject
+  const result = channelOutboundEnvelopeSchema.safeParse({
+    tenantId: 'tnt-1',
+    tenantSlug: 'demo',
+    channel: 'WHATSAPP',
+    conversationId: 'cnv-1',
+    recipient: {},
+    text: 'Test mesaj',
+  });
+  assert(!result.success, 'recipient with neither phone nor email should fail');
+
+  // Phone only → accept
+  const withPhone = channelOutboundEnvelopeSchema.safeParse({
+    tenantId: 'tnt-1',
+    tenantSlug: 'demo',
+    channel: 'WHATSAPP',
+    conversationId: 'cnv-1',
+    recipient: { phone: '+905551234567' },
+    text: 'Test mesaj',
+  });
+  assert(withPhone.success, 'recipient with phone only should pass');
+
+  // Email only → accept
+  const withEmail = channelOutboundEnvelopeSchema.safeParse({
+    tenantId: 'tnt-1',
+    tenantSlug: 'demo',
+    channel: 'EMAIL',
+    conversationId: 'cnv-1',
+    recipient: { email: 'vatandas@example.com' },
+    text: 'Test mesaj',
+  });
+  assert(withEmail.success, 'recipient with email only should pass');
+}
+
+function testCitizenContactPhoneRegex() {
+  // Valid E.164-like formats
+  const validPhones = ['+905551234567', '+1234567890', '905551234567'];
+  for (const phone of validPhones) {
+    const result = intakeCitizenContactSchema.safeParse({ phone });
+    assert(result.success, `phone '${phone}' should be valid`);
+  }
+
+  // Invalid formats
+  const invalidPhones = ['abc', '123', '+0invalid', ''];
+  for (const phone of invalidPhones) {
+    const result = intakeCitizenContactSchema.safeParse({ phone });
+    assert(!result.success, `phone '${phone}' should be invalid`);
+  }
+
+  // null is allowed
+  const nullResult = intakeCitizenContactSchema.safeParse({ phone: null });
+  assert(nullResult.success, 'null phone should be valid');
+
+  // undefined is allowed
+  const undefResult = intakeCitizenContactSchema.safeParse({});
+  assert(undefResult.success, 'missing phone should be valid (optional)');
+}
+
 testValidRequestSchema();
 testRejectInvalidRequestEmail();
 testValidResultSchema();
@@ -167,5 +226,7 @@ testRejectInvalidMissingField();
 testRejectInvalidConfidence();
 testRejectLegacyStatusTicketNo();
 testEmailChannelEnvelopeSchema();
+testRecipientRequiresPhoneOrEmail();
+testCitizenContactPhoneRegex();
 
 console.log('shared intake schema tests passed');

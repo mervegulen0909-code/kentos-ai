@@ -12,21 +12,25 @@ const metrics = [
   ['SLA', 'Departman, kategori ve süre hedefleri operasyon panelinde izlenir.'],
 ];
 
+const DEFAULT_TENANT = process.env.NEXT_PUBLIC_DEFAULT_TENANT_SLUG ?? '';
+
 export default function CitizenHome() {
   return (
     <main className="wrap home-shell">
       <section className="hero">
         <div className="hero-copy">
-          <p className="eyebrow">Demo Belediyesi · KentOS AI</p>
+          <p className="eyebrow">KentOS AI</p>
           <h1 className="display">Belediye asistanı; talebi alır, kayda çevirir, süreci görünür kılar.</h1>
           <p className="lede">
             Vatandaş tek cümleyle başlar. Sistem konuyu yapılandırır, eksik bilgi varsa tamamlatır ve resmi başvuru omurgasına güvenli takip koduyla taşır.
           </p>
-          <div className="action-row">
-            <Link className="cta" href="/demo-belediye/report">Başvuru oluştur</Link>
-            <Link className="secondary-cta" href="/demo-belediye/track">Takip kodu gir</Link>
-            <Link className="secondary-cta" href="/widget/demo-belediye">Widget önizle</Link>
-          </div>
+          {DEFAULT_TENANT && (
+            <div className="action-row">
+              <Link className="cta" href={`/${DEFAULT_TENANT}/report`}>Başvuru oluştur</Link>
+              <Link className="secondary-cta" href={`/${DEFAULT_TENANT}/track`}>Takip kodu gir</Link>
+              <Link className="secondary-cta" href={`/widget/${DEFAULT_TENANT}`}>Widget önizle</Link>
+            </div>
+          )}
           <div className="home-metrics" aria-label="KentOS yetenekleri">
             {metrics.map(([value, label]) => (
               <div className="metric-card" key={value}>
@@ -58,23 +62,30 @@ export default function CitizenHome() {
             </div>
           </div>
 
-          <form action="/demo-belediye/report" method="get" style={{ display: 'grid', gap: 12, marginTop: 18 }}>
-            <input type="hidden" name="source" value="assistant-preview" />
-            <div className="field" style={{ marginBottom: 0 }}>
-              <label htmlFor="assistant-preview-message">Vatandaşın ilk mesajı</label>
-              <textarea
-                id="assistant-preview-message"
-                name="draft"
-                rows={4}
-                placeholder="Örn. 7. Cadde köşesinde mazgal taşmış, yol su içinde kaldı."
-                defaultValue="Atatürk Mahallesi 12. Sokak'ta kaldırım çöktü, bebek arabası geçemiyor."
-              />
-            </div>
-            <div className="action-row" style={{ marginTop: 0 }}>
-              <button className="cta" type="submit">Mesajı başvuruya taşı</button>
-              <Link className="secondary-cta" href="/widget/demo-belediye">Widget kabuğunu aç</Link>
-            </div>
-          </form>
+          {DEFAULT_TENANT && (
+            <form action={`/${DEFAULT_TENANT}/report`} method="get" style={{ display: 'grid', gap: 12, marginTop: 18 }}>
+              <input type="hidden" name="source" value="assistant-preview" />
+              <div className="field" style={{ marginBottom: 0 }}>
+                <label htmlFor="assistant-preview-message">Vatandaşın ilk mesajı</label>
+                <textarea
+                  id="assistant-preview-message"
+                  name="draft"
+                  rows={4}
+                  placeholder="Örn. 7. Cadde köşesinde mazgal taşmış, yol su içinde kaldı."
+                  defaultValue="Atatürk Mahallesi 12. Sokak'ta kaldırım çöktü, bebek arabası geçemiyor."
+                />
+              </div>
+              <div className="action-row" style={{ marginTop: 0 }}>
+                <button className="cta" type="submit">Mesajı başvuruya taşı</button>
+                <Link className="secondary-cta" href={`/widget/${DEFAULT_TENANT}`}>Widget kabuğunu aç</Link>
+              </div>
+            </form>
+          )}
+          <p style={{ margin: '10px 0 0', color: 'var(--muted)', fontSize: '.95rem' }}>
+            Gizlilik ve veri işleme özetini inceleyin:
+            {' '}
+            <Link href="/privacy-policy">Gizlilik Politikası</Link>
+          </p>
         </section>
       </section>
     </main>

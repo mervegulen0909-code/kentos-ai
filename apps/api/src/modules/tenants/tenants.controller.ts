@@ -1,5 +1,6 @@
 import { Body, Controller, Get, Inject, Param, Patch, Post, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
+import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Roles } from '../../common/decorators/roles.decorator.js';
 import { CurrentUser } from '../../common/decorators/current-user.decorator.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
@@ -13,11 +14,15 @@ import { UpdateWidgetSettingsDto } from './dto/widget-settings.dto.js';
 import { RolesGuard } from '../../common/guards/roles.guard.js';
 import { TenantsService } from './tenants.service.js';
 
+@ApiBearerAuth()
+@ApiTags('tenants')
 @UseGuards(AuthGuard('jwt'), RolesGuard)
 @Controller()
 export class TenantsController {
   constructor(@Inject(TenantsService) private readonly tenants: TenantsService) {}
 
+  @ApiOperation({ summary: 'Mevcut kiracı (belediye) bilgisi' })
+  @ApiResponse({ status: 200, description: 'Kiracı detayı — departman, kategori, SLA, şablon' })
   @Get('tenants/current')
   current(@CurrentUser() user: AuthenticatedUser) {
     return this.tenants.getCurrent(user.tenantId);

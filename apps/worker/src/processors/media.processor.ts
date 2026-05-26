@@ -71,6 +71,7 @@ export async function runMediaJob(job: { name: string; data: MediaJobData }, dep
   const scanOutcome = deps.scan ? await deps.scan({ storageKey: job.data.storageKey }) : skippedOutcome('no-scanner');
 
   if (scanOutcome.scanStatus === 'INFECTED' && deps.onInfected) {
+    // Karantina hook başarısız olursa job yeniden denenebilmesi için hata fırlatılır
     await deps.onInfected({
       attachmentId: job.data.attachmentId,
       tenantId: job.data.tenantId,
@@ -79,11 +80,14 @@ export async function runMediaJob(job: { name: string; data: MediaJobData }, dep
       threat: scanOutcome.threat,
       scannedAt: scanOutcome.scannedAt,
     }).catch((error) => {
-      console.error('[media] quarantine hook failed', error instanceof Error ? error.message : error);
+      const msg = error instanceof Error ? error.message : String(error);
+      // İnfected attachment karantinaya alınamazsa kritik hata — job retry edilmeli
+      throw new Error(`[media] quarantine hook failed for ${job.data.attachmentId}: ${msg}`);
     });
   }
 
   if (deps.updateAttachment) {
+    // DB güncelleme başarısız olursa job retry edilebilir; scan sonucu kaybedilmemeli
     await deps.updateAttachment({
       attachmentId: job.data.attachmentId,
       status: scanOutcome.scanStatus,
@@ -99,7 +103,8 @@ export async function runMediaJob(job: { name: string; data: MediaJobData }, dep
         scannedAt: scanOutcome.scannedAt ?? null,
       },
     }).catch((error) => {
-      console.error('[media] attachment scan persistence failed', error instanceof Error ? error.message : error);
+      const msg = error instanceof Error ? error.message : String(error);
+      throw new Error(`[media] attachment scan persistence failed for ${job.data.attachmentId}: ${msg}`);
     });
   }
 

@@ -70,6 +70,12 @@ export class PublicConversationService {
     const tenant = envelope.tenantSlug
       ? await this.requireTenant(envelope.tenantSlug)
       : await this.requireTenantById(envelope.tenantId ?? '');
+
+    // CSAT response detection: if message is a single digit 1-5 from a citizen
+    // with a recently-resolved ticket, record the score and short-circuit.
+    const csatResult = await this.tryRecordCsatResponse(tenant.id, envelope);
+    if (csatResult) return csatResult;
+
     const inboundEvent = await this.recordInboundEvent(tenant.id, envelope);
     if (inboundEvent?.processedAt) {
       const existingConversation = await this.findConversationForEnvelope(tenant.id, envelope);
@@ -337,6 +343,41 @@ export class PublicConversationService {
       orderBy: { name: 'asc' },
       select: { id: true, code: true, name: true, departmentId: true },
     });
+  }
+
+  private async tryRecordCsatResponse(
+    tenantId: string,
+    envelope: ChannelIntakeEnvelope,
+  ): Promise<Record<string, unknown> | null> {
+    const text = envelope.text.trim();
+    const score = parseInt(text, 10);
+    if (isNaN(score) || score < 1 || score > 5 || text !== String(score)) return null;
+
+    const phone = envelope.citizenContact?.phone?.trim();
+    if (!phone) return null;
+
+    // Look for the most recently resolved ticket for this citizen (last 48h, no score yet)
+    const cutoff = new Date(Date.now() - 48 * 60 * 60 * 1000);
+    const ticket = await this.prisma.ticket.findFirst({
+      where: {
+        tenantId,
+        status: 'RESOLVED',
+        csatScore: null,
+        resolvedAt: { gte: cutoff },
+        citizen: { phone },
+      },
+      orderBy: { resolvedAt: 'desc' },
+      select: { id: true, ticketNo: true },
+    });
+
+    if (!ticket) return null;
+
+    await this.prisma.ticket.update({
+      where: { id: ticket.id },
+      data: { csatScore: score, csatRespondedAt: new Date() },
+    });
+
+    return { csatRecorded: true, ticketId: ticket.id, ticketNo: ticket.ticketNo, score };
   }
 
   private toResponse(

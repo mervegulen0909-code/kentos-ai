@@ -32,7 +32,12 @@ export async function apiFetch<T>(path: string, options: ApiOptions = {}): Promi
   if (options.body && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
   if (options.token) headers.set('Authorization', `Bearer ${options.token}`);
 
-  const response = await fetch(`${API_BASE_URL}${path}`, { ...options, headers, cache: 'no-store' });
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    ...options,
+    headers,
+    cache: 'no-store',
+    signal: options.signal ?? AbortSignal.timeout(10_000),
+  });
   if (!response.ok) {
     const rawBody = await response.text();
     throw new ApiError(response.status, rawBody || `KentOS API ${response.status}`, safeErrorMessage(response.status));
@@ -95,6 +100,31 @@ export type AnalyticsAiUsage = {
     last30d: AnalyticsAiUsageWindow;
   };
   byProvider: AnalyticsAiUsageProviderSummary[];
+};
+
+export type AnalyticsOutboundDeliveries = {
+  total: number;
+  pending: number;
+  dispatched: number;
+  delivered: number;
+  failed: number;
+  skipped: number;
+  byChannel: Array<{
+    channel: string;
+    total: number;
+    pending: number;
+    dispatched: number;
+    delivered: number;
+    failed: number;
+    skipped: number;
+  }>;
+  recentFailures: Array<{
+    id: string;
+    channel: string;
+    attempts: number;
+    lastError: string | null;
+    updatedAt: string;
+  }>;
 };
 
 export type AnalyticsDepartmentSummary = {
@@ -273,6 +303,83 @@ function buildQuery(filters: TicketListFilters = {}) {
   return query ? `?${query}` : '';
 }
 
+// ─── New types for D4 admin pages ────────────────────────────────────────────
+
+export type UserListItem = {
+  id: string;
+  email: string;
+  fullName: string;
+  role: string;
+  isActive: boolean;
+  createdAt: string;
+  departments: Array<{ id: string; name: string }>;
+};
+
+export type CreateUserInput = {
+  email: string;
+  fullName: string;
+  role: string;
+  password: string;
+  departmentIds?: string[];
+};
+
+export type UpdateUserInput = {
+  fullName?: string;
+  role?: string;
+  isActive?: boolean;
+  departmentIds?: string[];
+};
+
+export type CitizenListItem = {
+  id: string;
+  displayName: string | null;
+  phone: string | null;
+  email: string | null;
+  createdAt: string;
+  ticketCount: number;
+  isAnonymized?: boolean;
+};
+
+export type CitizenDetail = CitizenListItem & {
+  identifiers: Array<{ kind: string; normalizedValue: string; isPrimary: boolean }>;
+  tickets: Array<{ id: string; ticketNo: string; title: string; status: string; createdAt: string }>;
+};
+
+export type ReportListItem = {
+  id: string;
+  type: string;
+  requestedBy: string;
+  createdAt: string;
+  generatedAt: string | null;
+  status: string;
+};
+
+export type ReportDetail = ReportListItem & {
+  generatedReport: unknown;
+};
+
+export type CsatOverview = {
+  overall: { avg: number | null; responseCount: number };
+  byDepartment: Array<{ departmentId: string | null; departmentName: string | null; avg: number | null; responseCount: number }>;
+  trend: Array<{ score: number | null; respondedAt: string | null }>;
+  lowScoreTickets: Array<{ id: string; ticketNo: string; csatScore: number | null; csatRespondedAt: string | null; departmentId: string | null }>;
+};
+
+export type OperatorPerformanceItem = {
+  userId: string;
+  fullName: string;
+  email: string;
+  role: string;
+  assigned: number;
+  resolved: number;
+  resolutionRate: number;
+  avgResolutionHours: number | null;
+  csatAvg: number | null;
+  csatResponses: number;
+};
+
+// ─── adminApi ────────────────────────────────────────────────────────────────
+
 export const adminApi = {
   overview: (token: string) => apiFetch<AnalyticsOverview>('/analytics/overview', { token }),
   departmentSummary: (token: string) => apiFetch<AnalyticsDepartmentSummary[]>('/analytics/departments', { token }),
@@ -281,10 +388,11 @@ export const adminApi = {
   conversationSegments: (token: string) =>
     apiFetch<AnalyticsConversationSegments>('/analytics/conversation-segments', { token }),
   aiUsage: (token: string) => apiFetch<AnalyticsAiUsage>('/analytics/ai-usage', { token }),
+  outboundDeliveries: (token: string) => apiFetch<AnalyticsOutboundDeliveries>('/analytics/outbound-deliveries', { token }),
   rescanAttachment: (token: string, attachmentId: string) =>
     apiFetch<{ attachmentId: string; scanStatus: 'PENDING' }>(`/attachments/${attachmentId}/rescan`, { method: 'POST', token }),
-  quarantinedAttachments: (token: string) =>
-    apiFetch<Array<{
+  quarantinedAttachments: async (token: string) =>
+    (await apiFetch<{ data: Array<{
       attachmentId: string;
       fileName: string;
       mimeType: string;
@@ -295,8 +403,9 @@ export const adminApi = {
       ticketId: string | null;
       ticketNo: string | null;
       ticketTitle: string | null;
-    }>>('/attachments/quarantined', { token }),
-  tickets: (token: string, filters?: TicketListFilters) => apiFetch<TicketListItem[]>(`/tickets${buildQuery(filters)}`, { token }),
+    }>; meta: { total: number; page: number; limit: number; totalPages: number } }>('/attachments/quarantined', { token })).data,
+  tickets: async (token: string, filters?: TicketListFilters) =>
+    (await apiFetch<{ data: TicketListItem[]; meta: { total: number; page: number; limit: number; totalPages: number } }>(`/tickets${buildQuery(filters)}`, { token })).data,
   ticket: (token: string, id: string) => apiFetch<TicketDetail>(`/tickets/${id}`, { token }),
   auditLog: (token: string, id: string) => apiFetch<AuditLogItem[]>(`/tickets/${id}/audit-log`, { token }),
   handoffs: (token: string) => apiFetch<HandoffSummary[]>('/tickets/handoffs', { token }),
@@ -329,12 +438,74 @@ export const adminApi = {
     apiFetch<AiBudgetSettings>('/ai-budget-settings', { method: 'PATCH', token, body: JSON.stringify(input) }),
   runRetentionNow: (token: string) =>
     apiFetch<{ enqueued: boolean; tenantId: string }>('/retention-settings/run-now', { method: 'POST', token }),
-  users: (token: string, isActive?: boolean) => {
-    const query = isActive !== undefined ? `?isActive=${isActive}` : '';
-    return apiFetch<UserSummary[]>(`/users${query}`, { token });
+  // Users
+  users: async (token: string, params?: { role?: string; q?: string; page?: number; limit?: number }) => {
+    const qs = new URLSearchParams();
+    if (params?.role) qs.set('role', params.role);
+    if (params?.q) qs.set('q', params.q);
+    if (params?.page) qs.set('page', String(params.page));
+    if (params?.limit) qs.set('limit', String(params.limit));
+    const query = qs.toString();
+    const result = await apiFetch<{
+      data: Array<Omit<UserListItem, 'departments'> & { departments: Array<{ department: { id: string; name: string } }> }>;
+      total: number;
+      page: number;
+      limit: number;
+    }>(`/users${query ? `?${query}` : ''}`, { token });
+    return {
+      data: result.data.map((user) => ({
+        ...user,
+        departments: user.departments.map((entry) => entry.department),
+      })),
+      meta: { total: result.total, page: result.page, limit: result.limit },
+    };
   },
-  createUser: (token: string, input: { email: string; fullName: string; password: string; role?: string }) =>
-    apiFetch<UserSummary>('/users', { method: 'POST', token, body: JSON.stringify(input) }),
-  updateUser: (token: string, id: string, input: { fullName?: string; role?: string; isActive?: boolean; password?: string }) =>
-    apiFetch<UserSummary>(`/users/${id}`, { method: 'PATCH', token, body: JSON.stringify(input) }),
+  createUser: (token: string, input: CreateUserInput) =>
+    apiFetch<UserListItem>('/users', { method: 'POST', token, body: JSON.stringify(input) }),
+  updateUser: (token: string, id: string, input: UpdateUserInput) =>
+    apiFetch<UserListItem>(`/users/${id}`, { method: 'PATCH', token, body: JSON.stringify(input) }),
+  deleteUser: (token: string, id: string) =>
+    apiFetch<{ id: string; isActive: false }>(`/users/${id}`, { method: 'DELETE', token }),
+
+  // Citizens
+  citizens: async (token: string, params?: { q?: string; page?: number }) => {
+    const qs = new URLSearchParams();
+    if (params?.q) qs.set('q', params.q);
+    if (params?.page) qs.set('page', String(params.page));
+    const query = qs.toString();
+    const result = await apiFetch<{
+      data: Array<Omit<CitizenListItem, 'ticketCount'> & { _count: { tickets: number } }>;
+      total: number;
+      page: number;
+      limit: number;
+    }>(`/citizens${query ? `?${query}` : ''}`, { token });
+    return {
+      data: result.data.map(({ _count, ...citizen }) => ({
+        ...citizen,
+        ticketCount: _count.tickets,
+      })),
+      meta: { total: result.total, page: result.page, limit: result.limit },
+    };
+  },
+  citizen: (token: string, id: string) => apiFetch<CitizenDetail>(`/citizens/${id}`, { token }),
+  anonymizeCitizen: (token: string, id: string) =>
+    apiFetch<{ id: string; anonymized: true }>(`/citizens/${id}/anonymize`, { method: 'POST', token }),
+  exportCitizen: (token: string, id: string) =>
+    apiFetch<unknown>(`/citizens/${id}/export`, { token }),
+
+  // Reports
+  reports: (token: string, params?: { type?: string; page?: number }) => {
+    const qs = new URLSearchParams();
+    if (params?.type) qs.set('type', params.type);
+    if (params?.page) qs.set('page', String(params.page));
+    const query = qs.toString();
+    return apiFetch<{ data: ReportListItem[]; meta: { total: number } }>(`/reports${query ? `?${query}` : ''}`, { token });
+  },
+  report: (token: string, id: string) => apiFetch<ReportDetail>(`/reports/${id}`, { token }),
+  generateReport: (token: string, type: string) =>
+    apiFetch<{ jobId: string | undefined }>('/reports/generate', { method: 'POST', token, body: JSON.stringify({ type }) }),
+
+  // Analytics extras
+  csat: (token: string) => apiFetch<CsatOverview>('/analytics/csat', { token }),
+  operators: (token: string) => apiFetch<OperatorPerformanceItem[]>('/analytics/operators', { token }),
 };

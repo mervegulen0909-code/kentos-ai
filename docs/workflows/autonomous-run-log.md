@@ -14,6 +14,77 @@ Her yeni release/verification checkpoint en az şu alanları içermelidir:
 - **Next action:** sıradaki iş
 - **Blocker:** yoksa `None`
 
+## 2026-05-22 - Production SSH rescue recovery checkpoint
+
+- **Owner:** `Codex`
+- **Status:** passed
+- **Action taken:** Recovered production root/SSH access after the Hetzner VPS stopped accepting the prior login path. Enabled Hetzner rescue mode with power cycle, switched from the unreliable temporary-password path to a fresh local rescue SSH key, mounted the normal OS root filesystem from rescue, restored root key-based access through `/root/.ssh/authorized_keys`, confirmed `PubkeyAuthentication yes` in `/etc/ssh/sshd_config`, and then reconnected to the normal OS. Re-ran production container and health checks after recovery.
+- **Files changed:** `docs/releases/RELEASE_NOTES.md`, `docs/workflows/autonomous-run-log.md`, `docs/workflows/production-infra-runbook.md`.
+- **Verification run:** Hetzner Cloud browser-assisted rescue enable/power cycle; rescue SSH login using the generated local key; `lsblk`; mount of `/dev/sda1`; authorized-keys restore; `grep`/`sed` checks against `/etc/ssh/sshd_config`; reboot to normal OS; normal SSH reconnect; `docker compose --env-file .env.production.local -f infra/docker-compose.prod.yml ps`; `/opt/kentos-ai/infra/healthcheck-prod.sh`.
+- **Result:** Passed. The normal OS root filesystem was confirmed on `/dev/sda1`, root key-based login is working again on `46.224.217.16`, and production services remain healthy (`api`, `postgres`, `redis`, `clamav`, `caddy`, `citizen-web`, `admin-web`, `worker`, `whatsapp-gateway`, `minio`; healthcheck reports API and gateway healthy).
+- **Next action:** Disable Hetzner rescue mode after confirming no more rescue work is needed, keep the recovery SSH key stored securely for future incidents, and continue only the remaining operator-owned provider/account gates.
+- **Blocker:** None for SSH/platform access. Remaining blockers are still external provider/account approvals.
+
+## 2026-05-22 - Command surface and release hygiene closure checkpoint
+
+- **Owner:** `Codex`
+- **Status:** partial
+- **SLA:** Final `go/hold` refresh after canonical pnpm-backed verification rerun on a clean worktree.
+- **Action taken:** Restored the documented root command surface in `package.json` (`verify`, `ops:preflight`, `ops:external`, `infra:prod:bootstrap`, `db:deploy`), added `--help` entrypoints for the Node-backed verification/ops scripts, expanded repo verification coverage in `verify` and `ops:preflight`, documented the `pnpm` bootstrap fallback for PATH issues, and classified local account/browser state versus committed operator helper tooling in docs/checklists.
+- **Files changed:** `package.json`, `.gitignore`, `scripts/verify-env.mjs`, `scripts/ops-preflight.mjs`, `scripts/ops-external-systems.mjs`, `docs/workflows/verify-from-cowork.md`, `docs/workflows/ops-preflight-runbook.md`, `docs/workflows/production-infra-runbook.md`, `docs/checklists/release-checklist.md`, `docs/accounts/README.md`, `docs/accounts/browser-profiles.md`, `docs/releases/RELEASE_NOTES.md`, `docs/workflows/autonomous-run-log.md`.
+- **Verification run:** script contract checks via `npm.cmd run verify -- --help`, `npm.cmd run ops:preflight -- --help`, `npm.cmd run ops:external -- --help`, `npm.cmd run infra:prod:bootstrap -- --help`; default guard run via `npm.cmd run ops:preflight`; syntax/static spot checks via `node --check scripts/verify-env.mjs`, `node --check scripts/ops-preflight.mjs`, `node --check scripts/ops-external-systems.mjs`, `node --check scripts/bootstrap-prod-env.mjs`.
+- **Result:** Partial. Root script contract drift is closed and the Node-backed entrypoints are callable without relying on `pnpm` being on `PATH`. Full repo/prod evidence is intentionally still pending because the current worktree is dirty and the shell does not provide a ready pnpm bootstrap for rerunning the canonical verification chain end-to-end.
+- **Next action:** On the target machine, restore the normal pnpm bootstrap, rerun `pnpm verify`, `pnpm ops:preflight -- --with-verification`, and the approved prod-readiness smoke sequence, then update release state from `hold` to `go` or keep `hold` with precise blocker evidence.
+- **Blocker:** Canonical final evidence rerun is still outstanding; operator-owned live-provider gates remain external.
+
+## 2026-05-22 - Meta business verification and WhatsApp phone registration checkpoint
+
+- **Owner:** `Codex`
+- **Status:** partial
+- **SLA:** Re-check after Meta business verification review completes or after the operator receives an approval/update notice.
+- **Action taken:** Logged into Meta for Developers and Meta Business Settings, confirmed the `KentOS AI` app exists and remains `In development`, opened the business verification flow, and checked the WhatsApp Business account state in WhatsApp Manager.
+- **Files changed:** `docs/releases/RELEASE_NOTES.md`, `docs/workflows/autonomous-run-log.md`.
+- **Verification run:** Manual operator-assisted browser verification in Meta Developers, Security Center, Business Settings, and WhatsApp Manager on `2026-05-22`.
+- **Result:** Partial. Business verification for `FERSA ELEKTRONIK SANAYI VE TICARET LIMITED SIRKETI` is `Değerlendirmede`, the WhatsApp Business account is approved, and only the default Meta test number `+1 555-647-0488` is currently attached. The real production phone registration for `+90 535 281 12 35` has not been completed.
+- **Next action:** Wait for Meta verification approval, then return to WhatsApp Manager and register the real production number in international format (`+90 535 281 12 35`) using the operator-controlled SMS or voice verification flow. Record the permanent token and final phone registration evidence once completed.
+- **Blocker:** Meta business verification is still pending review, so the add-phone-number flow for the real production line remains blocked.
+
+## 2026-05-22 - Twilio phone inventory checkpoint
+
+- **Owner:** `Codex`
+- **Status:** partial
+- **SLA:** Upgrade/account-mode decision and final outbound policy review before live SMS enable.
+- **Action taken:** Logged into the `KentOS AI` Twilio console, inspected `Active numbers`, and inspected `Verified Caller IDs`.
+- **Files changed:** `docs/releases/RELEASE_NOTES.md`, `docs/workflows/autonomous-run-log.md`.
+- **Verification run:** Manual operator-assisted browser verification in Twilio Console on `2026-05-22`.
+- **Result:** Partial. Twilio remains a `trial` account with one active Twilio-owned number `+1 218 663 3732`. The operator phone `+90 535 281 12 35` is already present under `Verified Caller IDs`, so the line is known to Twilio, but live outbound remains gated by trial-account policy and later operator approval.
+- **Next action:** Keep `TWILIO_FROM_NUMBER` aligned with the intended production sending number, decide whether the project will use the Twilio-owned number or another approved sender path, and complete any required Twilio account upgrade/MFA steps before enabling live SMS outbound.
+- **Blocker:** Trial-account restrictions still apply, and no final production sender decision has been recorded yet.
+
+## 2026-05-22 - Postmark sender readiness checkpoint
+
+- **Owner:** `Codex`
+- **Status:** partial
+- **SLA:** Re-check after operator completes mailbox confirmation and DNS verification.
+- **Action taken:** Logged into Postmark, inspected the servers overview, and inspected sender signatures/domain verification state.
+- **Files changed:** `docs/releases/RELEASE_NOTES.md`, `docs/workflows/autonomous-run-log.md`.
+- **Verification run:** Manual operator-assisted browser verification in Postmark on `2026-05-22`.
+- **Result:** Partial. The account is accessible, the sender signature `destek@cebtecep.com` is now confirmed, but the account remains in `Test mode` and the sender domain `cebtecep.com` is not yet verified (`DKIM Not Verified`, `Return-Path Not Verified`).
+- **Next action:** Publish the required Postmark DNS records for `cebtecep.com` (`20260519190009pm._domainkey` TXT with the Postmark DKIM value, and `pm-bounces` CNAME -> `pm.mtasv.net`), wait for DKIM/Return-Path verification, and only then finalize the production outbound email provider decision or SMTP fallback.
+- **Blocker:** Postmark cannot be treated as production-ready until sender-domain DNS verification finishes and the account exits `Test mode`.
+
+## 2026-05-22 - `cebtecep.com` DNS ownership checkpoint
+
+- **Owner:** `Codex`
+- **Status:** blocked
+- **SLA:** Re-check after the operator identifies the authoritative DNS account or registrar for `cebtecep.com`.
+- **Action taken:** Checked the currently accessible Natro customer account and compared its active domain inventory against the Postmark DNS work required for `cebtecep.com`.
+- **Files changed:** `docs/releases/RELEASE_NOTES.md`, `docs/workflows/autonomous-run-log.md`.
+- **Verification run:** Manual operator-assisted browser verification in Natro customer panel on `2026-05-22`.
+- **Result:** Blocked. The accessible Natro account contains only `didimonline.com` and `izmirusulü.com`; `cebtecep.com` is not present there, so the DNS panel needed for Postmark DKIM / Return-Path records could not be reached.
+- **Next action:** Identify the authoritative DNS provider/account for `cebtecep.com` (alternate Natro account, Cloudflare, hosting panel, registrar account, or delegated DNS provider), then publish the pending Postmark records.
+- **Blocker:** The DNS control plane for `cebtecep.com` is still unknown.
+
 ## 2026-04-30 15:00 — Run start checkpoint
 
 - **Action taken:** Approved autonomous implementation plan recorded; started Sprint 1 execution loop.
@@ -1003,6 +1074,30 @@ Eksik schema ile yazılan checkpoint release kanıtı sayılmaz.
 - **Result:** Passed. Gateway unit tests passed 20/20, gateway typecheck and script syntax checks passed, the production challenge endpoint returned HTTP 200 with the expected plain-text challenge, and VPS healthcheck reports API, gateway, and ClamAV healthy after recreating ClamAV to clear a stale Docker health flag. Live WhatsApp outbound remains disabled.
 - **Next action:** Finish Twilio MFA with a fresh SMS/voice code. For Meta production messaging, register a real WhatsApp phone number, add payment only with explicit approval, complete business verification when operator has legal/business documents ready, then retrieve app secret/permanent token and enable signatures before any live outbound flag is changed.
 - **Blocker:** Twilio still needs a fresh phone verification code. Meta production phone registration/payment/business verification remain operator-controlled external steps.
+
+## 2026-05-13 - External closure and widget allowlist checkpoint
+
+- **Owner:** `1 - Ana Kontrol`
+- **Status:** passed with external account gates remaining
+- **Action taken:** Re-ran the production external-systems preflight, verified production web surfaces with Playwright CLI, fixed a local gateway smoke false-negative for Meta's `text/plain` webhook challenge response, and corrected the demo tenant widget allowlist in production so the real municipality origin passes `widget-status` diagnostics. The tenant allowlist now keeps local QA origins and includes `https://xn--izmirusul-y9a.com`, `https://www.xn--izmirusul-y9a.com`, and `https://vatandas.xn--izmirusul-y9a.com`.
+- **Browser/Playwright evidence:** Municipality homepage at `https://xn--izmirusul-y9a.com` loads as `Demo Belediye`; the "Belediye asistani" launcher opens the citizen-web iframe; admin login succeeds for the demo tenant; `/reports` shows conversation segments, AI usage/cost, and channel performance cards; `/settings` shows the production widget install snippet and connection probe. Meta Developers redirects to a login page, Twilio Console redirects to login, and Postmark shows the login/signup surface, so account/MFA/password-owned steps cannot be completed from automation alone.
+- **Verification run:** `pnpm ops:external -- --env-file .env.production.local --expected-server-ip 46.224.217.16 --compose --json`; `node --check scripts/smoke-gateway.mjs`; `pnpm --filter @kentos/whatsapp-gateway test`; `pnpm typecheck`; local dry-run gateway start with dummy `META_APP_SECRET`, `META_WEBHOOK_VERIFY_TOKEN`, and `TWILIO_AUTH_TOKEN`; `pnpm smoke:gateway`; direct production `GET /api/v1/public/demo-belediye/widget-status` with `x-probe-origin=https://xn--izmirusul-y9a.com`.
+- **Result:** External preflight passed on all remote/DNS/HTTPS/provider/safety gates with `passed=23`, `warning=1`, `blocked=0`, `failed=0`; the only warning is local Docker Desktop `compose ps` being unavailable, while compose config, public HTTPS, DNS, provider readiness, live-outbound gate, and retention gate all pass. Gateway tests passed 20/20. Gateway smoke passed, including Meta challenge 200/403, Meta signature rejection, Twilio signature rejection, internal outbound auth rejection, and email inbound auth rejection. Production widget diagnostics now return `originAllowed=true` for the municipality origin.
+- **Files changed:** `scripts/smoke-gateway.mjs`, `docs/releases/RELEASE_NOTES.md`, `docs/workflows/autonomous-run-log.md`.
+- **Next action:** Complete provider-account gates in the browser when the operator can provide account login/MFA/business-verification/payment inputs: Meta production phone/business/payment/permanent token, Twilio login/MFA, and Postmark account or SMTP credential confirmation. Keep live outbound and retention delete disabled until explicit approval.
+- **Blocker:** Remaining work is outside the repo and account-owner controlled. Automation cannot enter Meta/Facebook credentials, Twilio MFA codes, payment details, legal business-verification documents, or provider secrets without the operator present.
+
+## 2026-05-16 - Repo hygiene, outbound visibility, and smoke automation implementation
+
+- **Owner:** `Codex`
+- **Status:** in progress, local static/focused checks passing
+- **Action taken:** Implemented local artifact hygiene in `.gitignore`, refactored outbound worker processing into a testable runner, fixed failed-attempt bookkeeping to increment once per failed worker execution, skipped already-dispatched deliveries to avoid duplicate sends, added admin analytics for outbound delivery totals/failures, surfaced outbound delivery health in reports, continued widget follow-up messages on the same `conversationId`, and added Playwright coverage for widget continuation plus automated 390px admin/citizen smoke.
+- **Verification run:** `pnpm --filter @kentos/worker test`; `pnpm --filter @kentos/api typecheck`; `pnpm --filter @kentos/admin-web typecheck`; `pnpm --filter @kentos/citizen-web typecheck`.
+- **Result:** Passed. Worker tests now include outbound success, gateway failure, missing config, and terminal-state skip cases. API/admin/citizen typecheck passed after adding `/analytics/outbound-deliveries`, the reports UI panel, and widget continuation state handling.
+- **Final verification run:** `pnpm db:generate`; `pnpm --filter @kentos/api test`; `pnpm --filter @kentos/worker test`; `pnpm --filter @kentos/shared test`; `pnpm --filter @kentos/citizen-web test`; `pnpm --filter @kentos/whatsapp-gateway test`; `pnpm typecheck`; `pnpm build`; `git diff --check`; `pnpm exec playwright test --config=playwright.smoke.config.ts --list`; `pnpm ops:preflight -- --with-verification --json`; `pnpm ops:external -- --env-file .env.production.local --expected-server-ip 46.224.217.16 --compose --json`.
+- **Final result:** Static and focused verification passed. Playwright smoke discovery lists 8 tests, including the new widget continuation and mobile smoke specs. Preflight verification passed every command but overall status is `blocked` because this implementation worktree is intentionally dirty before commit/stage; local `.env` presence checks still warn about missing non-production secrets and placeholder attachment scan config. External readiness returned `passed=23`, `warning=1`, `blocked=0`, `failed=0`; only warning is local Docker Desktop being unavailable for local `compose ps`, while DNS/HTTPS/API/gateway/admin/citizen/municipality and compose config passed.
+- **Next action:** Commit or stage this implementation slice when ready, then rerun `pnpm ops:preflight -- --with-verification --json` to clear the git-clean block. Runtime Playwright execution still requires local API/admin/citizen servers and seeded local infra; production external account gates remain approval-controlled.
+- **Blocker:** No repo-internal verification blocker after commit hygiene. Production provider login/MFA/payment/secrets and live outbound/retention-delete switches remain outside automation and require explicit operator approval.
 
 ## 2026-05-19 — Citizen merge endpoint checkpoint
 

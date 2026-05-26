@@ -30,12 +30,14 @@ export async function submitWidgetMessage(tenantSlug: string, _state: WidgetSubm
 
   try {
     const attachmentIds = await uploadAttachmentIfPresent(tenantSlug, formData);
-    const conversation = await citizenApi.startConversation(tenantSlug, {
-      channel: 'WEB_CHAT',
-      displayName: displayName || undefined,
-      contact: contact || undefined,
-    });
-    const result = await citizenApi.sendConversationMessage(tenantSlug, conversation.conversationId, {
+    const conversationId = _state.conversationId && !_state.trackingToken
+      ? _state.conversationId
+      : (await citizenApi.startConversation(tenantSlug, {
+          channel: 'WEB_CHAT',
+          displayName: displayName || undefined,
+          contact: contact || undefined,
+        })).conversationId;
+    const result = await citizenApi.sendConversationMessage(tenantSlug, conversationId, {
       text: description,
       displayName: displayName || undefined,
       phone: contact.startsWith('05') ? contact : undefined,

@@ -28,11 +28,14 @@ Use this checklist before merging wave branches into `master` and before publish
 - [ ] `pnpm db:generate`
 - [ ] `pnpm typecheck`
 - [ ] `pnpm build`
+- [ ] Canonical local gate is recorded in this order: `pnpm db:generate`, targeted unit tests, `pnpm typecheck`, `pnpm build`, `git diff --check`, optional Playwright discovery/full run, then `pnpm ops:preflight -- --with-verification`.
 - [ ] `pnpm ops:preflight` reports no blocked gates before any production approval meeting.
+- [ ] `pnpm ops:preflight -- --strict-launch` reports no blocked gates before declaring the product ready for end users.
 - [ ] API `/health` responds locally.
 - [ ] API `/health/ready` responds locally after database seed.
 - [ ] No hardcoded secrets, production credentials, or real tokens are staged.
-- [ ] If the production VPS scaffold (`infra/docker-compose.prod.yml`) is part of the release: DNS for API/admin/citizen/gateway plus any `MUNICIPALITY_DOMAIN` is in place; `.env.production.local` was generated via `pnpm infra:prod:bootstrap` and reviewed; `pnpm ops:external` has no blocked gates; safety defaults (`*_OUTBOUND_LIVE=false`, `RETENTION_DRY_RUN=true`, `ATTACHMENT_SCAN_PROVIDER=placeholder`) are confirmed before any production deploy. See `docs/workflows/production-infra-runbook.md`.
+- [ ] If `pnpm` is not on `PATH`, bootstrap note is followed (`corepack enable` + new terminal, or `npm run <root-script>` / `npm.cmd run <root-script>` for Node-backed root entrypoints only).
+- [ ] If the production VPS scaffold (`infra/docker-compose.prod.yml`) is part of the release: DNS for API/admin/citizen/gateway plus any `MUNICIPALITY_DOMAIN` is in place; `.env.production.local` was generated via `pnpm infra:prod:bootstrap` and reviewed; `CITIZEN_SESSION_SECRET`, `INTERNAL_EVENTS_KEY`, Firebase client build values and Firebase API credential are configured; `pnpm ops:external -- --strict-launch` has no blocked gates. Safety defaults (`*_OUTBOUND_LIVE=false`, `RETENTION_DRY_RUN=true`, `ATTACHMENT_SCAN_PROVIDER=placeholder`) may be used while provisioning only; final launch requires healthy ClamAV and `ATTACHMENT_SCAN_PROVIDER=clamav`. See `docs/workflows/production-infra-runbook.md`.
 
 ## 4. API smoke
 
@@ -47,6 +50,7 @@ Run local API smoke when API, database, auth, RBAC, tenant settings, ticket work
 - [ ] Smoke verifies tenant settings write/read.
 - [ ] Smoke verifies authenticated ticket create, assignment, internal note, public message, status transition, and audit log.
 - [ ] Smoke verifies public citizen ticket create and TK tracking-code lookup.
+- [ ] Automated account-security coverage rejects missing/forged citizen erasure session tokens and permits deletion only for a signed-in disposable QA citizen.
 - [ ] Smoke verifies legacy/internal `KNT-*` ticket numbers do not work on public lookup endpoints.
 - [ ] Smoke verifies WhatsApp/internal channel ingest rejects missing internal key and accepts authorized text-only envelope handoff.
 - [ ] Smoke verifies public widget/ticket endpoint rejects disallowed `Origin` and accepts allowlisted widget origin.
@@ -55,6 +59,7 @@ Run local API smoke when API, database, auth, RBAC, tenant settings, ticket work
 - [ ] Smoke verifies `/public/:tenantSlug/widget-status` returns `widgetReady`, `originAllowed`, and `allowedOriginCount` for the seeded tenant.
 - [ ] Smoke verifies `/analytics/conversation-segments` returns `aiCompleted / operatorHandoff / awaitingInfo / automationRate`.
 - [ ] Smoke verifies `/analytics/channels` returns rows for at least the seeded channels (WEB_CHAT, WHATSAPP, INSTAGRAM, FACEBOOK, SMS; EMAIL is accepted without requiring demo data) and includes attachment counts when media is linked.
+- [ ] Smoke verifies `/analytics/outbound-deliveries` returns delivery totals, channel breakdowns, and recent failure review rows without citizen contact fields.
 - [ ] Smoke verifies internal outbound endpoints (`/internal/<channel>/outbound`) on the gateway reject missing `x-kentos-internal-key`.
 - [ ] Smoke verifies multi-channel webhook intake (`/webhooks/instagram`, `/webhooks/facebook`, `/webhooks/sms`) rejects missing `META_APP_SECRET` / `TWILIO_AUTH_TOKEN` signatures when those env vars are configured.
 
@@ -81,7 +86,9 @@ Run browser smoke when admin or citizen UI routes, forms, auth/session, settings
 - [ ] Admin ticket detail supports internal/public message attachment upload and shows linked attachment metadata without storage keys.
 - [ ] Admin settings supports department/category/SLA/message-template create or update flows currently in scope.
 - [ ] Admin settings shows tenant-specific widget embed script, preview path, expected `WEB_CHAT` channel, and production origin/rate-limit caveat.
+- [ ] Admin reports shows outbound delivery totals, failed delivery count, and channel-level delivery breakdown.
 - [ ] Citizen widget preview opens at `/widget/[tenantSlug]`, submits via conversation flow, and returns either follow-up or TK tracking state without raw errors.
+- [ ] Citizen widget preview can continue the same `conversationId` after a follow-up question and complete to a TK tracking state.
 - [ ] Citizen widget preview supports public-safe attachment upload in the ticket-creation path without exposing storage internals.
 - [ ] Citizen report creates a ticket, can attach a file, and redirects to the public ticket page under the `ticket/[trackingToken]` route.
 - [ ] Citizen tracking finds the same public ticket by TK tracking code only under the `ticket/[trackingToken]` route and shows safe attachment metadata.
@@ -89,6 +96,7 @@ Run browser smoke when admin or citizen UI routes, forms, auth/session, settings
 - [ ] Citizen pages do not expose internal notes, audit logs, AI reasoning, stack traces, secrets, or tenant internals.
 - [ ] Browser console has no unexpected errors on the smoke path.
 - [ ] Narrow mobile viewport has no blocking layout breakage.
+- [ ] Automated mobile smoke covers admin settings/reports/ticket detail plus citizen report/track/ticket at 390px without horizontal overflow.
 
 ### Browser status rule (strict)
 
@@ -107,6 +115,8 @@ Run browser smoke when admin or citizen UI routes, forms, auth/session, settings
 - [ ] Browser smoke status recorded with enum + gaps/blockers; widget/admin-install UI changes require explicit browser note.
 - [ ] Owner and SLA recorded for each open gap/blocker.
 - [ ] Local-only file exclusions recorded (for example `.claude/settings.json`).
+- [ ] Local-only account/browser state is excluded: `.accounts.local.md`, `.accounts.machine.env`, `.api-keys.local.env`, `.browser-profiles/`, and `verification-report.txt`.
+- [ ] Committed operator helpers are intentional and documented: `scripts/open-*.ps1`, `scripts/headless-*.ps1`, `scripts/setup-ai-accounts.mjs`, and `docs/accounts/**` are not runtime dependencies.
 - [ ] Risk level for the cycle recorded (`low`/`medium`/`high`) with one-line reason.
 - [ ] Rollback note recorded when any `partial` or `blocked` status exists.
 - [ ] Merge decision state recorded (`go`/`hold`) with rationale.
@@ -117,6 +127,7 @@ Run browser smoke when admin or citizen UI routes, forms, auth/session, settings
 - [ ] Merged feature branches are deleted locally and on remote unless explicitly preserved.
 - [ ] Active worktree branches are not deleted while attached to another session.
 - [ ] Local release operations keep `.claude/settings.json` and other local-only state out of staged release commits.
+- [ ] Root example/local helper files are intentionally classified: tracked docs under `docs/accounts/**`, ignored local notes under repo-root dotfiles, and operator launcher scripts under `scripts/`.
 - [ ] `git status --short` is clean or intentionally documented before final release report.
 - [ ] Housekeeping completion is logged in `docs/workflows/autonomous-run-log.md`.
 - [ ] Owner and SLA are set for unresolved housekeeping exceptions.
@@ -128,7 +139,7 @@ Run this scope when queue processors, notification delivery guardrails, or worke
 - [ ] Notification processor returns explicit skip reasons for non-deliverable public-message jobs.
 - [ ] SLA processor returns actionable `breached` and `dueSoon` counts with a timestamped summary.
 - [ ] Reports processor returns a timestamped acceptance summary suitable for QA/release evidence.
-- [ ] Outbound processor (`kentos.outbound`) honors retry/backoff and writes terminal `OutboundDelivery.state` (`DISPATCHED`, `FAILED`, `SKIPPED`).
+- [ ] Outbound processor (`kentos.outbound`) honors retry/backoff, increments attempts once per worker failure, records `lastError`, and writes terminal `OutboundDelivery.state` (`DISPATCHED`, `FAILED`, `SKIPPED`).
 - [ ] Retention processor (`kentos.retention`) accepts `tenantId / retentionDays / scope`, includes `attachments` in scope/all summaries, defaults to dry-run, and reports `attachmentStorageKeys`, `totals.attachments`, `totals.attachmentObjectsDeleted`, and `objectDeleteErrors`.
 - [ ] Media processor (`kentos.media`) accepts confirmed attachment payloads, verifies object metadata when S3 is configured, returns retry-safe skip/failure reasons, and documents virus scanning as a placeholder independent from retention.
 

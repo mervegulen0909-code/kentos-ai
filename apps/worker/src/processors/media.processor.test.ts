@@ -92,16 +92,21 @@ test('runMediaJob calls onInfected quarantine hook only on INFECTED scans', asyn
   assert.equal(quarantineCalls[0].scanProvider, 'clamav');
 });
 
-test('runMediaJob does not throw when quarantine hook fails', async () => {
-  const result = await runMediaJob({ name: 'process-attachment', data: baseJob }, {
-    readObjectMetadata: async () => ({ contentLength: 12, contentType: 'text/plain' }),
-    scan: async () => ({ scanStatus: 'INFECTED', scanProvider: 'clamav', threat: 'Eicar', scannedAt: '2026-05-10T00:00:00.000Z' }),
-    updateAttachment: async () => {},
-    onInfected: async () => { throw new Error('audit-log-down'); },
-  });
-  assert.equal(result.status, 'accepted');
-  if (result.status !== 'accepted') return;
-  assert.equal(result.scan.status, 'INFECTED');
+test('runMediaJob throws (BullMQ retry) when quarantine hook fails', async () => {
+  // If an INFECTED file cannot be quarantined the job must fail so BullMQ retries it.
+  await assert.rejects(
+    () => runMediaJob({ name: 'process-attachment', data: baseJob }, {
+      readObjectMetadata: async () => ({ contentLength: 12, contentType: 'text/plain' }),
+      scan: async () => ({ scanStatus: 'INFECTED', scanProvider: 'clamav', threat: 'Eicar', scannedAt: '2026-05-10T00:00:00.000Z' }),
+      updateAttachment: async () => {},
+      onInfected: async () => { throw new Error('audit-log-down'); },
+    }),
+    (err: unknown) => {
+      assert.ok(err instanceof Error);
+      assert.match(err.message, /quarantine hook failed.*att-1.*audit-log-down/);
+      return true;
+    },
+  );
 });
 
 test('runMediaJob skips scanner when payload validation fails (does not call updateAttachment)', async () => {
@@ -133,13 +138,18 @@ test('runMediaJob marks scan as ERROR when scanner throws', async () => {
   assert.equal(updates[0].status, 'ERROR');
 });
 
-test('runMediaJob does not throw when updateAttachment fails', async () => {
-  const result = await runMediaJob({ name: 'process-attachment', data: baseJob }, {
-    readObjectMetadata: async () => ({ contentLength: 12, contentType: 'text/plain' }),
-    scan: async () => ({ scanStatus: 'CLEAN', scanProvider: 'clamav', scannedAt: '2026-05-10T00:00:00.000Z' }),
-    updateAttachment: async () => { throw new Error('db-down'); },
-  });
-  assert.equal(result.status, 'accepted');
-  if (result.status !== 'accepted') return;
-  assert.equal(result.scan.status, 'CLEAN');
+test('runMediaJob throws (BullMQ retry) when updateAttachment fails', async () => {
+  // If scan result cannot be persisted to DB the job must fail so BullMQ retries it.
+  await assert.rejects(
+    () => runMediaJob({ name: 'process-attachment', data: baseJob }, {
+      readObjectMetadata: async () => ({ contentLength: 12, contentType: 'text/plain' }),
+      scan: async () => ({ scanStatus: 'CLEAN', scanProvider: 'clamav', scannedAt: '2026-05-10T00:00:00.000Z' }),
+      updateAttachment: async () => { throw new Error('db-down'); },
+    }),
+    (err: unknown) => {
+      assert.ok(err instanceof Error);
+      assert.match(err.message, /scan persistence failed.*att-1.*db-down/);
+      return true;
+    },
+  );
 });

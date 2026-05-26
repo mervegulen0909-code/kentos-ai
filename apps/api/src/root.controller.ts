@@ -10,7 +10,7 @@ export class RootController {
       message: 'KentOS API calisiyor. Kullanici arayuzleri admin ve vatandas web uygulamalarindadir.',
       links: {
         admin: 'http://localhost:3101',
-        citizen: 'http://localhost:3102/demo-belediye',
+        citizen: 'http://localhost:3102',
         apiHealth: 'http://localhost:3100/api/v1/health',
         apiDocs: 'http://localhost:3100/api/docs',
       },

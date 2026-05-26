@@ -1,9 +1,11 @@
-import { Injectable, OnModuleDestroy } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { Queue } from 'bullmq';
+import { redisConnection } from '../../common/redis.js';
 import type { MediaJobData } from '@kentos/shared';
 
 @Injectable()
 export class AttachmentMediaQueueService implements OnModuleDestroy {
+  private readonly logger = new Logger(AttachmentMediaQueueService.name);
   private queue?: Queue<MediaJobData>;
 
   async enqueueAttachment(data: MediaJobData) {
@@ -15,7 +17,7 @@ export class AttachmentMediaQueueService implements OnModuleDestroy {
       });
       return true;
     } catch (error) {
-      console.warn('Media queue enqueue failed', error);
+      this.logger.warn(`Media queue enqueue failed: ${error instanceof Error ? error.message : String(error)}`);
       return false;
     }
   }
@@ -26,7 +28,7 @@ export class AttachmentMediaQueueService implements OnModuleDestroy {
 
   private getQueue() {
     this.queue ??= new Queue<MediaJobData>('kentos.media', {
-      connection: { url: process.env.REDIS_URL ?? 'redis://localhost:6379' },
+      connection: redisConnection(),
     });
     return this.queue;
   }

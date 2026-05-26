@@ -1,6 +1,7 @@
 import type { WhatsAppProvider } from '@kentos/shared';
 import { forwardGenericInbound, handleGenericOutbound, type GenericChannelKey } from './generic-channel.js';
 import { forwardInboundMessages } from './intake-forwarder.js';
+import { logger } from './logger.js';
 import { handleWhatsAppOutbound } from './outbound-handler.js';
 import { BaileysProvider } from './providers/baileys.provider.js';
 import { MetaCloudProvider } from './providers/meta-cloud.provider.js';
@@ -11,8 +12,16 @@ function createProvider(): WhatsAppProvider {
 
 const provider: WhatsAppProvider = createProvider();
 
-console.log(`KentOS WhatsApp gateway adapter ready: ${provider.providerName}`);
-console.log('Aktif kanal saglayicilari: WHATSAPP, INSTAGRAM, FACEBOOK, SMS (env-flag ile canli send)');
+// ── Kanal durumu başlangıç logu ───────────────────────────────────────────────
+const channelFlags: Record<string, string> = {
+  WHATSAPP:  process.env.WHATSAPP_OUTBOUND_LIVE  === 'true' ? 'LIVE 🟢' : 'DRY-RUN 🟡',
+  INSTAGRAM: process.env.INSTAGRAM_OUTBOUND_LIVE === 'true' ? 'LIVE 🟢' : 'DRY-RUN 🟡',
+  FACEBOOK:  process.env.FACEBOOK_OUTBOUND_LIVE  === 'true' ? 'LIVE 🟢' : 'DRY-RUN 🟡',
+  SMS:       process.env.SMS_OUTBOUND_LIVE        === 'true' ? 'LIVE 🟢' : 'DRY-RUN 🟡',
+  EMAIL:     process.env.EMAIL_OUTBOUND_LIVE      === 'true' ? 'LIVE 🟢' : 'DRY-RUN 🟡',
+};
+logger.info(`KentOS WhatsApp gateway adapter ready`, { provider: provider.providerName });
+logger.info('Outbound kanal durumları', channelFlags);
 
 export async function handleWebhook(raw: unknown) {
   const messages = await provider.parseWebhook(raw);

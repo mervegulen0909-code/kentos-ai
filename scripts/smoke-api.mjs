@@ -5,6 +5,7 @@ const { PrismaClient } = databaseRequire('@prisma/client');
 
 const baseUrl = process.env.KENTOS_API_BASE_URL ?? 'http://127.0.0.1:3110/api/v1';
 const internalApiKey = process.env.INTERNAL_API_KEY ?? 'change-me-internal';
+const internalEventsKey = process.env.INTERNAL_EVENTS_KEY ?? 'kentos-internal-dev';
 const prisma = new PrismaClient();
 
 function section(name) {
@@ -102,6 +103,24 @@ const departmentStaffLogin = await request('/auth/login', {
 });
 console.log('department_staff_login', departmentStaffLogin.status, departmentStaffLogin.body.user.role);
 
+section('internal event stream ingress');
+const internalEvent = await request('/events/internal/emit', {
+  method: 'POST',
+  body: JSON.stringify({
+    key: internalEventsKey,
+    event: { type: 'ticket.updated', tenantId: login.body.user.tenantId, payload: { source: 'smoke-api' } },
+  }),
+});
+assert(internalEvent.body.ok === true, 'Internal event emission should accept the configured shared key without JWT.');
+await expectStatus('/events/internal/emit', 403, {
+  method: 'POST',
+  body: JSON.stringify({
+    key: `${internalEventsKey}-invalid`,
+    event: { type: 'ticket.updated', tenantId: login.body.user.tenantId, payload: { source: 'smoke-api' } },
+  }),
+});
+console.log('internal_events_key_contract', internalEvent.status, true);
+
 const managerLogin = await request('/auth/login', {
   method: 'POST',
   body: JSON.stringify({ tenantSlug: 'demo-belediye', email: 'manager@demo.local', password: 'ChangeMe123!' }),
@@ -155,10 +174,11 @@ try {
 
 section('user management');
 const userList = await request('/users', { token });
-assert(Array.isArray(userList.body), 'GET /users should return an array.');
-assert(userList.body.length > 0, 'GET /users should return at least the seeded admin user.');
-assert(userList.body.every((u) => u.id && u.email && u.fullName && u.role), 'User list items missing required fields.');
-console.log('user_list', userList.status, `${userList.body.length} kullanici`);
+assert(Array.isArray(userList.body.data), 'GET /users should return a paginated data array.');
+assert(userList.body.data.length > 0, 'GET /users should return at least the seeded admin user.');
+assert(userList.body.data.every((u) => u.id && u.email && u.fullName && u.role), 'User list items missing required fields.');
+assert(typeof userList.body.total === 'number' && typeof userList.body.page === 'number', 'GET /users pagination metadata missing.');
+console.log('user_list', userList.status, `${userList.body.data.length} kullanici`);
 
 const createdUser = await request('/users', {
   method: 'POST',
@@ -440,6 +460,15 @@ for (const key of ['aiCompleted', 'operatorHandoff', 'awaitingInfo', 'automation
     `Analytics conversation segments missing numeric ${key}.`,
   );
 }
+const analyticsOutboundDeliveries = await request('/analytics/outbound-deliveries', { token });
+for (const key of ['total', 'pending', 'dispatched', 'delivered', 'failed', 'skipped']) {
+  assert(
+    typeof analyticsOutboundDeliveries.body[key] === 'number',
+    `Analytics outbound deliveries missing numeric ${key}.`,
+  );
+}
+assert(Array.isArray(analyticsOutboundDeliveries.body.byChannel), 'Analytics outbound deliveries byChannel is not an array.');
+assert(Array.isArray(analyticsOutboundDeliveries.body.recentFailures), 'Analytics outbound deliveries recentFailures is not an array.');
 for (const channel of ['WEB_CHAT', 'WHATSAPP', 'INSTAGRAM', 'FACEBOOK', 'SMS']) {
   assert(
     analyticsChannels.body.some((row) => row.channel === channel),
@@ -456,10 +485,12 @@ await expectStatus('/analytics/overview', 403, { token: operatorToken });
 await expectStatus('/analytics/departments', 403, { token: operatorToken });
 await expectStatus('/analytics/channels', 403, { token: operatorToken });
 await expectStatus('/analytics/conversation-segments', 403, { token: operatorToken });
+await expectStatus('/analytics/outbound-deliveries', 403, { token: operatorToken });
 await expectStatus('/analytics/overview', 403, { token: departmentStaffToken });
 await expectStatus('/analytics/channels', 403, { token: departmentStaffToken });
 await expectStatus('/analytics/overview', 403, { token: readOnlyToken });
 await expectStatus('/analytics/conversation-segments', 403, { token: readOnlyToken });
+await expectStatus('/analytics/outbound-deliveries', 403, { token: readOnlyToken });
 
 const aiUsage = await request('/analytics/ai-usage', { token });
 for (const window of ['last24h', 'last7d', 'last30d']) {
@@ -473,7 +504,7 @@ await expectStatus('/analytics/ai-usage', 403, { token: readOnlyToken });
 console.log('ai_usage_read', true);
 
 const forbiddenAnalyticsKeys = ['citizen', 'citizens', 'citizenId', 'phone', 'email', 'auditLogs', 'messages', 'internalNotes', 'aiRuns', 'aiClassification'];
-const analyticsPayload = JSON.stringify([analyticsOverview.body, analyticsDepartments.body, analyticsCategories.body, analyticsNeighborhoods.body, analyticsChannels.body, analyticsConversationSegments.body, managerAnalyticsOverview.body, managerAnalyticsDepartments.body, managerAnalyticsChannels.body]);
+const analyticsPayload = JSON.stringify([analyticsOverview.body, analyticsDepartments.body, analyticsCategories.body, analyticsNeighborhoods.body, analyticsChannels.body, analyticsConversationSegments.body, analyticsOutboundDeliveries.body, managerAnalyticsOverview.body, managerAnalyticsDepartments.body, managerAnalyticsChannels.body]);
 for (const key of forbiddenAnalyticsKeys) {
   assert(!analyticsPayload.includes(`"${key}"`), `Analytics response leaked ${key}.`);
 }
@@ -530,7 +561,8 @@ const adminAttachmentDownload = await request(`/attachments/${adminAttachmentUpl
 assert(adminAttachmentDownload.body.downloadUrl, 'Admin attachment download did not return a signed URL.');
 
 const quarantinedList = await request('/attachments/quarantined', { token });
-assert(Array.isArray(quarantinedList.body), 'Attachments quarantined list is not an array.');
+assert(Array.isArray(quarantinedList.body.data), 'Attachments quarantined data is not an array.');
+assert(typeof quarantinedList.body.meta?.total === 'number', 'Attachments quarantined pagination metadata is missing.');
 await expectStatus('/attachments/quarantined', 403, { token: operatorToken });
 await expectStatus('/attachments/quarantined', 403, { token: readOnlyToken });
 const rescanResponse = await request(`/attachments/${adminAttachmentUpload.body.attachmentId}/rescan`, {
@@ -640,7 +672,7 @@ await request(`/tickets/${operatorMatrixTicket.body.id}/status`, {
   body: JSON.stringify({ status: 'ASSIGNED' }),
 });
 const managerTickets = await request(`/tickets?q=${encodeURIComponent(operatorMatrixTicket.body.title)}`, { token: managerToken });
-assert(managerTickets.body.some((ticket) => ticket.id === operatorMatrixTicket.body.id), 'Manager cannot see tenant ticket list.');
+assert(managerTickets.body.data.some((ticket) => ticket.id === operatorMatrixTicket.body.id), 'Manager cannot see tenant ticket list.');
 const managerMatrixTicket = await request(`/tickets/${operatorMatrixTicket.body.id}`, { token: managerToken });
 assert(managerMatrixTicket.body.id === operatorMatrixTicket.body.id, 'Manager cannot read tenant ticket detail.');
 await request(`/tickets/${operatorMatrixTicket.body.id}/public-messages`, {
@@ -680,16 +712,16 @@ const temizlikTicket = await request('/tickets', {
 console.log('department_staff_hidden_ticket_create', temizlikTicket.status, temizlikTicket.body.ticketNo);
 
 const departmentStaffTickets = await request(`/tickets?q=${encodeURIComponent(fenTicket.body.title)}`, { token: departmentStaffToken });
-const departmentStaffTicketIds = departmentStaffTickets.body.map((ticket) => ticket.id);
+const departmentStaffTicketIds = departmentStaffTickets.body.data.map((ticket) => ticket.id);
 assert(departmentStaffTicketIds.includes(fenTicket.body.id), 'Department staff cannot see own department ticket.');
 const departmentStaffHiddenTickets = await request(`/tickets?q=${encodeURIComponent(temizlikTicket.body.title)}`, { token: departmentStaffToken });
-assert(!departmentStaffHiddenTickets.body.some((ticket) => ticket.id === temizlikTicket.body.id), 'Department staff can see another department ticket.');
+assert(!departmentStaffHiddenTickets.body.data.some((ticket) => ticket.id === temizlikTicket.body.id), 'Department staff can see another department ticket.');
 
 const departmentStaffFenTicket = await request(`/tickets/${fenTicket.body.id}`, { token: departmentStaffToken });
 console.log('department_staff_read_scope', departmentStaffFenTicket.status, departmentStaffFenTicket.body.department.id === fenDepartment.id);
 await expectStatus(`/tickets/${temizlikTicket.body.id}`, 404, { token: departmentStaffToken });
 const departmentStaffFilteredOutTickets = await expectStatus(`/tickets?departmentId=${temizlikDepartment.id}`, 200, { token: departmentStaffToken });
-assert(departmentStaffFilteredOutTickets.body.length === 0, 'Department staff department filter returned out-of-scope tickets.');
+assert(departmentStaffFilteredOutTickets.body.data.length === 0, 'Department staff department filter returned out-of-scope tickets.');
 
 await request(`/tickets/${fenTicket.body.id}/notes`, {
   method: 'POST',
@@ -971,7 +1003,7 @@ assert(
 );
 
 const publicTicketAdminView = await request('/tickets?q=kald%C4%B1r%C4%B1m%20%C3%A7%C3%B6kt%C3%BC', { token });
-const publicTicketRecord = publicTicketAdminView.body.find((ticket) => ticket.publicTrackingToken === publicTicket.body.trackingToken);
+const publicTicketRecord = publicTicketAdminView.body.data.find((ticket) => ticket.publicTrackingToken === publicTicket.body.trackingToken);
 assert(publicTicketRecord, 'Public ticket not visible from staff list for audit verification.');
 const publicTicketDbRecord = await prisma.ticket.findFirst({
   where: { tenantId: login.body.user.tenantId, publicTrackingToken: publicTicket.body.trackingToken },
@@ -1089,5 +1121,37 @@ const mergedRecord = await prisma.citizen.findUnique({ where: { id: mergeSource.
 assert(mergedRecord?.mergedIntoCitizenId === mergeTarget.id, 'Merge did not set mergedIntoCitizenId');
 assert(mergedRecord?.mergedAt !== null, 'Merge did not set mergedAt');
 console.log('citizen_merge', true);
+
+// ── Firebase Auth + KVKK Erasure (public endpoints) ─────────────────────────
+section('firebase_auth_erasure');
+
+// 1. Geçersiz Firebase token → 401 beklenir
+await expectStatus(`/public/demo-belediye/auth/firebase`, 401, {
+  method: 'POST',
+  body: JSON.stringify({ idToken: 'invalid-token-smoke-test' }),
+});
+console.log('firebase_auth_invalid_token_401', true);
+
+// 2. Geçersiz/eksik sessionToken ile erasure → 401 beklenir
+await expectStatus(`/public/demo-belediye/citizen/erasure`, 401, {
+  method: 'POST',
+  body: JSON.stringify({ sessionToken: 'invalid-session-token' }),
+});
+console.log('erasure_invalid_session_401', true);
+
+// 3. Eksik body ile erasure → 400 beklenir
+await expectStatus(`/public/demo-belediye/citizen/erasure`, 400, {
+  method: 'POST',
+  body: JSON.stringify({}),
+});
+console.log('erasure_missing_body_400', true);
+
+// 4. Geçersiz tenantSlug ile Firebase auth → 404 veya 401 beklenir
+const invalidTenantRes = await request(`/public/nonexistent-tenant-slug-xyz/auth/firebase`, {
+  method: 'POST',
+  body: JSON.stringify({ idToken: 'any' }),
+});
+assert([401, 404].includes(invalidTenantRes.status), `Expected 401 or 404 for invalid tenant, got ${invalidTenantRes.status}`);
+console.log('firebase_auth_invalid_tenant_4xx', true);
 
 await prisma.$disconnect();

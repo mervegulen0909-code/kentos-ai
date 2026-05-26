@@ -13,6 +13,8 @@ const adminSections = [
   { href: '/handoffs', label: 'Operator devri' },
   { href: '/queues', label: 'Birim kuyruklari' },
   { href: '/reports', label: 'Raporlar' },
+  { href: '/users', label: 'Kullanicilar' },
+  { href: '/citizens', label: 'Vatandaslar' },
   { href: '/settings', label: 'Ayarlar' },
 ];
 

@@ -14,6 +14,17 @@ veya doğrudan:
 node scripts/verify-env.mjs
 ```
 
+`pnpm` PATH'te degilse, root Node entrypoint'leri `npm run` ile de baslatabilirsiniz:
+
+```powershell
+npm run verify -- --help
+npm run ops:preflight -- --help
+```
+
+Windows PowerShell execution policy `npm.ps1` calismasini engelliyorsa `npm.cmd run ...` kullanin.
+
+Makinede kalici kurulum gerekiyorsa once `corepack enable` calistirip yeni terminal acin. Workspace icindeki gercek `pnpm` komutlari icin kanonik yol yine `pnpm ...` komutlaridir.
+
 Script `verification-report.txt` dosyasını üretir; içeriği bana `cat verification-report.txt` çıktısı olarak yapıştırman yeterli (Windows'ta PowerShell'de `Get-Content verification-report.txt`).
 
 ## Ne yapar
@@ -28,9 +39,14 @@ Script `verification-report.txt` dosyasını üretir; içeriği bana `cat verifi
 | `db-generate` | `pnpm db:generate` | Prisma client'ı yenile (yeni `OutboundDelivery` modeli + enum değerleri için) |
 | `typecheck` | `pnpm typecheck` | tüm workspace boyunca TS check |
 | `build` | `pnpm build` | tüm app build'i |
-| `whatsapp-test` | `pnpm --filter @kentos/whatsapp-gateway test` | gateway unit testleri (intake-forwarder, outbound-handler) |
-| `shared-test` | `pnpm --filter @kentos/shared test` | (varsa) shared paket testleri — opsiyonel |
-| `worker-typecheck` | `pnpm --filter @kentos/worker typecheck` | worker app typecheck |
+| `api-test` | `pnpm --filter @kentos/api test` | API unit testleri |
+| `worker-test` | `pnpm --filter @kentos/worker test` | worker unit testleri |
+| `gateway-test` | `pnpm --filter @kentos/whatsapp-gateway test` | gateway unit testleri |
+| `admin-web-test` | `pnpm --filter @kentos/admin-web test` | admin-web unit testleri |
+| `shared-test` | `pnpm --filter @kentos/shared test` | shared paket testleri |
+| `citizen-web-test` | `pnpm --filter @kentos/citizen-web test` | citizen-web testleri |
+| `diff-check` | `git diff --check` | whitespace / patch hygiene |
+| `playwright-list` | `pnpm exec playwright test --config tests/playwright.config.ts --list` | Playwright smoke discovery (opsiyonel) |
 
 ## Hızlı modlar
 
@@ -38,6 +54,7 @@ Script `verification-report.txt` dosyasını üretir; içeriği bana `cat verifi
 - Sadece testleri koş: `pnpm verify --only test`
 - DB adımını atla (örn. local Postgres yoksa): `pnpm verify --skip db`
 - Tek bir adımı koş: `pnpm verify --only typecheck`
+- Playwright discovery adımını atla: `pnpm verify --skip ui`
 
 ## Hata durumunda
 
@@ -58,4 +75,4 @@ pnpm smoke:api
 pnpm e2e
 ```
 
-`verify` script'i, statik doğrulamayı tek tıkla bitirip "kod hazır" sinyalini Cowork tarafına geri taşımak içindir.
+`verify` script'i, repo-ici unit/static gate'i tek entrypoint altinda toplar. Final release gate icin bunun ardindan `pnpm ops:preflight -- --with-verification` calistirilir.

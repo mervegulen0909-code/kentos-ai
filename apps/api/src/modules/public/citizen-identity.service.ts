@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, InternalServerErrorException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import {
   buildCitizenIdentifierInputs,
@@ -237,7 +237,7 @@ export class CitizenIdentityService {
 
         const survivor = clusterCitizens.find((entry) => entry.id === decision.survivorCitizenId) ?? clusterCitizens[0];
         if (!survivor) {
-          throw new Error('Backfill survivor could not be resolved.');
+          throw new InternalServerErrorException('Backfill survivor could not be resolved.');
         }
 
         const duplicateCitizens = clusterCitizens.filter((entry) => decision.duplicateCitizenIds.includes(entry.id));
@@ -330,6 +330,22 @@ export class CitizenIdentityService {
     };
   }
 
+  private async detectMergeCycle(citizenId: string, targetId: string, db: DbClient): Promise<boolean> {
+    let current: string | null = targetId;
+    const visited = new Set<string>();
+    while (current) {
+      if (current === citizenId) return true; // cycle detected
+      if (visited.has(current)) break; // already-merged chain — no new cycle
+      visited.add(current);
+      const record: { mergedIntoCitizenId: string | null } | null = await db.citizen.findUnique({
+        where: { id: current },
+        select: { mergedIntoCitizenId: true },
+      });
+      current = record?.mergedIntoCitizenId ?? null;
+    }
+    return false;
+  }
+
   private async reconcileCitizenCluster(
     db: DbClient,
     input: {
@@ -371,7 +387,7 @@ export class CitizenIdentityService {
     });
 
     const survivor = weightedCitizens[0]?.citizen;
-    if (!survivor) throw new Error('Canonical citizen could not be selected.');
+    if (!survivor) throw new InternalServerErrorException('Canonical citizen could not be selected.');
 
     const duplicates = weightedCitizens.slice(1).map((entry) => entry.citizen);
     if (!duplicates.length) {
@@ -387,6 +403,17 @@ export class CitizenIdentityService {
     }
 
     const duplicateIds = duplicates.map((duplicate) => duplicate.id);
+
+    // Cycle detection: make sure survivor is not already pointing back to one of the duplicates
+    for (const duplicate of duplicates) {
+      const hasCycle = await this.detectMergeCycle(duplicate.id, survivor.id, db);
+      if (hasCycle) {
+        throw new InternalServerErrorException(
+          `Merge cycle detected: merging citizen ${duplicate.id} into ${survivor.id} would create a circular reference.`,
+        );
+      }
+    }
+
     const mergedAt = new Date();
 
     await db.ticket.updateMany({

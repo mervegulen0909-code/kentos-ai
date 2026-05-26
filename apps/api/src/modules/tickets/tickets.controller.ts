@@ -1,21 +1,54 @@
-import { Body, Controller, Get, Inject, Param, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Inject, MessageEvent, Param, Post, Query, Sse, UseGuards } from '@nestjs/common';
+import { Observable, interval, from, EMPTY } from 'rxjs';
+import { map, switchMap, catchError } from 'rxjs/operators';
 import { AuthGuard } from '@nestjs/passport';
+import { ApiBearerAuth, ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { TicketStatus } from '@kentos/database';
 import { CurrentUser } from '../../common/decorators/current-user.decorator.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import { Roles } from '../../common/decorators/roles.decorator.js';
 import { RolesGuard } from '../../common/guards/roles.guard.js';
 import { AssignTicketDto } from './dto/assign-ticket.dto.js';
+import { BulkAssignDto } from './dto/bulk-assign.dto.js';
+import { BulkStatusDto } from './dto/bulk-status.dto.js';
 import { CreateTicketMessageDto } from './dto/create-ticket-message.dto.js';
 import { CreateTicketDto } from './dto/create-ticket.dto.js';
+import { ScheduleMessageDto } from './dto/schedule-message.dto.js';
+import { SuggestReplyDto } from './dto/suggest-reply.dto.js';
 import { UpdateTicketStatusDto } from './dto/update-ticket-status.dto.js';
 import { TicketsService } from './tickets.service.js';
 
+@ApiBearerAuth()
+@ApiTags('tickets')
 @UseGuards(AuthGuard('jwt'), RolesGuard)
 @Controller('tickets')
 export class TicketsController {
   constructor(@Inject(TicketsService) private readonly tickets: TicketsService) {}
 
+  @ApiOperation({ summary: 'SSE stream — ticket durum değişikliği olayları' })
+  @Sse(':id/events')
+  ticketEvents(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+  ): Observable<MessageEvent> {
+    // Poll every 5 seconds for ticket updates
+    return interval(5000).pipe(
+      switchMap(() => from(this.tickets.get(user, id))),
+      map((ticket) => ({ data: JSON.stringify({ type: 'ticket.updated', ticket }) } as MessageEvent)),
+      catchError(() => EMPTY),
+    );
+  }
+
+  @ApiOperation({ summary: 'Ticket listesi (sayfalı, filtrelenebilir)' })
+  @ApiQuery({ name: 'status', required: false, enum: TicketStatus })
+  @ApiQuery({ name: 'departmentId', required: false })
+  @ApiQuery({ name: 'categoryId', required: false })
+  @ApiQuery({ name: 'assignedToId', required: false })
+  @ApiQuery({ name: 'q', required: false, description: 'Serbest metin arama' })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiResponse({ status: 200, description: 'Ticket listesi ve sayfalama meta' })
+  @ApiResponse({ status: 401, description: 'Kimlik doğrulama gerekli' })
   @Get()
   list(
     @CurrentUser() user: AuthenticatedUser,
@@ -24,16 +57,25 @@ export class TicketsController {
     @Query('categoryId') categoryId?: string,
     @Query('assignedToId') assignedToId?: string,
     @Query('q') q?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
   ) {
-    return this.tickets.list(user, { status, departmentId, categoryId, assignedToId, q });
+    return this.tickets.list(user, {
+      status, departmentId, categoryId, assignedToId, q,
+      page: page ? Number(page) : undefined,
+      limit: limit ? Number(limit) : undefined,
+    });
   }
 
+  @ApiOperation({ summary: 'Yeni ticket oluştur' })
+  @ApiResponse({ status: 201, description: 'Ticket oluşturuldu' })
   @Roles('SUPER_ADMIN', 'TENANT_ADMIN', 'MANAGER', 'DEPARTMENT_STAFF', 'OPERATOR')
   @Post()
   create(@CurrentUser() user: AuthenticatedUser, @Body() dto: CreateTicketDto) {
     return this.tickets.create(user, dto);
   }
 
+  @ApiOperation({ summary: 'WhatsApp handoff listesi' })
   @Get('handoffs')
   listHandoffs(@CurrentUser() user: AuthenticatedUser) {
     return this.tickets.listHandoffs(user);
@@ -50,6 +92,8 @@ export class TicketsController {
     return this.tickets.createTicketFromHandoff(user, id);
   }
 
+  @ApiOperation({ summary: 'Ticket detayı' })
+  @ApiResponse({ status: 404, description: 'Ticket bulunamadı' })
   @Get(':id')
   get(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
     return this.tickets.get(user, id);
@@ -106,5 +150,38 @@ export class TicketsController {
   @Post(':id/reject')
   reject(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string, @Body() dto: CreateTicketMessageDto) {
     return this.tickets.updateStatus(user, id, { status: TicketStatus.REJECTED, publicMessage: dto.body });
+  }
+
+  @ApiOperation({ summary: 'AI yanıt önerisi — operatör için otomatik taslak üretir' })
+  @ApiResponse({ status: 200, description: 'Öneri metni, model adı ve token kullanımı' })
+  @Roles('SUPER_ADMIN', 'TENANT_ADMIN', 'MANAGER', 'DEPARTMENT_STAFF', 'OPERATOR')
+  @Post(':id/suggest-reply')
+  suggestReply(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string, @Body() dto: SuggestReplyDto) {
+    return this.tickets.suggestReply(user, id, dto);
+  }
+
+  @Roles('SUPER_ADMIN', 'TENANT_ADMIN', 'MANAGER', 'OPERATOR')
+  @Post('bulk-assign')
+  @ApiOperation({ summary: 'Toplu atama (max 50 ticket)' })
+  bulkAssign(@CurrentUser() user: AuthenticatedUser, @Body() dto: BulkAssignDto) {
+    return this.tickets.bulkAssign(user, dto);
+  }
+
+  @Roles('SUPER_ADMIN', 'TENANT_ADMIN', 'MANAGER', 'OPERATOR')
+  @Post('bulk-status')
+  @ApiOperation({ summary: 'Toplu durum güncelleme (max 50 ticket)' })
+  bulkUpdateStatus(@CurrentUser() user: AuthenticatedUser, @Body() dto: BulkStatusDto) {
+    return this.tickets.bulkUpdateStatus(user, dto);
+  }
+
+  @Roles('SUPER_ADMIN', 'TENANT_ADMIN', 'MANAGER', 'OPERATOR')
+  @Post(':id/schedule-message')
+  @ApiOperation({ summary: 'Zamanlanmış mesaj gönder' })
+  scheduleMessage(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body() dto: ScheduleMessageDto,
+  ) {
+    return this.tickets.scheduleMessage(user, id, dto);
   }
 }

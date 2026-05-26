@@ -1,4 +1,5 @@
 import type { ChannelProvider, GenericInboundMessage, GenericSendInput, SendMessageResult } from '@kentos/shared';
+import { logger } from '../logger.js';
 
 type FacebookWebhookEntry = {
   id?: string;
@@ -50,7 +51,7 @@ export class FacebookMessengerProvider implements ChannelProvider {
 
   async sendText(input: GenericSendInput): Promise<SendMessageResult> {
     if (process.env.FACEBOOK_OUTBOUND_LIVE !== 'true') {
-      console.log(`[Facebook DM] dry-run → ${input.to}: "${input.text.slice(0, 60)}"`);
+      logger.info('[FACEBOOK] dry-run', { to: input.to, textPreview: input.text.slice(0, 60) });
       return {
         provider: this.providerName,
         externalMessageId: `fb-dry-${Date.now()}`,

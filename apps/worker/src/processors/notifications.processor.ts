@@ -40,7 +40,6 @@ export async function processNotificationJob(job: { name: string; data: Notifica
     return { processor: 'notifications', job: job.name, skipped: skipReason ?? 'not_deliverable' };
   }
 
-  // Idempotency: check if an outbound delivery was already created for this ticket message
   const idempotencyKey = `${TICKET_MSG_IDEMPOTENCY_PREFIX}${message.id}`;
   const existing = await prisma.outboundDelivery.findFirst({
     where: { tenantId: message.tenantId, externalConversationId: idempotencyKey },
@@ -56,7 +55,6 @@ export async function processNotificationJob(job: { name: string; data: Notifica
       channel: 'WHATSAPP',
       state: OutboundDeliveryState.PENDING,
       recipientPhone: to,
-      // Use externalConversationId as idempotency key so replayed jobs are deduplicated
       externalConversationId: idempotencyKey,
       body: message.body,
     },

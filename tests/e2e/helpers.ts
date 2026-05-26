@@ -35,6 +35,8 @@ export async function createPublicTicket(request: APIRequestContext, suffix: str
 
 export async function loginAdmin(page: Page) {
   await page.goto(`${adminBaseURL}/login`);
+  await page.getByLabel('Belediye kodu').fill(tenantSlug);
+  await page.getByLabel('E-posta').fill('admin@demo.local');
   await page.getByLabel('Sifre').fill('ChangeMe123!');
   await page.getByRole('button', { name: 'Guvenli giris yap' }).click();
   await page.waitForURL(`${adminBaseURL}/`, { timeout: 30_000 });

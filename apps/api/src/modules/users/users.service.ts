@@ -1,92 +1,192 @@
-import { ConflictException, ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  ForbiddenException,
+  Inject,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import bcrypt from 'bcryptjs';
 import { UserRole } from '@kentos/database';
-import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
+import type { Prisma } from '@kentos/database';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import { CreateUserDto } from './dto/create-user.dto.js';
 import { UpdateUserDto } from './dto/update-user.dto.js';
 
-const ALLOWED_ROLES = new Set<string>(Object.values(UserRole));
-
-function safeRole(role: string | undefined, fallback: UserRole): UserRole {
-  if (!role) return fallback;
-  return (ALLOWED_ROLES.has(role) ? role : fallback) as UserRole;
+interface ListFilters {
+  role?: string;
+  page?: number;
+  limit?: number;
+  q?: string;
 }
 
-function safeUser(user: { id: string; email: string; fullName: string; role: string; isActive: boolean; createdAt: Date }) {
-  return {
-    id: user.id,
-    email: user.email,
-    fullName: user.fullName,
-    role: user.role,
-    isActive: user.isActive,
-    createdAt: user.createdAt.toISOString(),
-  };
-}
+const USER_SELECT = {
+  id: true,
+  tenantId: true,
+  email: true,
+  fullName: true,
+  role: true,
+  isActive: true,
+  createdAt: true,
+  updatedAt: true,
+  departments: {
+    select: {
+      department: {
+        select: {
+          id: true,
+          name: true,
+        },
+      },
+    },
+  },
+} as const;
 
 @Injectable()
 export class UsersService {
   constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
 
-  async list(user: AuthenticatedUser, filters: { isActive?: boolean } = {}) {
-    const users = await this.prisma.user.findMany({
-      where: {
-        tenantId: user.tenantId,
-        ...(filters.isActive !== undefined ? { isActive: filters.isActive } : {}),
-      },
-      select: { id: true, email: true, fullName: true, role: true, isActive: true, createdAt: true },
-      orderBy: { fullName: 'asc' },
-    });
-    return users.map(safeUser);
+  async list(
+    user: AuthenticatedUser,
+    filters: ListFilters,
+  ): Promise<{ data: unknown[]; total: number; page: number; limit: number }> {
+    const page = Math.max(1, filters.page ?? 1);
+    const limit = Math.min(100, Math.max(1, filters.limit ?? 20));
+    const skip = (page - 1) * limit;
+
+    const where = {
+      tenantId: user.tenantId,
+      ...(filters.role ? { role: filters.role as UserRole } : {}),
+      ...(filters.q
+        ? {
+            OR: [
+              { fullName: { contains: filters.q, mode: 'insensitive' as const } },
+              { email: { contains: filters.q, mode: 'insensitive' as const } },
+            ],
+          }
+        : {}),
+    };
+
+    const [data, total] = await this.prisma.$transaction([
+      this.prisma.user.findMany({
+        where,
+        select: USER_SELECT,
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.user.count({ where }),
+    ]);
+
+    return { data, total, page, limit };
   }
 
-  async create(user: AuthenticatedUser, dto: CreateUserDto) {
-    const existing = await this.prisma.user.findFirst({
-      where: { tenantId: user.tenantId, email: dto.email.toLowerCase().trim() },
-      select: { id: true },
+  async create(user: AuthenticatedUser, dto: CreateUserDto): Promise<unknown> {
+    const email = dto.email.toLowerCase().trim();
+    const existing = await this.prisma.user.findUnique({
+      where: { tenantId_email: { tenantId: user.tenantId, email } },
     });
-    if (existing) throw new ConflictException('Bu e-posta adresi zaten kayitli.');
+
+    if (existing) {
+      throw new ConflictException(
+        `A user with email "${email}" already exists in this tenant.`,
+      );
+    }
 
     const passwordHash = await bcrypt.hash(dto.password, 12);
-    const role = safeRole(dto.role, UserRole.OPERATOR);
 
     const created = await this.prisma.user.create({
       data: {
         tenantId: user.tenantId,
-        email: dto.email.toLowerCase().trim(),
+        email,
         fullName: dto.fullName.trim(),
+        role: dto.role,
         passwordHash,
-        role,
-        isActive: true,
+        ...(dto.departmentIds?.length
+          ? {
+              departments: {
+                create: dto.departmentIds.map((departmentId) => ({
+                  departmentId,
+                })),
+              },
+            }
+          : {}),
       },
-      select: { id: true, email: true, fullName: true, role: true, isActive: true, createdAt: true },
+      select: USER_SELECT,
     });
-    return safeUser(created);
+
+    return created;
   }
 
-  async update(user: AuthenticatedUser, id: string, dto: UpdateUserDto) {
+  async update(
+    user: AuthenticatedUser,
+    id: string,
+    dto: UpdateUserDto,
+  ): Promise<unknown> {
     const target = await this.prisma.user.findFirst({
       where: { id, tenantId: user.tenantId },
-      select: { id: true },
     });
-    if (!target) throw new NotFoundException('Kullanici bulunamadi.');
 
-    // Prevent self-deactivation
-    if (id === user.id && dto.isActive === false) {
-      throw new ForbiddenException('Kendi hesabinizi deaktive edemezsiniz.');
+    if (!target) {
+      throw new NotFoundException(`User "${id}" not found.`);
     }
 
-    const data: Record<string, unknown> = {};
-    if (dto.fullName !== undefined) data.fullName = dto.fullName.trim();
-    if (dto.role !== undefined) data.role = safeRole(dto.role, UserRole.OPERATOR);
-    if (dto.isActive !== undefined) data.isActive = dto.isActive;
-    if (dto.password !== undefined) data.passwordHash = await bcrypt.hash(dto.password, 12);
+    if (user.id === id && dto.role !== undefined) {
+      throw new ForbiddenException('You cannot change your own role.');
+    }
 
-    const updated = await this.prisma.user.update({
-      where: { id },
-      data,
-      select: { id: true, email: true, fullName: true, role: true, isActive: true, createdAt: true },
+    if (user.id === id && dto.isActive === false) {
+      throw new ForbiddenException('You cannot deactivate your own account.');
+    }
+
+    const updateData: Record<string, unknown> = {};
+
+    if (dto.fullName !== undefined) updateData.fullName = dto.fullName.trim();
+    if (dto.role !== undefined) updateData.role = dto.role;
+    if (dto.isActive !== undefined) updateData.isActive = dto.isActive;
+    if (dto.password !== undefined) {
+      updateData.passwordHash = await bcrypt.hash(dto.password, 12);
+    }
+
+    const updated = await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+      if (dto.departmentIds !== undefined) {
+        await tx.userDepartment.deleteMany({ where: { userId: id } });
+        if (dto.departmentIds.length > 0) {
+          await tx.userDepartment.createMany({
+            data: dto.departmentIds.map((departmentId) => ({
+              userId: id,
+              departmentId,
+            })),
+          });
+        }
+      }
+
+      return tx.user.update({
+        where: { id },
+        data: updateData,
+        select: USER_SELECT,
+      });
     });
-    return safeUser(updated);
+
+    return updated;
+  }
+
+  async remove(user: AuthenticatedUser, id: string): Promise<unknown> {
+    if (user.id === id) {
+      throw new ForbiddenException('You cannot deactivate your own account.');
+    }
+
+    const target = await this.prisma.user.findFirst({
+      where: { id, tenantId: user.tenantId },
+    });
+
+    if (!target) {
+      throw new NotFoundException(`User "${id}" not found.`);
+    }
+
+    return this.prisma.user.update({
+      where: { id },
+      data: { isActive: false },
+      select: USER_SELECT,
+    });
   }
 }

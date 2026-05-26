@@ -117,3 +117,23 @@ export async function addPublicMessageAction(formData: FormData) {
     });
   });
 }
+
+export async function suggestReplyAction(
+  _prevState: { suggestion?: string; model?: string; error?: string } | null,
+  formData: FormData,
+): Promise<{ suggestion?: string; model?: string; error?: string }> {
+  const ticketId = String(formData.get('ticketId') ?? '');
+  const operatorNote = String(formData.get('operatorNote') ?? '').trim();
+  const token = await resolveAdminAccessToken();
+  if (!token) return { error: 'Oturum bulunamadi.' };
+
+  try {
+    const result = await apiFetch<{ suggestion: string; model: string; tokensUsed: number | null }>(
+      `/tickets/${ticketId}/suggest-reply`,
+      { method: 'POST', token, body: JSON.stringify({ operatorNote: operatorNote || undefined }) },
+    );
+    return { suggestion: result.suggestion, model: result.model };
+  } catch {
+    return { error: 'AI yanit onerisi alinamadi. Lutfen tekrar deneyin.' };
+  }
+}
