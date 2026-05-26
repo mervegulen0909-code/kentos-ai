@@ -19,6 +19,8 @@ async function bootstrap() {
   app.useLogger(logger);
 
   const config = app.get(ConfigService);
+  const corsOrigin = config.get<string>('CORS_ORIGIN')?.trim();
+  const isProduction = config.get<string>('NODE_ENV') === 'production';
 
   app.setGlobalPrefix('api/v1', { exclude: [{ path: '/', method: RequestMethod.GET }] });
   app.use(helmet({
@@ -46,8 +48,6 @@ async function bootstrap() {
     next();
   });
 
-  const corsOrigin = config.get<string>('CORS_ORIGIN')?.trim();
-  const isProduction = config.get<string>('NODE_ENV') === 'production';
   if (isProduction && !corsOrigin) {
     throw new Error('CORS_ORIGIN env var is required in production. Set it to a comma-separated list of allowed origins.');
   }

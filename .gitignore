@@ -1,6 +1,7 @@
 # dependencies
 node_modules/
 .pnpm-store/
+package-lock.json
 
 # builds
 .next/
@@ -37,6 +38,7 @@ redis-data/
 # logs
 *.log
 logs/
+.qa-logs/
 npm-debug.log*
 pnpm-debug.log*
 yarn-debug.log*

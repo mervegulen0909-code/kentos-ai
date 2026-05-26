@@ -1,15 +1,15 @@
 import { redisConnection } from './redis-connection.js';
 import { Worker } from 'bullmq';
-import Redis from 'ioredis';
+import { Redis } from 'ioredis';
 import type { QueueName } from './queue-names.js';
 import { logger } from '../logger.js';
 
 /** TTL for the idempotency lock key (1 hour). */
 const JOB_LOCK_TTL_SECONDS = 3600;
 
-let idempotencyRedis: Redis | null = null;
+let idempotencyRedis: InstanceType<typeof Redis> | null = null;
 
-function getIdempotencyRedis(): Redis {
+function getIdempotencyRedis(): InstanceType<typeof Redis> {
   if (!idempotencyRedis) {
     const { url } = redisConnection();
     idempotencyRedis = new Redis(url, { maxRetriesPerRequest: null });

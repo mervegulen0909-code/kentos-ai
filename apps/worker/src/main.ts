@@ -70,10 +70,10 @@ const healthServer = createServer(async (req, res) => {
       const queueStats = await Promise.all(
         queues.map(async (q) => {
           const counts = await q.getJobCounts('active', 'completed', 'failed', 'waiting', 'delayed');
-          return { name: q.name, ...counts };
+          return { name: q.name, ...counts } as { name: string; failed?: number } & Record<string, number | string | undefined>;
         }),
       );
-      const totalFailed = queueStats.reduce((sum, q) => sum + (q.failed ?? 0), 0);
+      const totalFailed = queueStats.reduce((sum, q) => sum + Number(q.failed ?? 0), 0);
       res.writeHead(totalFailed > 100 ? 503 : 200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({
         ok: totalFailed <= 100,

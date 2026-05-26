@@ -16,7 +16,7 @@ async function resolveWaTemplateKey(
 ): Promise<string | null> {
   const prisma = getPrismaClient();
 
-  const lastInbound = await prisma.channelEvent.findFirst({
+  const lastInbound = await prisma.conversation.findFirst({
     where: {
       tenantId,
       channel: 'WHATSAPP',

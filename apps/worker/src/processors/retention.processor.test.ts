@@ -39,6 +39,7 @@ function buildDeps(options: {
   const tenantCalls = { findUnique: 0 };
   return {
     deletedKeys,
+    attachmentCalls: attachment.calls,
     tenantCalls,
     deps: {
       prisma: {
@@ -65,7 +66,7 @@ function buildDeps(options: {
 }
 
 test('retention defaults attachment scope to dry-run', async () => {
-  const { deps, deletedKeys } = buildDeps();
+  const { deps, deletedKeys, attachmentCalls } = buildDeps();
   const result = await runRetentionJob({ name: 'retention', data: { scope: 'attachments', retentionDays: 1 } }, deps);
 
   assert.equal(result.dryRun, true);
@@ -73,11 +74,11 @@ test('retention defaults attachment scope to dry-run', async () => {
   assert.equal(result.totals.attachmentObjectsDeleted, 0);
   assert.deepEqual(result.attachmentStorageKeys, ['attachments/tenant-1/old.txt']);
   assert.deepEqual(deletedKeys, []);
-  assert.equal(deps.prisma.attachment.calls.deleteMany, 0);
+  assert.equal(attachmentCalls.deleteMany, 0);
 });
 
 test('retention deletes DB and S3 objects only with explicit flags', async () => {
-  const { deps, deletedKeys } = buildDeps();
+  const { deps, deletedKeys, attachmentCalls } = buildDeps();
   const result = await runRetentionJob({
     name: 'retention',
     data: { scope: 'attachments', retentionDays: 1, dryRun: false, deleteAttachmentObjects: true },
@@ -88,7 +89,7 @@ test('retention deletes DB and S3 objects only with explicit flags', async () =>
   assert.equal(result.totals.attachments, 1);
   assert.equal(result.totals.attachmentObjectsDeleted, 1);
   assert.deepEqual(deletedKeys, ['attachments/tenant-1/old.txt']);
-  assert.equal(deps.prisma.attachment.calls.deleteMany, 1);
+  assert.equal(attachmentCalls.deleteMany, 1);
 });
 
 test('retention all scope includes attachments in dry-run summary', async () => {
