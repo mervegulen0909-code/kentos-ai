@@ -46,13 +46,5 @@
     "@playwright/test": "^1.50.0",
     "tsx": "^4.21.0",
     "typescript": "^5.7.3"
-  },
-  "pnpm": {
-    "overrides": {
-      "glob": "^13.0.6",
-      "lodash": "^4.18.1",
-      "multer": "^2.1.1",
-      "picomatch": "^4.0.4"
-    }
   }
 }

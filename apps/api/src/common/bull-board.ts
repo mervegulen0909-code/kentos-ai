@@ -27,6 +27,10 @@ export function mountBullBoard(app: { use: (...args: unknown[]) => void }): void
   const boardUser = process.env.BULL_BOARD_USER;
   const boardPass = process.env.BULL_BOARD_PASS;
 
+  if (!boardUser || !boardPass) {
+    console.warn('[BullBoard] BULL_BOARD_USER veya BULL_BOARD_PASS ayarlanmamış. /admin/queues endpoint\'i 503 döndürecek.');
+  }
+
   const serverAdapter = new ExpressAdapter();
   serverAdapter.setBasePath('/admin/queues');
 

@@ -4,6 +4,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { ThrottlerWithHeadersGuard } from './common/guards/throttler-with-headers.guard.js';
 import { TenantThrottleGuard } from './common/guards/tenant-throttle.guard.js';
+import { validateEnv } from './common/env.validation.js';
 import { AdminModule } from './modules/admin/admin.module.js';
 import { CitizensModule } from './modules/citizens/citizens.module.js';
 import { AnalyticsModule } from './modules/analytics/analytics.module.js';
@@ -24,6 +25,7 @@ import { RootController } from './root.controller.js';
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: ['.env.local', '.env', '../../.env.local', '../../.env'],
+      validate: validateEnv,
     }),
     ThrottlerModule.forRootAsync({
       inject: [ConfigService],

@@ -37,8 +37,16 @@ export class RateLimitService implements OnModuleDestroy {
   private readonly memoryBuckets = new Map<string, Bucket>();
   private redis: RedisLike | null = null;
   private redisDisabledUntil = 0;
+  private readonly cleanupTimer: ReturnType<typeof setInterval>;
 
-  constructor(@Inject(ConfigService) private readonly config: ConfigService) {}
+  constructor(@Inject(ConfigService) private readonly config: ConfigService) {
+    this.cleanupTimer = setInterval(() => {
+      const now = Date.now();
+      for (const [key, bucket] of this.memoryBuckets) {
+        if (bucket.resetAt <= now) this.memoryBuckets.delete(key);
+      }
+    }, 60_000);
+  }
 
   async hit(scope: string, key: string, limit: number, windowMs: number): Promise<RateLimitResult> {
     const now = Date.now();
@@ -74,6 +82,7 @@ export class RateLimitService implements OnModuleDestroy {
   }
 
   async onModuleDestroy() {
+    clearInterval(this.cleanupTimer);
     if (this.redis) await this.redis.quit().catch(() => {});
   }
 

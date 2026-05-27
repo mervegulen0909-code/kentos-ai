@@ -20,6 +20,7 @@ import { SlaService } from './sla.service.js';
 import { TicketAiService } from './ticket-ai.service.js';
 import { TicketNumberService } from './ticket-number.service.js';
 import { EventsService } from '../events/events.service.js';
+import { WebhookQueueService } from '../tenants/webhook-queue.service.js';
 
 @Injectable()
 export class TicketsService {
@@ -35,6 +36,7 @@ export class TicketsService {
     @Inject(EventsService) private readonly eventsService: EventsService,
     @Inject(TicketAiService) private readonly ticketAi: TicketAiService,
     @Inject(FcmPushService) private readonly fcmPush: FcmPushService,
+    @Inject(WebhookQueueService) private readonly webhooks: WebhookQueueService,
   ) {}
 
   suggestReply(user: AuthenticatedUser, ticketId: string, dto: SuggestReplyDto) {
@@ -167,6 +169,10 @@ export class TicketsService {
       payload: { ticketId: ticket.id, ticketNo: ticket.ticketNo, status: ticket.status, priority: ticket.priority },
     });
 
+    void this.webhooks.dispatchEvent(user.tenantId, 'ticket.created', {
+      ticketId: ticket.id, ticketNo: ticket.ticketNo, status: ticket.status, priority: ticket.priority,
+    });
+
     // F9: Duplicate detection — link to an existing open ticket from the same citizen if similar title in last 48h
     if (relations.citizenId) {
       const since48h = new Date(Date.now() - 48 * 60 * 60 * 1000);
@@ -297,6 +303,10 @@ export class TicketsService {
       payload: { ticketId: id, departmentId: dto.departmentId, assignedToId: dto.assignedToId ?? null },
     });
 
+    void this.webhooks.dispatchEvent(user.tenantId, 'ticket.assigned', {
+      ticketId: id, departmentId: dto.departmentId, assignedToId: dto.assignedToId ?? null,
+    });
+
     return updatedTicket;
   }
 
@@ -419,6 +429,9 @@ export class TicketsService {
       tenantId: user.tenantId,
       payload: { ticketId: id, status: dto.status },
     });
+
+    const webhookEvent = dto.status === 'RESOLVED' ? 'ticket.resolved' : dto.status === 'CLOSED' ? 'ticket.closed' : 'ticket.updated';
+    void this.webhooks.dispatchEvent(user.tenantId, webhookEvent, { ticketId: id, status: dto.status });
 
     // FCM push notification — fire-and-forget, does not block response
     void this.sendStatusPush(ticket, dto.status);

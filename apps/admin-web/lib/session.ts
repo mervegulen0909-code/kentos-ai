@@ -53,7 +53,8 @@ function decodeSessionState(value: string | undefined) {
 
   try {
     return JSON.parse(decodeURIComponent(value)) as AdminSessionUser;
-  } catch {
+  } catch (err) {
+    console.warn('[session] session cookie decode failed, clearing session', err instanceof Error ? err.message : String(err));
     return null;
   }
 }

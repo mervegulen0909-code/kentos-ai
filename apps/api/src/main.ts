@@ -48,8 +48,13 @@ async function bootstrap() {
     next();
   });
 
-  if (isProduction && !corsOrigin) {
-    throw new Error('CORS_ORIGIN env var is required in production. Set it to a comma-separated list of allowed origins.');
+  const nodeEnv = config.get<string>('NODE_ENV') ?? 'development';
+  const isStaging = nodeEnv === 'staging';
+  if ((isProduction || isStaging) && !corsOrigin) {
+    throw new Error('CORS_ORIGIN env var is required in production/staging. Set it to a comma-separated list of allowed origins.');
+  }
+  if (!corsOrigin) {
+    logger.warn('CORS_ORIGIN not set — all origins allowed. Set this env var in non-dev environments.');
   }
   app.enableCors({
     origin: corsOrigin ? corsOrigin.split(',').map((o) => o.trim()) : true,
