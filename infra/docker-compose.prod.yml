@@ -101,6 +101,9 @@ services:
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
       S3_ENDPOINT: http://minio:9000
       S3_FORCE_PATH_STYLE: "true"
+      # API does not scan attachments; only the worker does.
+      # Override to prevent /health/ready from checking ClamAV.
+      ATTACHMENT_SCAN_PROVIDER: placeholder
       FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID:-}
       FIREBASE_SERVICE_ACCOUNT_BASE64: ${FIREBASE_SERVICE_ACCOUNT_BASE64:-}
     command: ["pnpm", "--filter", "@kentos/api", "start"]
