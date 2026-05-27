@@ -12,7 +12,19 @@ let idempotencyRedis: InstanceType<typeof Redis> | null = null;
 function getIdempotencyRedis(): InstanceType<typeof Redis> {
   if (!idempotencyRedis) {
     const { url } = redisConnection();
-    idempotencyRedis = new Redis(url, { maxRetriesPerRequest: null });
+    idempotencyRedis = new Redis(url, { maxRetriesPerRequest: null, lazyConnect: true });
+    // Prevent unhandled 'error' events from crashing the process
+    idempotencyRedis.on('error', (err) => {
+      logger.error('[worker] idempotency Redis connection error', {
+        error: err instanceof Error ? err.message : String(err),
+      });
+    });
+    // Connect lazily so the process doesn't hang on startup
+    idempotencyRedis.connect().catch((err) => {
+      logger.error('[worker] idempotency Redis connect failed', {
+        error: err instanceof Error ? err.message : String(err),
+      });
+    });
   }
   return idempotencyRedis;
 }
