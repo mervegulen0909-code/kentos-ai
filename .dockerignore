@@ -1,0 +1,36 @@
+# Exclude compiled output — Docker builds fresh with pnpm build
+**/dist
+**/.next
+
+# Dev/test artifacts
+node_modules
+**/node_modules
+**/.turbo
+**/coverage
+**/*.test.ts
+**/*.spec.ts
+
+# Local config
+.env
+.env.local
+.env.*.local
+.env.production.local
+
+# Git
+.git
+.gitignore
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docs / misc
+docs/
+*.md
+!README.md
