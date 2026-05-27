@@ -28,14 +28,32 @@ export class WebhookQueueService implements OnModuleDestroy {
   constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
 
   async dispatchEvent(tenantId: string, event: WebhookEventName, payload: Record<string, unknown>): Promise<void> {
-    const webhooks = await (this.prisma as unknown as {
-      tenantWebhook: { findMany(args: unknown): Promise<{ id: string }[]> };
-    }).tenantWebhook.findMany({
-      where: { tenantId, isActive: true, events: { has: event } },
-      select: { id: true },
-    });
+    try {
+      // events is stored as Json (string[]) — fetch all active webhooks and
+      // filter in-process because Prisma's `has` filter only works on scalar
+      // list fields, not Json columns.
+      const webhooks = await (this.prisma as unknown as {
+        tenantWebhook: {
+          findMany(args: unknown): Promise<{ id: string; events: unknown }[]>;
+        };
+      }).tenantWebhook.findMany({
+        where: { tenantId, isActive: true },
+        select: { id: true, events: true },
+      });
 
-    await Promise.all(webhooks.map((wh) => this.dispatch({ webhookId: wh.id, event, payload, tenantId })));
+      const matching = webhooks.filter((wh) => {
+        const evts = wh.events;
+        return Array.isArray(evts) && (evts as string[]).includes(event);
+      });
+
+      await Promise.all(matching.map((wh) => this.dispatch({ webhookId: wh.id, event, payload, tenantId })));
+    } catch (error) {
+      // Never let webhook fan-out crash the request — log and continue.
+      this.logger.warn(
+        `dispatchEvent failed silently: ${error instanceof Error ? error.message : String(error)}`,
+        { tenantId, event },
+      );
+    }
   }
 
   async dispatch(data: WebhookJobData): Promise<boolean> {
