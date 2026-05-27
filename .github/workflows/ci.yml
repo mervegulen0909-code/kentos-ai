@@ -162,6 +162,13 @@ jobs:
             git pull origin master
             pnpm install --frozen-lockfile
             pnpm ops:external -- --skip-network
+            echo "=== Disk usage before cleanup ==="
+            df -h /
+            echo "=== Freeing Docker build cache and dangling images ==="
+            docker builder prune -f || true
+            docker image prune -f || true
+            echo "=== Disk usage after cleanup ==="
+            df -h /
             docker compose --env-file .env.production.local -f infra/docker-compose.prod.yml build
             docker compose --env-file .env.production.local -f infra/docker-compose.prod.yml up -d postgres redis minio minio-init
             docker compose --env-file .env.production.local -f infra/docker-compose.prod.yml up -d --force-recreate clamav
