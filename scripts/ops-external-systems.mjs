@@ -212,10 +212,14 @@ function addRequiredEnvChecks() {
 }
 
 function addProviderReadinessChecks() {
-  // Firebase is optional — only validate credentials when FIREBASE_PROJECT_ID
-  // is explicitly set (i.e. the operator intentionally enables Firebase auth).
+  // Firebase client vars (NEXT_PUBLIC_*) are required when FIREBASE_PROJECT_ID
+  // is set — these are baked into the Next.js build.
+  // The server-side service account (FIREBASE_SERVICE_ACCOUNT_BASE64) is
+  // needed only for token verification; its absence is a WARNING (the app
+  // starts, Firebase login fails gracefully at runtime).
   const firebaseProjectId = readEnv("FIREBASE_PROJECT_ID");
-  const firebaseMissing = [];
+  const firebaseClientMissing = [];
+  const firebaseServerMissing = [];
   if (firebaseProjectId) {
     for (const name of [
       "NEXT_PUBLIC_FIREBASE_API_KEY",
@@ -223,31 +227,37 @@ function addProviderReadinessChecks() {
       "NEXT_PUBLIC_FIREBASE_PROJECT_ID",
       "NEXT_PUBLIC_FIREBASE_APP_ID",
     ]) {
-      if (!readEnv(name)) firebaseMissing.push(name);
+      if (!readEnv(name)) firebaseClientMissing.push(name);
     }
     if (
       !readEnv("FIREBASE_SERVICE_ACCOUNT_BASE64") &&
       !readEnv("GOOGLE_APPLICATION_CREDENTIALS")
     ) {
-      firebaseMissing.push(
+      firebaseServerMissing.push(
         "FIREBASE_SERVICE_ACCOUNT_BASE64 or GOOGLE_APPLICATION_CREDENTIALS",
       );
     }
   }
+  const firebaseAllMissing = [...firebaseClientMissing, ...firebaseServerMissing];
   addCheck({
     id: "citizen-firebase-auth",
-    status: firebaseMissing.length
+    // Client vars missing → block (build would be broken).
+    // Server service account missing → warning only (runtime degradation).
+    status: firebaseClientMissing.length
       ? strictLaunch
         ? "blocked"
         : "warning"
-      : "passed",
-    summary: firebaseMissing.length
-      ? `Citizen Firebase auth configuration is missing: ${firebaseMissing.join(", ")}`
+      : firebaseServerMissing.length
+        ? "warning"
+        : "passed",
+    summary: firebaseAllMissing.length
+      ? `Citizen Firebase auth configuration is missing: ${firebaseAllMissing.join(", ")}`
       : firebaseProjectId
         ? "Citizen Firebase auth client and API verifier configuration are present."
         : "Firebase auth is disabled (FIREBASE_PROJECT_ID not set) — citizen login uses session-based auth only.",
     detail:
-      "Set FIREBASE_PROJECT_ID (and related vars) to enable Firebase push notifications and mobile auth.",
+      "NEXT_PUBLIC_FIREBASE_* client vars are required when FIREBASE_PROJECT_ID is set. " +
+      "FIREBASE_SERVICE_ACCOUNT_BASE64 enables server-side token verification (add when available).",
   });
 
   // BULL_BOARD_USER/PASS protect the queue dashboard — always required in
