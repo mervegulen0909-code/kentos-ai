@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { AttachmentsModule } from '../attachments/attachments.module.js';
 import { EventsModule } from '../events/events.module.js';
+import { TenantsModule } from '../tenants/tenants.module.js';
 import { CsatQueueService } from './csat-queue.service.js';
 import { SlaQueueService } from './sla-queue.service.js';
 import { NeighborhoodRoutingService } from './neighborhood-routing.service.js';
@@ -14,7 +15,7 @@ import { TicketsController } from './tickets.controller.js';
 import { TicketsService } from './tickets.service.js';
 
 @Module({
-  imports: [AttachmentsModule, EventsModule],
+  imports: [AttachmentsModule, EventsModule, TenantsModule],
   controllers: [TicketsController],
   providers: [TicketsService, TicketAiService, FcmPushService, NotificationQueueService, NotificationTemplateService, SlaService, TicketNumberService, CsatQueueService, NeighborhoodRoutingService, SlaQueueService],
 })
