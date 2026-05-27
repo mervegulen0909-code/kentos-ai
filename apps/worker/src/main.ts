@@ -32,6 +32,12 @@ logger.info('KentOS worker ready', { queues: workers.map((w) => w.name) });
 const dlqQueue = new Queue(queueNames.dlq, { connection: redisConnection() });
 
 for (const worker of workers) {
+  worker.on('error', (error) => {
+    // Prevent unhandled 'error' events from crashing the process
+    logger.error(`[${worker.name}] worker connection error`, {
+      error: error instanceof Error ? error.message : String(error),
+    });
+  });
   worker.on('completed', (job, result) => {
     logger.info(`[${worker.name}] job completed`, { jobId: job.id, result });
   });

@@ -170,6 +170,12 @@ jobs:
             docker compose --env-file .env.production.local -f infra/docker-compose.prod.yml up -d --force-recreate worker whatsapp-gateway
             echo "Waiting for services to become healthy..."
             sleep 120
+            echo "=== Container states ==="
+            docker compose --env-file .env.production.local -f infra/docker-compose.prod.yml ps
+            echo "=== Worker logs (last 80 lines) ==="
+            docker logs infra-worker-1 2>&1 | tail -80 || true
+            echo "=== Gateway logs (last 20 lines) ==="
+            docker logs infra-whatsapp-gateway-1 2>&1 | tail -20 || true
             ./infra/healthcheck-prod.sh
             pnpm ops:external -- --strict-launch --compose
             echo "Deploy completed successfully"
