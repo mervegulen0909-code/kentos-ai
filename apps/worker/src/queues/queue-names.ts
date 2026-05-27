@@ -6,7 +6,7 @@ export const queueNames = {
   outbound: 'kentos.outbound',
   webhooks: 'kentos.webhooks',
   csat: 'kentos.csat',
-  dlq: 'kentos:dlq',
+  dlq: 'kentos.dlq',
 } as const;
 
 export type QueueName = (typeof queueNames)[keyof typeof queueNames];
