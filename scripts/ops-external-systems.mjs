@@ -212,46 +212,63 @@ function addRequiredEnvChecks() {
 }
 
 function addProviderReadinessChecks() {
-  const firebaseMissing = [
-    "NEXT_PUBLIC_FIREBASE_API_KEY",
-    "NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN",
-    "NEXT_PUBLIC_FIREBASE_PROJECT_ID",
-    "NEXT_PUBLIC_FIREBASE_APP_ID",
-    "FIREBASE_PROJECT_ID",
-  ].filter((name) => !readEnv(name));
-  if (
-    !readEnv("FIREBASE_SERVICE_ACCOUNT_BASE64") &&
-    !readEnv("GOOGLE_APPLICATION_CREDENTIALS")
-  ) {
-    firebaseMissing.push(
-      "FIREBASE_SERVICE_ACCOUNT_BASE64 or GOOGLE_APPLICATION_CREDENTIALS",
-    );
+  // Firebase is optional — only validate credentials when FIREBASE_PROJECT_ID
+  // is explicitly set (i.e. the operator intentionally enables Firebase auth).
+  const firebaseProjectId = readEnv("FIREBASE_PROJECT_ID");
+  const firebaseMissing = [];
+  if (firebaseProjectId) {
+    for (const name of [
+      "NEXT_PUBLIC_FIREBASE_API_KEY",
+      "NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN",
+      "NEXT_PUBLIC_FIREBASE_PROJECT_ID",
+      "NEXT_PUBLIC_FIREBASE_APP_ID",
+    ]) {
+      if (!readEnv(name)) firebaseMissing.push(name);
+    }
+    if (
+      !readEnv("FIREBASE_SERVICE_ACCOUNT_BASE64") &&
+      !readEnv("GOOGLE_APPLICATION_CREDENTIALS")
+    ) {
+      firebaseMissing.push(
+        "FIREBASE_SERVICE_ACCOUNT_BASE64 or GOOGLE_APPLICATION_CREDENTIALS",
+      );
+    }
   }
   addCheck({
     id: "citizen-firebase-auth",
-    status: firebaseMissing.length ? (strictLaunch ? "blocked" : "warning") : "passed",
-    summary: firebaseMissing.length
-      ? `Citizen Firebase auth configuration is missing: ${firebaseMissing.join(", ")}`
-      : "Citizen Firebase auth client and API verifier configuration are present.",
-    detail:
-      "Login, account and erasure flows require Firebase configuration plus the signed citizen session secret.",
-  });
-
-  const operationsMissing = ["SENTRY_DSN", "BULL_BOARD_USER", "BULL_BOARD_PASS"].filter(
-    (name) => !readEnv(name),
-  );
-  addCheck({
-    id: "operations-observability",
-    status: operationsMissing.length
+    status: firebaseMissing.length
       ? strictLaunch
         ? "blocked"
         : "warning"
       : "passed",
-    summary: operationsMissing.length
-      ? `Operational monitoring values are missing: ${operationsMissing.join(", ")}`
+    summary: firebaseMissing.length
+      ? `Citizen Firebase auth configuration is missing: ${firebaseMissing.join(", ")}`
+      : firebaseProjectId
+        ? "Citizen Firebase auth client and API verifier configuration are present."
+        : "Firebase auth is disabled (FIREBASE_PROJECT_ID not set) — citizen login uses session-based auth only.",
+    detail:
+      "Set FIREBASE_PROJECT_ID (and related vars) to enable Firebase push notifications and mobile auth.",
+  });
+
+  // BULL_BOARD_USER/PASS protect the queue dashboard — always required in
+  // strict-launch. SENTRY_DSN is optional observability — warning only.
+  const dashboardMissing = ["BULL_BOARD_USER", "BULL_BOARD_PASS"].filter(
+    (name) => !readEnv(name),
+  );
+  const observabilityMissing = ["SENTRY_DSN"].filter((name) => !readEnv(name));
+  const allOperationsMissing = [...dashboardMissing, ...observabilityMissing];
+  addCheck({
+    id: "operations-observability",
+    status: allOperationsMissing.length
+      ? dashboardMissing.length && strictLaunch
+        ? "blocked"
+        : "warning"
+      : "passed",
+    summary: allOperationsMissing.length
+      ? `Operational monitoring values are missing: ${allOperationsMissing.join(", ")}`
       : "Operational monitoring and protected queue access values are configured.",
     detail:
-      "Use --strict-launch when making a production readiness decision.",
+      "BULL_BOARD_USER and BULL_BOARD_PASS protect the queue dashboard and are required in strict-launch. SENTRY_DSN is optional.",
   });
 
   const aiProvider = readEnv("AI_PROVIDER") || "stub";
