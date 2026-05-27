@@ -229,7 +229,7 @@ function addProviderReadinessChecks() {
   }
   addCheck({
     id: "citizen-firebase-auth",
-    status: firebaseMissing.length ? "blocked" : "passed",
+    status: firebaseMissing.length ? (strictLaunch ? "blocked" : "warning") : "passed",
     summary: firebaseMissing.length
       ? `Citizen Firebase auth configuration is missing: ${firebaseMissing.join(", ")}`
       : "Citizen Firebase auth client and API verifier configuration are present.",
