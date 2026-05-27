@@ -88,29 +88,6 @@ function isTokenFresh(token: string | null, safetyWindowSeconds = 30) {
   }
 }
 
-async function refreshAdminAccessToken(refreshToken: string) {
-  const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:3100/api/v1'}/auth/refresh`, {
-    method: 'POST',
-    headers: {
-      Accept: 'application/json',
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ refreshToken }),
-    cache: 'no-store',
-    signal: AbortSignal.timeout(8_000),
-  });
-
-  if (!response.ok) {
-    throw new Error(`Refresh failed with status ${response.status}`);
-  }
-
-  const result = await response.json() as { accessToken?: string; refreshToken?: string };
-  if (!result.accessToken) {
-    throw new Error('Refresh response missing accessToken');
-  }
-
-  return { accessToken: result.accessToken, refreshToken: result.refreshToken };
-}
 
 export async function getSessionToken() {
   const store = await cookies();
@@ -142,31 +119,19 @@ export async function getAdminSession(): Promise<AdminSession | null> {
   return { accessToken, refreshToken, user };
 }
 
+/**
+ * resolveAdminSession — read-only session accessor for Server Components.
+ *
+ * Token refresh is handled exclusively by middleware.ts (the only place in
+ * Next.js 15 where cookies can be written outside of a Route Handler /
+ * Server Action).  Pages and layouts must NOT call cookies().set/delete;
+ * they call this function which only reads.
+ *
+ * Route Handlers and Server Actions that need to write cookies should use
+ * setAdminSession / clearSessionToken directly.
+ */
 export async function resolveAdminSession(): Promise<AdminSession | null> {
-  const store = await cookies();
-  const accessToken = store.get(sessionCookieName)?.value ?? null;
-  const refreshToken = store.get(refreshCookieName)?.value ?? null;
-  const user = decodeSessionState(store.get(sessionStateCookieName)?.value);
-
-  if (!refreshToken || !user) return null;
-  if (isTokenFresh(accessToken)) return { accessToken: accessToken!, refreshToken, user };
-
-  try {
-    const refreshed = await refreshAdminAccessToken(refreshToken);
-    const store = await cookies();
-    store.set(sessionCookieName, refreshed.accessToken, getAccessCookieOptions());
-    // If API issued a new refresh token (rotation), persist it
-    if (refreshed.refreshToken) {
-      store.set(refreshCookieName, refreshed.refreshToken, getLongLivedCookieOptions());
-    }
-    return { accessToken: refreshed.accessToken, refreshToken: refreshed.refreshToken ?? refreshToken, user };
-  } catch {
-    const staleStore = await cookies();
-    staleStore.delete(sessionCookieName);
-    staleStore.delete(refreshCookieName);
-    staleStore.delete(sessionStateCookieName);
-    return null;
-  }
+  return getAdminSession();
 }
 
 export async function setAdminSession(session: AdminSession) {
