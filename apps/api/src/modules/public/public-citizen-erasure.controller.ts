@@ -1,4 +1,4 @@
-import { Body, Controller, Inject, Param, Post, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Inject, Param, Post, UseGuards } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { IsNotEmpty, IsString, MaxLength } from 'class-validator';
@@ -13,9 +13,12 @@ class CitizenErasureDto {
   sessionToken!: string;
 }
 
+const CITIZEN_ERASURE_THROTTLE_TTL_MS = Number(process.env.CITIZEN_ERASURE_THROTTLE_TTL_MS ?? 3_600_000);
+const CITIZEN_ERASURE_THROTTLE_LIMIT = Number(process.env.CITIZEN_ERASURE_THROTTLE_LIMIT ?? 1);
+
 @ApiTags('public')
 @UseGuards(PublicChannelGuard)
-@Throttle({ default: { ttl: 60_000, limit: 5 } }) // max 5 erasure attempts / minute
+@Throttle({ default: { ttl: CITIZEN_ERASURE_THROTTLE_TTL_MS, limit: CITIZEN_ERASURE_THROTTLE_LIMIT } })
 @Controller('public/:tenantSlug/citizen')
 export class PublicCitizenErasureController {
   constructor(
@@ -29,6 +32,10 @@ export class PublicCitizenErasureController {
     @Param('tenantSlug') tenantSlug: string,
     @Body() dto: CitizenErasureDto,
   ) {
+    if (!dto.sessionToken || typeof dto.sessionToken !== 'string') {
+      throw new BadRequestException('sessionToken is required.');
+    }
+
     const session = this.sessions.verify(dto.sessionToken, tenantSlug);
     return this.citizens.selfErase(session.tenantId, session.citizenId);
   }

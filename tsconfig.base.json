@@ -4,6 +4,11 @@
     "lib": ["ES2022"],
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
+    "baseUrl": ".",
+    "paths": {
+      "@kentos/database": ["packages/database/src/index.ts"],
+      "@kentos/shared": ["packages/shared/src/index.ts"]
+    },
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
     "allowSyntheticDefaultImports": true,

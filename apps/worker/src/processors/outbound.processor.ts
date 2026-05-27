@@ -1,4 +1,4 @@
-import { OutboundDeliveryState } from '@kentos/database';
+import { OutboundDeliveryState, PrismaClient } from '@kentos/database';
 import type { ChannelOutboundEnvelope, IntakeChannel } from '@kentos/shared';
 import { getPrismaClient } from '../prisma-client.js';
 
@@ -14,20 +14,16 @@ async function resolveWaTemplateKey(
   tenantId: string,
   recipientPhone: string,
 ): Promise<string | null> {
-  const prismaRaw = getPrismaClient() as unknown as {
-    channelEvent: {
-      findFirst(input: unknown): Promise<{ createdAt: Date } | null>;
-    };
-  };
+  const prisma = getPrismaClient();
 
-  const lastInbound = await prismaRaw.channelEvent.findFirst({
+  const lastInbound = await prisma.conversation.findFirst({
     where: {
       tenantId,
       channel: 'WHATSAPP',
       externalConversationId: recipientPhone,
     },
     orderBy: { createdAt: 'desc' },
-  } as unknown);
+  });
 
   if (!lastInbound) return WA_DEFAULT_TEMPLATE; // no prior contact — must use template
   const age = Date.now() - lastInbound.createdAt.getTime();
@@ -38,29 +34,8 @@ type OutboundJobData = {
   deliveryId: string;
 };
 
-type OutboundDeliveryRecord = {
-  id: string;
-  tenantId: string;
-  conversationId: string | null;
-  channel: string;
-  state: OutboundDeliveryState;
-  recipientPhone: string | null;
-  recipientEmail: string | null;
-  externalConversationId: string | null;
-  templateKey: string | null;
-  body: string;
-  tenant: { slug: string } | null;
-};
-
-type OutboundPrisma = {
-  outboundDelivery: {
-    findUnique(input: unknown): Promise<OutboundDeliveryRecord | null>;
-    update(input: unknown): Promise<unknown>;
-  };
-};
-
 type OutboundDependencies = {
-  prisma: OutboundPrisma;
+  prisma: PrismaClient;
   fetch: typeof fetch;
   resolveGatewayUrl?: (channel: IntakeChannel) => string | null;
   internalApiKey?: string;
@@ -87,7 +62,7 @@ function resolveGatewayUrl(channel: IntakeChannel): string | null {
 
 export async function processOutboundJob(job: { name: string; data: OutboundJobData }) {
   return runOutboundJob(job, {
-    prisma: getPrismaClient() as unknown as OutboundPrisma,
+    prisma: getPrismaClient(),
     fetch,
     resolveGatewayUrl,
     internalApiKey: process.env.INTERNAL_API_KEY,

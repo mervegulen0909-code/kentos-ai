@@ -2,6 +2,7 @@ import { Inject, Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Queue } from 'bullmq';
 import { redisConnection } from '../../common/redis.js';
+import { OUTBOUND_JOB_OPTIONS } from '../../common/queue/queue-job-defaults.js';
 import { AuditActorType, ChannelType, OutboundDeliveryState } from '@kentos/database';
 import type { IntakeChannel } from '@kentos/shared';
 import { PrismaService } from '../prisma/prisma.service.js';
@@ -83,11 +84,8 @@ export class OutboundDispatchService implements OnModuleDestroy {
         'channel-outbound',
         { deliveryId: delivery.id },
         {
+          ...OUTBOUND_JOB_OPTIONS,
           jobId: `outbound-${delivery.id}`,
-          attempts: 5,
-          backoff: { type: 'exponential', delay: 5_000 },
-          removeOnComplete: 200,
-          removeOnFail: 1_000,
           delay: scheduledDelay,
         },
       );

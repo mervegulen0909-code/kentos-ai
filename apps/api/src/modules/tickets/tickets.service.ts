@@ -683,11 +683,7 @@ export class TicketsService {
     if (!title) return;
 
     try {
-      const deviceTokens = await (this.prisma as unknown as {
-        citizenDeviceToken: {
-          findMany(args: unknown): Promise<Array<{ token: string }>>;
-        };
-      }).citizenDeviceToken.findMany({
+      const deviceTokens = await this.prisma.citizenDeviceToken.findMany({
         where: { tenantId: ticket.tenantId, citizenId: ticket.citizenId, isActive: true },
         select: { token: true },
       });

@@ -226,12 +226,14 @@ model User {
   id           String   @id @default(cuid())
   tenantId     String
   email        String
-  passwordHash String
-  fullName     String
-  role         UserRole
-  isActive     Boolean  @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  passwordHash        String
+  passwordResetToken  String?
+  passwordResetExpiry DateTime?
+  fullName            String
+  role                UserRole
+  isActive            Boolean  @default(true)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
 
   tenant          Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   assignedTickets Ticket[]         @relation("AssignedTickets")

@@ -33,7 +33,7 @@ export async function processCsatJob(job: { name: string; data: CsatJobData }) {
   }
 
   // Check if CSAT already sent (csatRespondedAt or csatScore already set)
-  if ((ticket as unknown as { csatScore: number | null; csatRespondedAt: Date | null }).csatScore !== null) {
+  if (ticket.csatScore !== null) {
     return { processor: 'csat', skipped: 'already-responded' };
   }
 

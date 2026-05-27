@@ -7,7 +7,7 @@ test('citizen erasure rejects direct citizen id and forged session token', async
   const directResponse = await request.post(`${apiBaseURL}/public/${tenantSlug}/citizen/erasure`, {
     data: { citizenId: 'forged-citizen-id' },
   });
-  expect(directResponse.status()).toBe(401);
+  expect(directResponse.status()).toBe(400);
 
   const forgedTokenResponse = await request.post(`${apiBaseURL}/public/${tenantSlug}/citizen/erasure`, {
     data: { sessionToken: 'forged-session-token' },
@@ -21,7 +21,10 @@ test('citizen account route cannot erase through a forged cookie', async ({ requ
     sessionToken: 'forged-session-token',
   });
   const response = await request.post(`${citizenBaseURL}/${tenantSlug}/account/erasure`, {
-    headers: { cookie: `citizen_session_${tenantSlug}=${encodeURIComponent(forgedSession)}` },
+    headers: {
+      cookie: `citizen_session_${tenantSlug}=${encodeURIComponent(forgedSession)}`,
+      'x-requested-with': 'KentOS',
+    },
   });
 
   expect(response.status()).toBe(401);

@@ -161,6 +161,10 @@ export async function resolveAdminSession(): Promise<AdminSession | null> {
     }
     return { accessToken: refreshed.accessToken, refreshToken: refreshed.refreshToken ?? refreshToken, user };
   } catch {
+    const staleStore = await cookies();
+    staleStore.delete(sessionCookieName);
+    staleStore.delete(refreshCookieName);
+    staleStore.delete(sessionStateCookieName);
     return null;
   }
 }

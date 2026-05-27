@@ -160,7 +160,7 @@ export async function processReportJob(job: { name: string; data: ReportJobData 
         periodStart: sevenDaysAgo,
         periodEnd: now,
         summary: `${reportType} — ${openedCount} açılan, ${closedCount} kapanan, ${currentlyOpenCount} bekleyen ticket`,
-        metrics: generatedReport as unknown as Prisma.JsonObject,
+        metrics: generatedReport as Prisma.JsonObject,
       },
     });
     return {
