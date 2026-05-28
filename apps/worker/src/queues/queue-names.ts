@@ -7,6 +7,7 @@ export const queueNames = {
   webhooks: 'kentos.webhooks',
   csat: 'kentos.csat',
   geocode: 'kentos.geocode',
+  digest: 'kentos.digest',
   dlq: 'kentos.dlq',
 } as const;
 

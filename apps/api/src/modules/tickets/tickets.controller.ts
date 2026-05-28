@@ -163,6 +163,30 @@ export class TicketsController {
     return this.tickets.suggestReply(user, id, dto);
   }
 
+  // 4.1 — AI ticket özetleme
+  @ApiOperation({ summary: 'AI ticket özeti' })
+  @Roles('SUPER_ADMIN', 'TENANT_ADMIN', 'MANAGER', 'DEPARTMENT_STAFF', 'OPERATOR')
+  @Post(':id/summarize')
+  summarize(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+    return this.tickets.summarize(user, id);
+  }
+
+  // 4.2 — Follow-up tespiti
+  @ApiOperation({ summary: 'Otomatik follow-up tespiti (WAITING_INFO durumu kontrolü)' })
+  @Roles('SUPER_ADMIN', 'TENANT_ADMIN', 'MANAGER', 'DEPARTMENT_STAFF', 'OPERATOR')
+  @Post(':id/evaluate-follow-up')
+  evaluateFollowUp(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+    return this.tickets.evaluateFollowUp(user, id);
+  }
+
+  // 4.3 — Sentiment analizi
+  @ApiOperation({ summary: 'Vatandaş mesajı sentiment analizi' })
+  @Roles('SUPER_ADMIN', 'TENANT_ADMIN', 'MANAGER', 'DEPARTMENT_STAFF', 'OPERATOR')
+  @Post(':id/analyze-sentiment')
+  analyzeSentiment(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+    return this.tickets.analyzeSentiment(user, id);
+  }
+
   @ApiOperation({ summary: 'Akıllı otomatik atama — en az yüklü operatörü atar' })
   @Roles('SUPER_ADMIN', 'TENANT_ADMIN', 'MANAGER', 'OPERATOR')
   @Post(':id/smart-assign')

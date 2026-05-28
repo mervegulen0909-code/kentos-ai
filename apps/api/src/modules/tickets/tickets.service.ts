@@ -45,6 +45,18 @@ export class TicketsService {
     return this.ticketAi.suggestReply(user.tenantId, ticketId, dto.operatorNote);
   }
 
+  summarize(user: AuthenticatedUser, ticketId: string) {
+    return this.ticketAi.summarize(user.tenantId, ticketId);
+  }
+
+  evaluateFollowUp(user: AuthenticatedUser, ticketId: string) {
+    return this.ticketAi.evaluateFollowUp(user.tenantId, ticketId);
+  }
+
+  analyzeSentiment(user: AuthenticatedUser, ticketId: string) {
+    return this.ticketAi.analyzeSentiment(user.tenantId, ticketId);
+  }
+
   async smartAssign(user: AuthenticatedUser, id: string) {
     const ticket = await this.requireTicket(user, id);
     this.requireMutableTicket(ticket.status);
