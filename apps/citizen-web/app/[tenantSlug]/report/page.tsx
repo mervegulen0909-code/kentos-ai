@@ -140,6 +140,13 @@ export default async function ReportPage({
           <button className="cta" type="submit">Başvuruyu oluştur</button>
         </form>
       </section>
+
+      {/* Hızlı erişim bağlantıları */}
+      <nav style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', marginTop: '1.5rem', padding: '0 0.5rem' }}>
+        <a href={`/${tenantSlug}/track`} style={{ color: 'var(--muted)', fontSize: '0.85rem' }}>📋 Başvuru Takibi</a>
+        <a href={`/${tenantSlug}/faq`} style={{ color: 'var(--muted)', fontSize: '0.85rem' }}>❓ Bilgi Bankası</a>
+        <a href={`/${tenantSlug}/appointments`} style={{ color: 'var(--muted)', fontSize: '0.85rem' }}>📅 E-Randevu</a>
+      </nav>
     </main>
   );
 }

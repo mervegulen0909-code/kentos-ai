@@ -138,4 +138,36 @@ export const citizenApi = {
     apiFetch<PublicConversation>(`/public/${tenantSlug}/conversations`, { method: 'POST', body: JSON.stringify(input) }),
   sendConversationMessage: (tenantSlug: string, conversationId: string, input: SendPublicConversationMessageInput) =>
     apiFetch<PublicConversation>(`/public/${tenantSlug}/conversations/${conversationId}/messages`, { method: 'POST', body: JSON.stringify(input) }),
+
+  // FAQ
+  faqList: (tenantSlug: string, lang?: string) =>
+    apiFetch<Array<{ id: string; title: string; slug: string; lang: string; viewCount: number; createdAt: string }>>(
+      `/public/${tenantSlug}/faq${lang ? `?lang=${lang}` : ''}`,
+    ),
+  faqArticle: (tenantSlug: string, slug: string, lang?: string) =>
+    apiFetch<{ id: string; title: string; body: string; slug: string; lang: string; viewCount: number; createdAt: string }>(
+      `/public/${tenantSlug}/faq/${slug}${lang ? `?lang=${lang}` : ''}`,
+    ),
+
+  // Appointments
+  availableSlots: (tenantSlug: string, from?: string, to?: string) => {
+    const qs = new URLSearchParams();
+    if (from) qs.set('from', from);
+    if (to) qs.set('to', to);
+    const q = qs.toString();
+    return apiFetch<Array<{ id: string; startsAt: string; endsAt: string; capacity: number; booked: number; departmentName?: string | null }>>(
+      `/public/${tenantSlug}/appointment-slots${q ? `?${q}` : ''}`,
+    );
+  },
+  bookAppointment: (tenantSlug: string, dto: { slotId: string; citizenName: string; citizenPhone?: string; note?: string }) =>
+    apiFetch<{ id: string; status: string; citizenName: string; slot: { startsAt: string } }>(
+      `/public/${tenantSlug}/appointments`,
+      { method: 'POST', body: JSON.stringify(dto) },
+    ),
+  cancelAppointment: (tenantSlug: string, id: string) =>
+    apiFetch<{ ok: boolean }>(`/public/${tenantSlug}/appointments/${id}`, { method: 'DELETE' }),
+
+  // e-Devlet KPS kimlik dogrulama
+  verifyIdentity: (dto: { tckn: string; firstName: string; lastName: string; birthYear: number }) =>
+    apiFetch<{ verified: boolean; fullName?: string }>('/public/edevlet/verify', { method: 'POST', body: JSON.stringify(dto) }),
 };
