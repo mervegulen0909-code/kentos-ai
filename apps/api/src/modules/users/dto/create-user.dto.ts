@@ -2,12 +2,12 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   IsEmail,
   IsEnum,
+  IsNotEmpty,
   IsOptional,
   IsString,
   MinLength,
   ArrayUnique,
   IsArray,
-  NotContains,
 } from 'class-validator';
 import { UserRole } from '@kentos/database';
 
@@ -18,7 +18,7 @@ export class CreateUserDto {
 
   @ApiProperty({ example: 'Ali Yılmaz' })
   @IsString()
-  @NotContains('', { message: 'fullName should not be empty' })
+  @IsNotEmpty({ message: 'fullName should not be empty' })
   fullName!: string;
 
   @ApiProperty({ enum: UserRole, example: UserRole.OPERATOR })
