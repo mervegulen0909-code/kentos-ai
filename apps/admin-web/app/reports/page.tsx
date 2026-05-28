@@ -81,6 +81,28 @@ function formatPercent(value: number) {
   return `${(value * 100).toFixed(1)}%`;
 }
 
+function formatAiProviderLabel(provider: string) {
+  if (provider === 'stub') return 'Deterministik fallback';
+  return provider;
+}
+
+function formatReportTypeLabel(type: string) {
+  return {
+    weekly_summary: 'Haftalik ozet',
+    sla_report: 'SLA raporu',
+    channel_report: 'Kanal raporu',
+  }[type] ?? type;
+}
+
+function formatReportStatusLabel(status: string) {
+  return {
+    PENDING: 'Hazirlaniyor',
+    RUNNING: 'Olusturuluyor',
+    COMPLETED: 'Hazir',
+    FAILED: 'Basarisiz',
+  }[status] ?? status;
+}
+
 export default async function ReportsPage() {
   const session = await resolveAdminSession();
   const hasSession = Boolean(session);
@@ -226,7 +248,7 @@ export default async function ReportsPage() {
                 <div className="responsive-list" style={{ marginTop: 12 }}>
                   {aiUsage.byProvider.map((row) => (
                     <div className="queue-row" key={row.provider}>
-                      <strong>{row.provider}</strong>
+                      <strong>{formatAiProviderLabel(row.provider)}</strong>
                       <span>{row.runs} cagri</span>
                       <span>Basari: {formatPercent(row.successRate)}</span>
                       <span>{row.tokensTotal} token</span>
@@ -445,8 +467,8 @@ export default async function ReportsPage() {
                 <div className="responsive-list">
                   {reports.data.map((r) => (
                     <div className="queue-row" key={r.id}>
-                      <strong>{r.type}</strong>
-                      <span>{r.status}</span>
+                      <strong>{formatReportTypeLabel(r.type)}</strong>
+                      <span>{formatReportStatusLabel(r.status)}</span>
                       <span>{new Date(r.createdAt).toLocaleDateString('tr-TR')}</span>
                       {r.generatedAt && <span>✓ {new Date(r.generatedAt).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}</span>}
                     </div>

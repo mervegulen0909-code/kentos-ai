@@ -71,10 +71,24 @@ const confidenceFormatter = new Intl.NumberFormat('tr-TR', {
 
 type FeedbackCopy = { title: string; detail: string };
 
+function FieldLabel({
+  htmlFor,
+  children,
+}: {
+  htmlFor: string;
+  children: string;
+}) {
+  return (
+    <label htmlFor={htmlFor} style={{ fontWeight: 700 }}>
+      {children}
+    </label>
+  );
+}
+
 const quickStatusActions = [
-  { action: updateStatusAction, intent: 'status', status: 'WAITING_INFO', label: 'Bilgi iste', pendingLabel: 'Isteniyor...', placeholder: 'Vatandastan istenen bilgiyi kisaca yazin' },
-  { action: updateStatusAction, intent: 'status', status: 'RESOLVED', label: 'Cozum bildir', pendingLabel: 'Bildiriliyor...', placeholder: 'Vatandasa gidecek cozum mesajini yazin' },
-  { action: updateStatusAction, intent: 'status', status: 'REJECTED', label: 'Reddet', pendingLabel: 'Reddediliyor...', placeholder: 'Reddetme gerekcesini vatandas dilinde yazin' },
+  { action: updateStatusAction, intent: 'status', status: 'WAITING_INFO', label: 'Bilgi iste', pendingLabel: 'Isteniyor...', fieldLabel: 'Vatandastan istenen bilgi', placeholder: 'Vatandastan istenen bilgiyi kisaca yazin' },
+  { action: updateStatusAction, intent: 'status', status: 'RESOLVED', label: 'Cozum bildir', pendingLabel: 'Bildiriliyor...', fieldLabel: 'Vatandasa gidecek cozum mesaji', placeholder: 'Vatandasa gidecek cozum mesajini yazin' },
+  { action: updateStatusAction, intent: 'status', status: 'REJECTED', label: 'Reddet', pendingLabel: 'Reddediliyor...', fieldLabel: 'Vatandasa gidecek red gerekcesi', placeholder: 'Reddetme gerekcesini vatandas dilinde yazin' },
 ];
 
 const successCopy: Record<string, FeedbackCopy> = {
@@ -205,7 +219,14 @@ export default async function TicketDetailPage({
                     <option key={status} value={status}>{statusCopy[status] ?? status}</option>
                   ))}
                 </select>
-                <input name="publicMessage" placeholder="Vatandasa opsiyonel durum mesaji" disabled={!canUpdateTicket} />
+                <FieldLabel htmlFor="ticket-status-public-message">Vatandasa opsiyonel durum mesaji</FieldLabel>
+                <input
+                  id="ticket-status-public-message"
+                  name="publicMessage"
+                  aria-label="Vatandasa opsiyonel durum mesaji"
+                  placeholder="Ornek: Ekip bugun sahada kontrol saglayacak."
+                  disabled={!canUpdateTicket}
+                />
                 <PendingSubmitButton type="submit" disabled={!canUpdateTicket} idleLabel="Durumu guncelle" pendingLabel="Guncelleniyor..." />
               </PendingFieldset>
             </form>
@@ -243,7 +264,7 @@ export default async function TicketDetailPage({
               <p><strong>Adres/cozumleme:</strong> {aiClassification.addressText ?? 'Yok'}</p>
               <p><strong>Takip no sorgusu:</strong> {aiClassification.statusTicketNo ?? 'Yok'}</p>
               <p><strong>Iletisim sinyali:</strong> {aiSummary?.contactSignals ? `${aiSummary.contactSignals.hasPhone ? 'Telefon var' : 'Telefon yok'} - ${aiSummary.contactSignals.hasEmail ? 'E-posta var' : 'E-posta yok'}${aiSummary.contactSignals.displayName ? ` - ${aiSummary.contactSignals.displayName}` : ''}` : 'Audit sinyali yok'}</p>
-              <p><strong>Eksik alanlar:</strong> {aiClassification.missingFields.length ? aiClassification.missingFields.map((field) => formatMissingFieldLabel(field)).join(', ') : 'Yok'}</p>
+              <p><strong>Eksik alanlar:</strong> {aiClassification.missingFields?.length ? aiClassification.missingFields.map((field) => formatMissingFieldLabel(field)).join(', ') : 'Yok'}</p>
               <p><strong>Takip sorusu:</strong> {aiClassification.followUpQuestion ?? 'Gerekmedi'}</p>
               <p><strong>Ozet:</strong> {aiClassification.reasoningSummary}</p>
             </div>
@@ -291,7 +312,15 @@ export default async function TicketDetailPage({
                     <input type="hidden" name="intent" value={quickAction.intent} />
                     <input type="hidden" name="ticketId" value={ticket.id} />
                     <input type="hidden" name="status" value={quickAction.status} />
-                    <textarea name="publicMessage" rows={3} placeholder={quickAction.placeholder} disabled={!canUpdateTicket} />
+                    <FieldLabel htmlFor={`quick-action-${quickAction.status.toLowerCase()}`}>{quickAction.fieldLabel}</FieldLabel>
+                    <textarea
+                      id={`quick-action-${quickAction.status.toLowerCase()}`}
+                      name="publicMessage"
+                      aria-label={quickAction.fieldLabel}
+                      rows={3}
+                      placeholder={quickAction.placeholder}
+                      disabled={!canUpdateTicket}
+                    />
                     <PendingSubmitButton type="submit" disabled={!canUpdateTicket || !statusOptions.includes(quickAction.status)} idleLabel={quickAction.label} pendingLabel={quickAction.pendingLabel} />
                   </PendingFieldset>
                 </form>
@@ -305,7 +334,15 @@ export default async function TicketDetailPage({
             <PendingFieldset style={{ display: 'grid', gap: 10 }}>
               <input type="hidden" name="intent" value="internal-note" />
               <input type="hidden" name="ticketId" value={ticket?.id ?? id} />
-              <textarea name="body" rows={4} placeholder="Sadece personel gorur" disabled={!canUpdateTicket} />
+              <FieldLabel htmlFor="ticket-internal-note">Sadece personel gorur</FieldLabel>
+              <textarea
+                id="ticket-internal-note"
+                name="body"
+                aria-label="Sadece personel gorur"
+                rows={4}
+                placeholder="Operasyon ekipleri icin ic not yazin."
+                disabled={!canUpdateTicket}
+              />
               <input name="attachment" type="file" accept="image/jpeg,image/png,image/webp,application/pdf,text/plain" disabled={!canUpdateTicket} />
               <PendingSubmitButton type="submit" disabled={!canUpdateTicket} idleLabel="Notu kaydet" pendingLabel="Kaydediliyor..." />
             </PendingFieldset>
@@ -325,7 +362,15 @@ export default async function TicketDetailPage({
             <PendingFieldset style={{ display: 'grid', gap: 10 }}>
               <input type="hidden" name="intent" value="public-message" />
               <input type="hidden" name="ticketId" value={ticket?.id ?? id} />
-              <textarea name="body" rows={4} placeholder="Vatandas takip ekraninda gorunur" disabled={!canUpdateTicket} />
+              <FieldLabel htmlFor="ticket-public-message">Vatandas takip ekraninda gorunur</FieldLabel>
+              <textarea
+                id="ticket-public-message"
+                name="body"
+                aria-label="Vatandas takip ekraninda gorunur"
+                rows={4}
+                placeholder="Vatandasa gidecek acik ve kisa mesaji yazin."
+                disabled={!canUpdateTicket}
+              />
               <input name="attachment" type="file" accept="image/jpeg,image/png,image/webp,application/pdf,text/plain" disabled={!canUpdateTicket} />
               <PendingSubmitButton type="submit" disabled={!canUpdateTicket} idleLabel="Mesaji gonder" pendingLabel="Gonderiliyor..." />
             </PendingFieldset>

@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Inject, MessageEvent, Param, Post, Query, Sse, UseGuards } from '@nestjs/common';
-import { Observable, interval, from, EMPTY } from 'rxjs';
+import { Observable, interval, from, of } from 'rxjs';
 import { map, switchMap, catchError } from 'rxjs/operators';
 import { AuthGuard } from '@nestjs/passport';
 import { ApiBearerAuth, ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
@@ -35,7 +35,10 @@ export class TicketsController {
     return interval(5000).pipe(
       switchMap(() => from(this.tickets.get(user, id))),
       map((ticket) => ({ data: JSON.stringify({ type: 'ticket.updated', ticket }) } as MessageEvent)),
-      catchError(() => EMPTY),
+      catchError((err: { status?: number }) => {
+        const type = err?.status === 404 ? 'ticket.not_found' : 'stream.error';
+        return of({ data: JSON.stringify({ type }) } as MessageEvent);
+      }),
     );
   }
 

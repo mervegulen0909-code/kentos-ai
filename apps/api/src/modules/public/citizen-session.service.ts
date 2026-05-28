@@ -60,8 +60,7 @@ export class CitizenSessionService {
   }
 
   private sign(encodedPayload: string): string {
-    const secret = this.config.get<string>('CITIZEN_SESSION_SECRET')
-      ?? this.config.getOrThrow<string>('JWT_ACCESS_SECRET');
+    const secret = this.config.getOrThrow<string>('CITIZEN_SESSION_SECRET');
     return createHmac('sha256', secret).update(encodedPayload).digest('base64url');
   }
 }

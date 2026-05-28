@@ -1,7 +1,7 @@
 import { createHmac } from 'node:crypto';
 import { expect, test } from '@playwright/test';
 import { PrismaClient } from '@kentos/database';
-import { apiBaseURL, citizenBaseURL, tenantSlug } from './helpers';
+import { apiBaseURL, citizenBaseURL, e2eDatabaseURL, tenantSlug } from './helpers';
 
 test('citizen erasure rejects direct citizen id and forged session token', async ({ request }) => {
   const directResponse = await request.post(`${apiBaseURL}/public/${tenantSlug}/citizen/erasure`, {
@@ -37,7 +37,7 @@ test('citizen erasure anonymizes only the authenticated disposable account', asy
 
   const prisma = new PrismaClient({
     datasources: {
-      db: { url: process.env.DATABASE_URL },
+      db: { url: e2eDatabaseURL },
     },
   });
   const suffix = `${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;

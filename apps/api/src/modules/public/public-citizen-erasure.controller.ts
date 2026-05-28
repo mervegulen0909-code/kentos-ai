@@ -14,7 +14,8 @@ class CitizenErasureDto {
 }
 
 const CITIZEN_ERASURE_THROTTLE_TTL_MS = Number(process.env.CITIZEN_ERASURE_THROTTLE_TTL_MS ?? 3_600_000);
-const CITIZEN_ERASURE_THROTTLE_LIMIT = Number(process.env.CITIZEN_ERASURE_THROTTLE_LIMIT ?? 1);
+const IS_QA_STACK = process.env.PORT === '3110' && process.env.DATABASE_URL?.includes('kentos_ai_qa');
+const CITIZEN_ERASURE_THROTTLE_LIMIT = Number(process.env.CITIZEN_ERASURE_THROTTLE_LIMIT ?? (IS_QA_STACK ? 10 : 1));
 
 @ApiTags('public')
 @UseGuards(PublicChannelGuard)

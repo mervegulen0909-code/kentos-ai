@@ -6,6 +6,8 @@
   "scripts": {
     "build": "nest build",
     "dev": "tsx watch src/main.ts",
+    "dev:qa": "tsx src/main.ts",
+    "start:qa": "node dist/apps/api/src/main.js",
     "start": "node dist/apps/api/src/main.js",
     "lint": "tsc -p tsconfig.json --noEmit",
     "typecheck": "tsc -p tsconfig.json --noEmit",

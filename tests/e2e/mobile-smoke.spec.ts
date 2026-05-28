@@ -36,6 +36,11 @@ test('mobile smoke keeps admin and citizen critical pages usable at 390px', asyn
     await expect(page.locator('.sidebar-status')).toContainText('TENANT_ADMIN oturumu');
     await expectNoHorizontalOverflow(page);
     await expect(page.getByRole('link', { name: 'Dashboard' })).toBeVisible();
+    if (path.startsWith('/tickets/')) {
+      await expect(page.getByLabel('Vatandasa opsiyonel durum mesaji')).toBeVisible();
+      await expect(page.getByLabel('Sadece personel gorur')).toBeVisible();
+      await expect(page.getByLabel('Vatandas takip ekraninda gorunur')).toBeVisible();
+    }
   }
 
   await gotoCitizenReport(page);

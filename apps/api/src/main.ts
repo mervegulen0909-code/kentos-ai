@@ -77,9 +77,10 @@ async function bootstrap() {
   mountBullBoard(app.getHttpAdapter().getInstance() as Parameters<typeof mountBullBoard>[0]);
 
   const port = Number(config.get<string>('PORT') ?? 3100);
-  await app.listen(port);
-  logger.log(`KentOS API listening on http://localhost:${port}/api/v1`);
-  logger.log(`KentOS API docs available on http://localhost:${port}/api/docs`);
+  const host = config.get<string>('HOST')?.trim() || 'localhost';
+  await app.listen(port, host);
+  logger.log(`KentOS API listening on http://${host}:${port}/api/v1`);
+  logger.log(`KentOS API docs available on http://${host}:${port}/api/docs`);
 
   // Outbound kanal ve kritik özellik durumları
   const live = (flag: string | undefined) => flag === 'true' ? 'LIVE 🟢' : 'DRY-RUN 🟡';

@@ -256,7 +256,10 @@ export class TicketsService {
     const department = await this.requireDepartment(user.tenantId, dto.departmentId);
     await this.requireDepartmentScope(user, dto.departmentId);
     if (dto.assignedToId) await this.requireAssignableUser(user.tenantId, dto.assignedToId, dto.departmentId);
-    const routedMessage = await this.templates.renderForTicket(ticket.id, 'TICKET_ROUTED', { departmentName: department.name });
+    const shouldCreatePublicRoutingMessage = this.shouldCreatePublicRoutingMessage(ticket, dto.departmentId);
+    const routedMessage = shouldCreatePublicRoutingMessage
+      ? await this.templates.renderForTicket(ticket.id, 'TICKET_ROUTED', { departmentName: department.name })
+      : null;
 
     const updatedTicket = await this.prisma.ticket.update({
       where: { id },
@@ -308,6 +311,13 @@ export class TicketsService {
     });
 
     return updatedTicket;
+  }
+
+  private shouldCreatePublicRoutingMessage(
+    ticket: { departmentId: string | null | undefined },
+    nextDepartmentId: string,
+  ) {
+    return ticket.departmentId !== nextDepartmentId;
   }
 
   async addInternalNote(user: AuthenticatedUser, id: string, dto: CreateTicketMessageDto) {

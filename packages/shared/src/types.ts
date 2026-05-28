@@ -184,7 +184,7 @@ export type PublicTicketAiIntakeRequest = {
 };
 
 export type PublicTicketAiIntakeResult = {
-  provider: 'stub' | 'netiva' | 'anthropic';
+  provider: 'stub' | 'netiva' | 'anthropic' | 'gemini';
   model: string;
   promptVersion: string;
   classification: IntakeClassification;

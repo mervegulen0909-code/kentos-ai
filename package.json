@@ -9,6 +9,9 @@
   },
   "scripts": {
     "dev": "corepack pnpm -r --parallel dev",
+    "qa:local:start": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/qa-stack.ps1 start",
+    "qa:local:status": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/qa-stack.ps1 status",
+    "qa:local:stop": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/qa-stack.ps1 stop",
     "build": "corepack pnpm -r build",
     "typecheck": "corepack pnpm -r typecheck",
     "test": "corepack pnpm -r test",

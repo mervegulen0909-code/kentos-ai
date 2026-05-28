@@ -1,38 +1,32 @@
-/**
- * rate-limiting.spec.ts
- * Rate limiting E2E testleri:
- * - Publik endpoint'ler → throttle çalışıyor mu?
- * - Auth brute-force → 5 denemeden sonra 429
- */
 import { expect, test } from '@playwright/test';
 import { apiBaseURL, tenantSlug } from './helpers';
 
 test.describe('Rate limiting', () => {
-  test('health endpoint rate limit olmadan erişilebilir', async ({ request }) => {
-    // Health endpoint @SkipThrottle ile işaretlenmiş
+  test('health endpoint remains reachable without throttling', async ({ request }) => {
     for (let i = 0; i < 10; i++) {
       const resp = await request.get(`${apiBaseURL}/health`);
       expect(resp.ok()).toBeTruthy();
     }
   });
 
-  test('public widget-settings — yüksek trafikte erişilebilir (SkipThrottle)', async ({ request }) => {
-    // Widget status endpoint @SkipThrottle ile işaretlenmiş
+  test('public widget-settings remains available under burst traffic', async ({ request }) => {
     const results = await Promise.all(
-      Array.from({ length: 8 }, () =>
-        request.get(`${apiBaseURL}/public/${tenantSlug}/widget-settings`),
-      ),
+      Array.from({ length: 8 }, () => request.get(`${apiBaseURL}/public/${tenantSlug}/widget-settings`)),
     );
-    // Hepsinin 200 veya 404 dönmesi beklenir (rate limit 429 olmamalı)
+
     for (const resp of results) {
       expect(resp.status()).not.toBe(429);
     }
   });
 
-  test('geçersiz login güvenli reddedilir ve rate-limit metadata döner', async ({ request }) => {
-    // Limiti tüketmek, aynı IP'yi paylaşan sonraki E2E login'lerini yanlış biçimde kilitler.
+  test('invalid login returns 401 and still exposes rate-limit headers', async ({ request }) => {
     const resp = await request.post(`${apiBaseURL}/auth/login`, {
-      data: { tenantSlug, email: `bruteforce-${Date.now()}@test.com`, password: 'wrong' },
+      data: {
+        tenantSlug,
+        email: `bruteforce-${Date.now()}@test.com`,
+        // Keep the password shape valid so the request reaches auth logic and not DTO validation.
+        password: 'WrongPass123!',
+      },
     });
 
     expect(resp.status()).toBe(401);

@@ -1,0 +1,3 @@
+-- Intentionally empty.
+-- The migration folder is preserved so `prisma migrate deploy` remains forward-only and deterministic
+-- for environments that already recorded this revision while the schema still retains ManagerReport.

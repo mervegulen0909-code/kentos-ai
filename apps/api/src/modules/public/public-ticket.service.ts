@@ -54,11 +54,13 @@ export class PublicTicketAiService {
     const budgetConfig = mergeTenantBudget(envConfig, tenantOverrides);
     const budget = await this.checkBudget(tenantId, budgetConfig);
 
+    const learningHints = await this.loadLearningExamples(tenantId, request.tenantContext.departments);
+
     let result: AiProviderResult;
     if (!budget.allowed) {
       result = this.markStubFallback(this.runDeterministic(request, requestedAt), `budget:${budget.reason}`);
     } else {
-      result = await this.runProviderWithFallback(request, requestedAt, budgetConfig);
+      result = await this.runProviderWithFallback(request, requestedAt, budgetConfig, learningHints);
     }
 
     const latencyMs = Math.max(0, Date.now() - startedAtMs);
@@ -108,11 +110,12 @@ export class PublicTicketAiService {
     request: PublicTicketAiIntakeRequest,
     requestedAt: string,
     budgetConfig: AiBudgetConfig,
+    learningHints: string,
   ): Promise<AiProviderResult> {
     const anthropicConfig = this.readAnthropicConfig();
     if (anthropicConfig.enabled) {
       try {
-        return this.markSuccess(await this.classifyWithAnthropic(request, requestedAt, anthropicConfig, budgetConfig));
+        return this.markSuccess(await this.classifyWithAnthropic(request, requestedAt, anthropicConfig, budgetConfig, learningHints));
       } catch (error) {
         return this.markStubFallback(
           this.runDeterministic(request, requestedAt),
@@ -121,10 +124,22 @@ export class PublicTicketAiService {
       }
     }
 
+    const geminiConfig = this.readGeminiConfig();
+    if (geminiConfig.enabled) {
+      try {
+        return this.markSuccess(await this.classifyWithGemini(request, requestedAt, geminiConfig, budgetConfig, learningHints));
+      } catch (error) {
+        return this.markStubFallback(
+          this.runDeterministic(request, requestedAt),
+          `gemini:${error instanceof Error ? error.message.slice(0, 120) : 'error'}`,
+        );
+      }
+    }
+
     const netivaConfig = this.readNetivaConfig();
     if (netivaConfig.enabled) {
       try {
-        return this.markSuccess(await this.classifyWithNetiva(request, requestedAt, netivaConfig, budgetConfig));
+        return this.markSuccess(await this.classifyWithNetiva(request, requestedAt, netivaConfig, budgetConfig, learningHints));
       } catch (error) {
         return this.markStubFallback(
           this.runDeterministic(request, requestedAt),
@@ -221,6 +236,7 @@ export class PublicTicketAiService {
     requestedAt: string,
     config: ReturnType<PublicTicketAiService['readAnthropicConfig']>,
     budgetConfig: AiBudgetConfig,
+    learningHints: string,
   ): Promise<PublicTicketAiIntakeResult & { __usage?: AiUsageInput }> {
     const maxTokens = budgetConfig.perRequestTokenLimit
       ? Math.min(config.maxTokens, budgetConfig.perRequestTokenLimit)
@@ -237,7 +253,7 @@ export class PublicTicketAiService {
         max_tokens: maxTokens,
         temperature: 0,
         system: [
-          { type: 'text', text: this.buildSystemPrompt(), cache_control: { type: 'ephemeral' } },
+          { type: 'text', text: this.buildSystemPrompt(learningHints), cache_control: { type: 'ephemeral' } },
         ],
         messages: [{ role: 'user', content: this.buildUserPrompt(input) }],
       }),
@@ -297,6 +313,71 @@ export class PublicTicketAiService {
     });
   }
 
+  private readGeminiConfig() {
+    const provider = process.env.AI_PROVIDER?.trim().toLowerCase();
+    const apiKey = process.env.GEMINI_API_KEY?.trim() || '';
+    return {
+      enabled: provider === 'gemini' && Boolean(apiKey),
+      apiKey,
+      baseUrl: this.normalizeBaseUrl(process.env.GEMINI_BASE_URL || 'https://generativelanguage.googleapis.com/v1beta/openai'),
+      model: process.env.GEMINI_MODEL?.trim() || process.env.AI_MODEL?.trim() || 'gemini-2.5-pro',
+      timeoutMs: this.readPositiveInt(process.env.GEMINI_TIMEOUT_MS || process.env.AI_TIMEOUT_MS, 30_000),
+      maxTokens: this.readPositiveInt(process.env.GEMINI_MAX_TOKENS || process.env.AI_MAX_TOKENS, 1_200),
+    };
+  }
+
+  private async classifyWithGemini(
+    input: PublicTicketAiIntakeRequest,
+    requestedAt: string,
+    config: ReturnType<PublicTicketAiService['readGeminiConfig']>,
+    budgetConfig: AiBudgetConfig,
+    learningHints: string,
+  ): Promise<PublicTicketAiIntakeResult & { __usage?: AiUsageInput }> {
+    const maxTokens = budgetConfig.perRequestTokenLimit
+      ? Math.min(config.maxTokens, budgetConfig.perRequestTokenLimit)
+      : config.maxTokens;
+    const response = await fetch(`${config.baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${config.apiKey}`,
+      },
+      body: JSON.stringify({
+        model: config.model,
+        messages: [
+          { role: 'system', content: this.buildSystemPrompt(learningHints) },
+          { role: 'user', content: this.buildUserPrompt(input) },
+        ],
+        temperature: 0,
+        max_tokens: maxTokens,
+        stream: false,
+      }),
+      signal: AbortSignal.timeout(config.timeoutMs),
+    });
+
+    if (!response.ok) {
+      const errText = await response.text().catch(() => '');
+      throw new ServiceUnavailableException(`Gemini AI request failed with ${response.status}: ${errText.slice(0, 200)}`);
+    }
+
+    const payload = await response.json() as {
+      choices?: Array<{ message?: { content?: string | null } }>;
+      usage?: unknown;
+    };
+    const content = payload.choices?.[0]?.message?.content;
+    if (!content) throw new ServiceUnavailableException('Gemini AI response did not include content');
+
+    const result = publicTicketAiIntakeResultSchema.parse({
+      provider: 'gemini',
+      model: config.model,
+      promptVersion: 'intake-classifier.v1',
+      requestedAt,
+      completedAt: new Date().toISOString(),
+      classification: this.parseClassification(content),
+    });
+    return { ...result, __usage: extractOpenAiUsage(payload) };
+  }
+
   private readNetivaConfig() {
     const provider = process.env.AI_PROVIDER?.trim().toLowerCase();
     const apiKey = process.env.NETIVA_API_KEY?.trim() || process.env.AI_API_KEY?.trim() || '';
@@ -316,6 +397,7 @@ export class PublicTicketAiService {
     requestedAt: string,
     config: ReturnType<PublicTicketAiService['readNetivaConfig']>,
     budgetConfig: AiBudgetConfig,
+    learningHints: string,
   ): Promise<PublicTicketAiIntakeResult & { __usage?: AiUsageInput }> {
     const maxTokens = budgetConfig.perRequestTokenLimit
       ? Math.min(config.maxTokens, budgetConfig.perRequestTokenLimit)
@@ -330,7 +412,7 @@ export class PublicTicketAiService {
       body: JSON.stringify({
         model: config.model,
         messages: [
-          { role: 'system', content: this.buildSystemPrompt() },
+          { role: 'system', content: this.buildSystemPrompt(learningHints) },
           { role: 'user', content: this.buildUserPrompt(input) },
         ],
         temperature: 0,
@@ -369,14 +451,96 @@ export class PublicTicketAiService {
     return intakeClassificationSchema.parse(JSON.parse(jsonText));
   }
 
-  private buildSystemPrompt() {
-    return [
+  async generateDraft(
+    tenantId: string,
+    ticketId: string,
+    classification: PublicTicketAiIntakeResult['classification'],
+    routing: { departmentCode: string | null; categoryCode: string | null },
+  ) {
+    if (process.env.AI_DRAFT_RESPONSE !== 'true' || !this.prisma) return;
+    const config = this.readAnthropicConfig();
+    if (!config.enabled) return;
+    try {
+      const prompt = [
+        'Bir belediye musteri hizmetleri yetkilisi olarak asagidaki vatandas sikayetine nazik, resmi ve kisa bir Turkce yanitinI yaz.',
+        `Sikayet basligi: ${classification.title}`,
+        `Kategori: ${routing.categoryCode ?? 'belirtilmemis'}`,
+        `Departman: ${routing.departmentCode ?? 'belirtilmemis'}`,
+        `Oncelik: ${classification.priority}`,
+        'Sadece yanit metnini yaz, baska hicbir sey ekleme. Maksimum 3 cumle.',
+      ].join('\n');
+
+      const response = await fetch(`${config.baseUrl}/v1/messages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-api-key': config.apiKey, 'anthropic-version': config.version },
+        body: JSON.stringify({ model: config.model, max_tokens: 300, temperature: 0.3, messages: [{ role: 'user', content: prompt }] }),
+        signal: AbortSignal.timeout(15_000),
+      });
+      if (!response.ok) return;
+      const payload = await response.json() as { content?: Array<{ type?: string; text?: string }> };
+      const draft = payload.content?.find((p) => p.type === 'text')?.text?.trim();
+      if (!draft) return;
+
+      await this.prisma.ticketMessage.create({
+        data: {
+          tenantId,
+          ticketId,
+          senderType: AuditActorType.AI,
+          visibility: MessageVisibility.INTERNAL,
+          body: `AI Yanit Taslagi (duzenleyip gonderebilirsiniz):\n\n${draft}`,
+        },
+      });
+    } catch {
+      // non-blocking
+    }
+  }
+
+  private buildSystemPrompt(learningHints = '') {
+    const base = [
       'Sen KentOS belediye operasyonlari icin guvenli bir AI intake siniflandiricisisin.',
       'Sadece gecerli JSON dondur. Markdown, aciklama, kod blogu veya ek metin dondurme.',
       'Vatandasa gizli alan, ic not, personel yorumu veya model akil yurutmesi ifsa etme.',
       'categoryCode ve departmentCode alanlarini yalniz verilen tenant seceneklerinden sec; emin degilsen null kullan.',
       'statusTicketNo yalniz TK-[A-F0-9]{16} formatinda takip kodu varsa dolu olsun; belediye ic ticket numarasi uretme.',
     ].join(' ');
+    return learningHints ? `${base}\n\n${learningHints}` : base;
+  }
+
+  private async loadLearningExamples(
+    tenantId: string,
+    departments: Array<{ id: string; code: string; name: string }>,
+  ): Promise<string> {
+    if (!this.prisma) return '';
+    try {
+      const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+      const corrections = await this.prisma.auditLog.findMany({
+        where: { tenantId, action: 'ticket.assigned', actorType: AuditActorType.USER, createdAt: { gte: since } },
+        include: { ticket: { select: { title: true } } },
+        orderBy: { createdAt: 'desc' },
+        take: 10,
+      });
+
+      const deptMap = new Map(departments.map((d) => [d.id, d.name]));
+      const examples = corrections
+        .filter((c) => {
+          const before = c.before as { departmentId?: string } | null;
+          const after = c.after as { departmentId?: string } | null;
+          return before?.departmentId && after?.departmentId && before.departmentId !== after.departmentId;
+        })
+        .map((c) => {
+          const before = c.before as { departmentId: string };
+          const after = c.after as { departmentId: string };
+          const from = deptMap.get(before.departmentId) ?? 'bilinmeyen';
+          const to = deptMap.get(after.departmentId) ?? 'bilinmeyen';
+          const title = c.ticket?.title ?? '(bilinmeyen)';
+          return `- "${title}": AI yonlendirdi="${from}", yetkili duzeltdi="${to}"`;
+        });
+
+      if (examples.length === 0) return '';
+      return `Bu belediyede son routing duzeltmeleri (ogrenme icin kullan, sadece JSON dondur):\n${examples.join('\n')}`;
+    } catch {
+      return '';
+    }
   }
 
   private buildUserPrompt(input: PublicTicketAiIntakeRequest) {
@@ -459,12 +623,15 @@ export class PublicTicketService {
       preferredCitizenId: options.preferredCitizenId,
     });
 
+    const tenantDepartments = await this.listTenantDepartments(tenant.id);
+    const tenantCategories = await this.listTenantCategories(tenant.id);
+
     const aiInput: PublicTicketAiIntakeRequest = {
       tenantContext: {
         tenantId: tenant.id,
         tenantSlug: tenant.slug,
-        departments: await this.listTenantDepartments(tenant.id),
-        categories: await this.listTenantCategories(tenant.id),
+        departments: tenantDepartments,
+        categories: tenantCategories,
       },
       message: {
         text: dto.description,
@@ -478,7 +645,15 @@ export class PublicTicketService {
       },
     };
     const aiResult = await this.ai.classify(aiInput);
-    const deadlines = await this.sla.calculateDeadlines({ tenantId: tenant.id, priority: 'NORMAL' });
+
+    const routing = this.resolveRouting(aiResult.classification, tenantDepartments, tenantCategories);
+    const priority = this.resolveTicketPriority(aiResult.classification.priority);
+    const deadlines = await this.sla.calculateDeadlines({
+      tenantId: tenant.id,
+      priority,
+      departmentId: routing.departmentId,
+      categoryId: routing.categoryId,
+    });
 
     const ticket = await this.prisma.ticket.create({
       data: {
@@ -492,6 +667,9 @@ export class PublicTicketService {
         addressText: dto.addressText ?? aiResult.classification.addressText ?? undefined,
         latitude: dto.latitude,
         longitude: dto.longitude,
+        priority,
+        departmentId: routing.departmentId ?? undefined,
+        categoryId: routing.categoryId ?? undefined,
         aiConfidence: aiResult.classification.confidence,
         aiClassification: aiResult.classification,
         ...deadlines,
@@ -512,6 +690,19 @@ export class PublicTicketService {
                 model: aiResult.model,
                 promptVersion: aiResult.promptVersion,
                 classification: aiResult.classification,
+              },
+            },
+            {
+              tenantId: tenant.id,
+              actorType: AuditActorType.AI,
+              action: 'ticket.ai_routed',
+              after: {
+                departmentId: routing.departmentId,
+                departmentCode: routing.departmentCode,
+                categoryId: routing.categoryId,
+                categoryCode: routing.categoryCode,
+                priority,
+                confidence: aiResult.classification.confidence,
               },
             },
             {
@@ -549,6 +740,9 @@ export class PublicTicketService {
       });
       await this.notifications.enqueueMessage(message.id);
     }
+
+    await this.checkAnomalyAndAlert(tenant.id, ticket.id, routing.categoryId, routing.departmentId);
+    void this.ai.generateDraft(tenant.id, ticket.id, aiResult.classification, routing);
 
     return this.get(tenantSlug, ticket.publicTrackingToken ?? ticket.ticketNo);
   }
@@ -652,6 +846,82 @@ export class PublicTicketService {
     }
 
     throw new InternalServerErrorException('Tracking token uretilemedi: 5 denemede benzersiz token uretilmedi.');
+  }
+
+  private async checkAnomalyAndAlert(
+    tenantId: string,
+    ticketId: string,
+    categoryId: string | null,
+    departmentId: string | null,
+  ) {
+    if (!categoryId && !departmentId) return;
+    const threshold = 5;
+    const windowMs = 24 * 60 * 60 * 1000;
+    try {
+      const since = new Date(Date.now() - windowMs);
+      const count = await this.prisma.ticket.count({
+        where: {
+          tenantId,
+          createdAt: { gte: since },
+          ...(categoryId ? { categoryId } : { departmentId }),
+        },
+      });
+
+      if (count < threshold) return;
+
+      const scope = categoryId ? 'kategori' : 'departman';
+      const alertBody = [
+        `⚠️ ANOMALİ UYARISI: Bu ${scope} için son 24 saatte ${count} şikayet alındı.`,
+        'Tekrarlayan altyapı sorunu veya toplu şikayet olabilir.',
+        'İlgili birim bilgilendirilmesi önerilir.',
+      ].join(' ');
+
+      await this.prisma.ticketMessage.create({
+        data: {
+          tenantId,
+          ticketId,
+          senderType: AuditActorType.SYSTEM,
+          visibility: MessageVisibility.INTERNAL,
+          body: alertBody,
+        },
+      });
+    } catch {
+      // anomaly check must never block ticket intake
+    }
+  }
+
+  private resolveRouting(
+    classification: { departmentCode?: string | null; categoryCode?: string | null; confidence?: number },
+    departments: Array<{ id: string; code: string; name: string }>,
+    categories: Array<{ id: string; code: string; name: string; departmentId: string | null }>,
+  ) {
+    const minConfidence = 0.5;
+    if ((classification.confidence ?? 0) < minConfidence) {
+      return { departmentId: null, departmentCode: null, categoryId: null, categoryCode: null };
+    }
+
+    const dept = classification.departmentCode
+      ? departments.find((d) => d.code === classification.departmentCode) ?? null
+      : null;
+
+    const cat = classification.categoryCode
+      ? categories.find((c) => c.code === classification.categoryCode && (!dept || c.departmentId === dept.id)) ?? null
+      : null;
+
+    const resolvedDept = dept ?? (cat ? departments.find((d) => d.id === cat.departmentId) ?? null : null);
+
+    return {
+      departmentId: resolvedDept?.id ?? null,
+      departmentCode: resolvedDept?.code ?? null,
+      categoryId: cat?.id ?? null,
+      categoryCode: cat?.code ?? null,
+    };
+  }
+
+  private resolveTicketPriority(aiPriority?: string | null): 'LOW' | 'NORMAL' | 'HIGH' | 'URGENT' {
+    const p = aiPriority?.toUpperCase();
+    if (p === 'LOW' || p === 'NORMAL' || p === 'HIGH' || p === 'URGENT') return p;
+    return 'NORMAL';
   }
 
   private async listTenantDepartments(tenantId: string) {

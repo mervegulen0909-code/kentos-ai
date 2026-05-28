@@ -20,6 +20,7 @@ coverage/
 .accounts.local.md
 .accounts.machine.env
 .api-keys.local.env
+scripts/qa-secrets.local.ps1
 .browser-profiles/
 docs/accounts/private/
 *.pem

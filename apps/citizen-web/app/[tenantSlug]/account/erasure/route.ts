@@ -35,6 +35,9 @@ export async function POST(
     if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
       return NextResponse.json({ error: 'Oturum gecersiz veya suresi dolmus.' }, { status: 401 });
     }
+    if (error instanceof ApiError && error.status === 429) {
+      return NextResponse.json({ error: 'Cok fazla istek gonderdiniz. Lutfen kisa bir sure sonra tekrar deneyin.' }, { status: 429 });
+    }
     return NextResponse.json({ error: 'Silme islemi basarisiz oldu.' }, { status: 500 });
   }
 

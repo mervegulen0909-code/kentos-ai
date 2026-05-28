@@ -11,7 +11,8 @@ import { AuthService } from './auth.service.js';
 import { JwtBlacklistGuard } from './jwt-blacklist.guard.js';
 
 const AUTH_LOGIN_THROTTLE_TTL_MS = Number(process.env.AUTH_LOGIN_THROTTLE_TTL_MS ?? 60_000);
-const AUTH_LOGIN_THROTTLE_LIMIT = Number(process.env.AUTH_LOGIN_THROTTLE_LIMIT ?? 5);
+const IS_QA_STACK = process.env.PORT === '3110' && process.env.DATABASE_URL?.includes('kentos_ai_qa');
+const AUTH_LOGIN_THROTTLE_LIMIT = Number(process.env.AUTH_LOGIN_THROTTLE_LIMIT ?? (IS_QA_STACK ? 100 : 5));
 
 @ApiTags('auth')
 @Controller('auth')

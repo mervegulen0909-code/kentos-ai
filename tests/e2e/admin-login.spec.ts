@@ -18,5 +18,6 @@ test('admin login redirects to dashboard with seeded tenant admin', async ({ pag
   await expect(page.locator('div[aria-live="polite"][title]')).toHaveCount(1);
   await expect(page.getByRole('heading', { name: /Yetkili ekiplerin talep yuku/i })).toBeVisible({ timeout: 30_000 });
   await expect(page.getByRole('link', { name: 'Talepler' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Cikis yap' })).toBeVisible();
   await expect(page.getByText(/Dashboard verisi alinamadi\./i)).toHaveCount(0);
 });

@@ -1,9 +1,10 @@
 import { randomBytes, randomUUID } from 'node:crypto';
-import { Inject, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
+import { Inject, Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import bcrypt from 'bcryptjs';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { MailService } from '../mail/mail.service.js';
 import { JwtBlacklistService } from './jwt-blacklist.service.js';
 import { LoginDto } from './dto/login.dto.js';
 import { RefreshDto } from './dto/refresh.dto.js';
@@ -26,13 +27,12 @@ const PASSWORD_RESET_TTL_MS = 60 * 60 * 1000; // 1 hour
 
 @Injectable()
 export class AuthService {
-  private readonly logger = new Logger(AuthService.name);
-
   constructor(
     @Inject(PrismaService) private readonly prisma: PrismaService,
     @Inject(JwtService) private readonly jwt: JwtService,
     @Inject(ConfigService) private readonly config: ConfigService,
     @Inject(JwtBlacklistService) private readonly blacklist: JwtBlacklistService,
+    @Inject(MailService) private readonly mail: MailService,
   ) {}
 
   async login(dto: LoginDto) {
@@ -158,8 +158,7 @@ export class AuthService {
         },
       });
 
-      // TODO: send email via Postmark when ready
-      this.logger.log(`Password reset token for ${email}: ${rawToken}`);
+      await this.mail.sendPasswordReset(user.email, rawToken);
     }
 
     // Always return success to avoid leaking whether the email exists

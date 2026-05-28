@@ -3,8 +3,9 @@ import { CitizenSessionService } from './citizen-session.service.js';
 
 const service = new CitizenSessionService({
   get: (key: string) => key === 'CITIZEN_SESSION_SECRET' ? 'citizen-test-secret' : undefined,
-  getOrThrow: () => {
-    throw new Error('Unexpected fallback secret read.');
+  getOrThrow: (key: string) => {
+    if (key === 'CITIZEN_SESSION_SECRET') return 'citizen-test-secret';
+    throw new Error(`Unexpected config read for key: ${key}`);
   },
 } as never);
 

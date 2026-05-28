@@ -5,6 +5,7 @@ export const tenantSlug = 'demo-belediye';
 export const adminBaseURL = process.env.E2E_ADMIN_BASE_URL ?? 'http://127.0.0.1:3001';
 export const citizenBaseURL = process.env.E2E_CITIZEN_BASE_URL ?? 'http://127.0.0.1:3002';
 export const apiBaseURL = process.env.E2E_API_BASE_URL ?? 'http://127.0.0.1:3100/api/v1';
+export const e2eDatabaseURL = process.env.DATABASE_URL ?? 'postgresql://kentos:kentos@127.0.0.1:5432/kentos_ai_qa?schema=public';
 
 export async function gotoCitizenReport(page: Page) {
   await page.goto(`${citizenBaseURL}/${tenantSlug}/report`, { waitUntil: 'domcontentloaded', timeout: 45_000 });
@@ -62,7 +63,7 @@ export async function createHandoffConversation(suffix: string) {
   const prisma = new PrismaClient({
     datasources: {
       db: {
-        url: process.env.DATABASE_URL ?? 'postgresql://kentos:kentos@127.0.0.1:5432/kentos_ai?schema=public',
+        url: e2eDatabaseURL,
       },
     },
   });
