@@ -19,6 +19,9 @@ import { ReportsModule } from './modules/reports/reports.module.js';
 import { TenantsModule } from './modules/tenants/tenants.module.js';
 import { TicketsModule } from './modules/tickets/tickets.module.js';
 import { UsersModule } from './modules/users/users.module.js';
+import { CannedRepliesModule } from './modules/canned-replies/canned-replies.module.js';
+import { TicketTagsModule } from './modules/ticket-tags/ticket-tags.module.js';
+import { PresenceModule } from './modules/presence/presence.module.js';
 import { RootController } from './root.controller.js';
 
 @Module({
@@ -50,6 +53,9 @@ import { RootController } from './root.controller.js';
     AdminModule,
     CitizensModule,
     EventsModule,
+    CannedRepliesModule,
+    TicketTagsModule,
+    PresenceModule,
   ],
   controllers: [RootController],
   providers: [

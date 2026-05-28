@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Inject, MessageEvent, Param, Post, Query, Sse, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Inject, MessageEvent, Param, Patch, Post, Query, Sse, UseGuards } from '@nestjs/common';
 import { Observable, interval, from, of } from 'rxjs';
 import { map, switchMap, catchError } from 'rxjs/operators';
 import { AuthGuard } from '@nestjs/passport';
@@ -200,5 +200,87 @@ export class TicketsController {
     @Body() dto: ScheduleMessageDto,
   ) {
     return this.tickets.scheduleMessage(user, id, dto);
+  }
+
+  // 3.2 — Tags
+  @Roles('SUPER_ADMIN', 'TENANT_ADMIN', 'MANAGER', 'DEPARTMENT_STAFF', 'OPERATOR')
+  @Post(':id/tags/:tagId')
+  @ApiOperation({ summary: 'Ticket\'a etiket ekle' })
+  attachTag(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string, @Param('tagId') tagId: string) {
+    return this.tickets.attachTag(user, id, tagId);
+  }
+
+  @Roles('SUPER_ADMIN', 'TENANT_ADMIN', 'MANAGER', 'DEPARTMENT_STAFF', 'OPERATOR')
+  @Delete(':id/tags/:tagId')
+  @ApiOperation({ summary: 'Ticket\'dan etiket kaldır' })
+  detachTag(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string, @Param('tagId') tagId: string) {
+    return this.tickets.detachTag(user, id, tagId);
+  }
+
+  // 3.4 — Watchers
+  @Post(':id/watch')
+  @ApiOperation({ summary: 'Ticket\'ı takip et' })
+  watchTicket(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+    return this.tickets.watchTicket(user, id);
+  }
+
+  @Delete(':id/watch')
+  @ApiOperation({ summary: 'Ticket takibini bırak' })
+  unwatchTicket(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+    return this.tickets.unwatchTicket(user, id);
+  }
+
+  @Get(':id/watchers')
+  @ApiOperation({ summary: 'Ticket takipçilerini listele' })
+  listWatchers(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+    return this.tickets.listWatchers(user, id);
+  }
+
+  // 3.5 — Checklist
+  @Get(':id/checklist')
+  @ApiOperation({ summary: 'Kontrol listesini getir' })
+  listChecklist(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+    return this.tickets.listChecklist(user, id);
+  }
+
+  @Post(':id/checklist')
+  @ApiOperation({ summary: 'Kontrol listesine öge ekle' })
+  addChecklistItem(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body() dto: { title: string; position?: number },
+  ) {
+    return this.tickets.addChecklistItem(user, id, dto);
+  }
+
+  @Patch(':id/checklist/:itemId')
+  @ApiOperation({ summary: 'Kontrol listesi ögesini güncelle' })
+  updateChecklistItem(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Param('itemId') itemId: string,
+    @Body() dto: { title?: string; position?: number },
+  ) {
+    return this.tickets.updateChecklistItem(user, id, itemId, dto);
+  }
+
+  @Post(':id/checklist/:itemId/toggle')
+  @ApiOperation({ summary: 'Kontrol listesi ögesini tamamla / geri al' })
+  toggleChecklistItem(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Param('itemId') itemId: string,
+  ) {
+    return this.tickets.toggleChecklistItem(user, id, itemId);
+  }
+
+  @Delete(':id/checklist/:itemId')
+  @ApiOperation({ summary: 'Kontrol listesi ögesini sil' })
+  removeChecklistItem(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Param('itemId') itemId: string,
+  ) {
+    return this.tickets.removeChecklistItem(user, id, itemId);
   }
 }

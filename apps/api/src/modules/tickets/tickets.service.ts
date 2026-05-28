@@ -435,6 +435,9 @@ export class TicketsService {
     await this.audit(user, id, 'ticket.internal_note_added', undefined, { messageId: message.id });
     await this.attachments.attachAdminToMessage(user, id, message.id, dto.attachmentIds);
 
+    // 3.3 — @mention notifications
+    void this.notifyMentions(user, id, dto.body);
+
     this.eventsService.emit({
       type: 'ticket.message_added',
       tenantId: user.tenantId,
@@ -781,6 +784,35 @@ export class TicketsService {
     return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
   }
 
+  private async notifyMentions(actor: AuthenticatedUser, ticketId: string, body: string) {
+    const handles = [...body.matchAll(/@(\S+)/g)].map((m) => m[1]).filter(Boolean);
+    if (!handles.length) return;
+    try {
+      const users = await this.prisma.user.findMany({
+        where: {
+          tenantId: actor.tenantId,
+          isActive: true,
+          id: { not: actor.id },
+          OR: handles.flatMap((h) => [
+            { email: { startsWith: h, mode: 'insensitive' as const } },
+            { fullName: { contains: h, mode: 'insensitive' as const } },
+          ]),
+        },
+        select: { id: true, fullName: true },
+      });
+      if (!users.length) return;
+      // Staff FCM push is gated behind UserDeviceToken table (planned future migration)
+      // For now emit SSE event so the frontend can react
+      for (const u of users) {
+        this.eventsService.emit({
+          type: 'ticket.mention' as never,
+          tenantId: actor.tenantId,
+          payload: { ticketId, mentionedUserId: u.id },
+        });
+      }
+    } catch { /* mention notification failure must never break the response */ }
+  }
+
   private async sendPublicReplyPush(ticket: { id: string; tenantId: string; title: string; citizenId: string | null }) {
     if (!ticket.citizenId) return;
     try {
@@ -1050,6 +1082,106 @@ export class TicketsService {
     });
 
     return { updated: ids.length, skipped: dto.ticketIds.length - ids.length };
+  }
+
+  // 3.2 — Ticket tag attach / detach (use raw SQL for _TicketTags junction; Prisma client not yet regenerated)
+  async attachTag(user: AuthenticatedUser, ticketId: string, tagId: string) {
+    await this.requireTicket(user, ticketId);
+    const tags = await this.prisma.$queryRaw<Array<{ id: string; name: string }>>`SELECT "id", "name" FROM "TicketTag" WHERE "id" = ${tagId} AND "tenantId" = ${user.tenantId} LIMIT 1`;
+    if (!tags.length) throw new NotFoundException('Etiket bulunamadi.');
+    await this.prisma.$executeRaw`INSERT INTO "_TicketTags" ("A","B") VALUES (${ticketId},${tagId}) ON CONFLICT DO NOTHING`;
+    await this.audit(user, ticketId, 'ticket.tag_attached', undefined, { tagId, tagName: tags[0]!.name });
+    return { ok: true };
+  }
+
+  async detachTag(user: AuthenticatedUser, ticketId: string, tagId: string) {
+    await this.requireTicket(user, ticketId);
+    await this.prisma.$executeRaw`DELETE FROM "_TicketTags" WHERE "A" = ${ticketId} AND "B" = ${tagId}`;
+    await this.audit(user, ticketId, 'ticket.tag_detached', undefined, { tagId });
+    return { ok: true };
+  }
+
+  // 3.4 — Watchers
+  async watchTicket(user: AuthenticatedUser, id: string) {
+    await this.requireTicket(user, id);
+    await this.prisma.$executeRaw`INSERT INTO "TicketWatcher" ("tenantId","ticketId","userId","createdAt") VALUES (${user.tenantId},${id},${user.id},NOW()) ON CONFLICT DO NOTHING`;
+    return { ok: true };
+  }
+
+  async unwatchTicket(user: AuthenticatedUser, id: string) {
+    await this.prisma.$executeRaw`DELETE FROM "TicketWatcher" WHERE "ticketId" = ${id} AND "userId" = ${user.id}`;
+    return { ok: true };
+  }
+
+  async listWatchers(user: AuthenticatedUser, id: string) {
+    await this.requireTicket(user, id);
+    return this.prisma.$queryRaw<Array<{ userId: string; createdAt: Date; fullName: string | null; email: string }>>`
+      SELECT w."userId", w."createdAt", u."fullName", u."email"
+      FROM "TicketWatcher" w
+      JOIN "User" u ON u."id" = w."userId"
+      WHERE w."ticketId" = ${id}
+    `;
+  }
+
+  // 3.5 — Checklist
+  async listChecklist(user: AuthenticatedUser, id: string) {
+    await this.requireTicket(user, id);
+    return this.prisma.$queryRaw<Array<{ id: string; title: string; done: boolean; position: number; doneAt: Date | null; doneById: string | null; createdAt: Date }>>`
+      SELECT "id","title","done","position","doneAt","doneById","createdAt"
+      FROM "TicketChecklistItem"
+      WHERE "ticketId" = ${id} AND "tenantId" = ${user.tenantId}
+      ORDER BY "position" ASC, "createdAt" ASC
+    `;
+  }
+
+  async addChecklistItem(user: AuthenticatedUser, id: string, dto: { title: string; position?: number }) {
+    await this.requireTicket(user, id);
+    const rows = await this.prisma.$queryRaw<Array<{ id: string }>>`
+      INSERT INTO "TicketChecklistItem" ("id","tenantId","ticketId","title","position","done","createdAt","updatedAt")
+      VALUES (gen_random_uuid()::text, ${user.tenantId}, ${id}, ${dto.title}, ${dto.position ?? 0}, false, NOW(), NOW())
+      RETURNING "id"
+    `;
+    return { id: rows[0]!.id, ticketId: id, title: dto.title, position: dto.position ?? 0, done: false };
+  }
+
+  async updateChecklistItem(user: AuthenticatedUser, ticketId: string, itemId: string, dto: { title?: string; position?: number }) {
+    const rows = await this.prisma.$queryRaw<Array<{ id: string; title: string; position: number }>>`
+      SELECT "id","title","position" FROM "TicketChecklistItem"
+      WHERE "id" = ${itemId} AND "ticketId" = ${ticketId} AND "tenantId" = ${user.tenantId} LIMIT 1
+    `;
+    if (!rows.length) throw new NotFoundException('Kontrol listesi ogesi bulunamadi.');
+    const item = rows[0]!;
+    await this.prisma.$executeRaw`
+      UPDATE "TicketChecklistItem"
+      SET "title" = ${dto.title ?? item.title}, "position" = ${dto.position ?? item.position}, "updatedAt" = NOW()
+      WHERE "id" = ${itemId}
+    `;
+    return { id: itemId, title: dto.title ?? item.title, position: dto.position ?? item.position };
+  }
+
+  async toggleChecklistItem(user: AuthenticatedUser, ticketId: string, itemId: string) {
+    const rows = await this.prisma.$queryRaw<Array<{ id: string; done: boolean }>>`
+      SELECT "id","done" FROM "TicketChecklistItem"
+      WHERE "id" = ${itemId} AND "ticketId" = ${ticketId} AND "tenantId" = ${user.tenantId} LIMIT 1
+    `;
+    if (!rows.length) throw new NotFoundException('Kontrol listesi ogesi bulunamadi.');
+    const done = !rows[0]!.done;
+    if (done) {
+      await this.prisma.$executeRaw`UPDATE "TicketChecklistItem" SET "done"=true,"doneAt"=NOW(),"doneById"=${user.id},"updatedAt"=NOW() WHERE "id"=${itemId}`;
+    } else {
+      await this.prisma.$executeRaw`UPDATE "TicketChecklistItem" SET "done"=false,"doneAt"=NULL,"doneById"=NULL,"updatedAt"=NOW() WHERE "id"=${itemId}`;
+    }
+    return { id: itemId, done };
+  }
+
+  async removeChecklistItem(user: AuthenticatedUser, ticketId: string, itemId: string) {
+    const rows = await this.prisma.$queryRaw<Array<{ id: string }>>`
+      SELECT "id" FROM "TicketChecklistItem"
+      WHERE "id" = ${itemId} AND "ticketId" = ${ticketId} AND "tenantId" = ${user.tenantId} LIMIT 1
+    `;
+    if (!rows.length) throw new NotFoundException('Kontrol listesi ogesi bulunamadi.');
+    await this.prisma.$executeRaw`DELETE FROM "TicketChecklistItem" WHERE "id" = ${itemId}`;
+    return { ok: true };
   }
 
   async scheduleMessage(user: AuthenticatedUser, ticketId: string, dto: { body: string; scheduledAt?: string }) {

@@ -104,6 +104,7 @@ model Tenant {
 
   aiRuns               AiRun[]
   auditLogs            AuditLog[]
+  cannedReplies        CannedReply[]
   categories           Category[]
   channelEvents        ChannelEvent[]
   citizenIdentifiers   CitizenIdentifier[]
@@ -116,6 +117,7 @@ model Tenant {
   outboundDeliveries   OutboundDelivery[]
   neighborhoods        Neighborhood[]
   slaPolicies          SlaPolicy[]
+  ticketTags           TicketTag[]
   tickets              Ticket[]
   users                User[]
   webhooks             TenantWebhook[]
@@ -239,10 +241,13 @@ model User {
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
 
-  tenant          Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  assignedTickets Ticket[]         @relation("AssignedTickets")
-  auditLogs       AuditLog[]
-  departments     UserDepartment[]
+  tenant           Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  assignedTickets  Ticket[]         @relation("AssignedTickets")
+  auditLogs        AuditLog[]
+  departments      UserDepartment[]
+  cannedReplies    CannedReply[]
+  watchedTickets   TicketWatcher[]
+  checklistItems   TicketChecklistItem[] @relation("ChecklistItemDoneBy")
 
   @@unique([tenantId, email])
   @@index([tenantId, role, isActive])
@@ -369,6 +374,9 @@ model Ticket {
   attachments            Attachment[]
   auditLogs              AuditLog[]
   messages               TicketMessage[]
+  tags                   TicketTag[]     @relation("TicketTags")
+  watchers               TicketWatcher[]
+  checklistItems         TicketChecklistItem[]
 
   @@unique([tenantId, ticketNo])
   @@unique([tenantId, publicTrackingToken])
@@ -592,4 +600,69 @@ model ManagerReport {
   tenant      Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([tenantId, type, periodStart])
+}
+
+// FAZ 3.1: Canned reply templates
+model CannedReply {
+  id         String   @id @default(cuid())
+  tenantId   String
+  ownerId    String?  // null = shared; non-null = personal
+  title      String
+  body       String
+  shortCode  String?
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  tenant     Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  owner      User?  @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, ownerId, isActive])
+}
+
+// FAZ 3.2: Ticket tags / labels
+model TicketTag {
+  id       String @id @default(cuid())
+  tenantId String
+  name     String
+  color    String @default("#6366f1")
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tickets  Ticket[] @relation("TicketTags")
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+}
+
+// FAZ 3.4: Ticket watchers / followers
+model TicketWatcher {
+  tenantId  String
+  ticketId  String
+  userId    String
+  createdAt DateTime @default(now())
+
+  ticket    Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  user      User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([ticketId, userId])
+  @@index([tenantId, userId])
+}
+
+// FAZ 3.5: Ticket sub-tasks / checklist
+model TicketChecklistItem {
+  id        String   @id @default(cuid())
+  tenantId  String
+  ticketId  String
+  title     String
+  done      Boolean  @default(false)
+  position  Int      @default(0)
+  doneAt    DateTime?
+  doneById  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  ticket    Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  doneBy    User?  @relation("ChecklistItemDoneBy", fields: [doneById], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, ticketId])
 }
