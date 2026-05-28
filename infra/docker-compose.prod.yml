@@ -122,7 +122,8 @@ services:
         ]
       interval: 20s
       timeout: 5s
-      retries: 10
+      retries: 15
+      start_period: 120s
 
   worker:
     build:
