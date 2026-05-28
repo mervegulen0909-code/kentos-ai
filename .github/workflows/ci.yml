@@ -179,6 +179,8 @@ jobs:
             sleep 120
             echo "=== Container states ==="
             docker compose --env-file .env.production.local -f infra/docker-compose.prod.yml ps
+            echo "=== API logs (last 100 lines) ==="
+            docker logs infra-api-1 2>&1 | tail -100 || true
             echo "=== Worker logs (last 80 lines) ==="
             docker logs infra-worker-1 2>&1 | tail -80 || true
             echo "=== Gateway logs (last 20 lines) ==="
