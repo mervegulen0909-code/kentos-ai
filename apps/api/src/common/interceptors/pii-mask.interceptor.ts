@@ -10,6 +10,9 @@ function maskValue(value: unknown): unknown {
     return value.replace(TC_KIMLIK_RE, (match) => `${match.slice(0, 3)}****${match.slice(-1)}`);
   }
   if (Array.isArray(value)) return value.map(maskValue);
+  // Date nesnelerini koruyarak gecir — Object.entries(new Date()) bos array dondurur
+  // ve tarihi {} objesine donusturerek JSON serialization'i bozar.
+  if (value instanceof Date) return value;
   if (value && typeof value === 'object') {
     const masked: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(value as Record<string, unknown>)) {

@@ -75,13 +75,18 @@ async function getTicketState(tenantSlug: string, trackingToken: string): Promis
   }
 }
 
-function formatDate(date: string | null) {
+function formatDate(date: string | null | undefined) {
   if (!date) return 'Henüz paylaşılmadı';
-
-  return new Intl.DateTimeFormat('tr-TR', {
-    dateStyle: 'long',
-    timeStyle: 'short',
-  }).format(new Date(date));
+  try {
+    const d = new Date(date);
+    if (isNaN(d.getTime())) return 'Henüz paylaşılmadı';
+    return new Intl.DateTimeFormat('tr-TR', {
+      dateStyle: 'long',
+      timeStyle: 'short',
+    }).format(d);
+  } catch {
+    return 'Henüz paylaşılmadı';
+  }
 }
 
 function getPriorityLabel(priority: string) {
