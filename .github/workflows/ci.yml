@@ -123,11 +123,11 @@ jobs:
         run: pnpm build
 
       - name: Start API for smoke
-        run: DATABASE_URL="$DATABASE_URL" PORT=3110 pnpm --filter @kentos/api dev > api.log 2>&1 &
+        run: DATABASE_URL="$DATABASE_URL" PORT=3110 pnpm --filter @kentos/api start:qa > api.log 2>&1 &
 
       - name: Wait for API health
         run: |
-          for i in {1..60}; do
+          for i in {1..90}; do
             if curl -fsS http://127.0.0.1:3110/api/v1/health >/dev/null; then
               exit 0
             fi
