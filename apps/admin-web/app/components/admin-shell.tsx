@@ -31,6 +31,9 @@ export function AdminShell({ children, hasSession = false, role = null }: AdminS
       <aside className="sidebar">
         <h1>KentOS AI</h1>
         <p style={{ color: 'var(--muted)' }}>Operasyon komuta paneli</p>
+        <div className="sidebar-status" role="status">
+          {hasSession ? `${role ?? 'Yetkili'} oturumu` : 'Oturum bekleniyor'}
+        </div>
         <nav aria-label="Admin bolumleri">
           {adminSections.map((section) => (
             <a href={section.href} key={section.href}>
@@ -39,9 +42,6 @@ export function AdminShell({ children, hasSession = false, role = null }: AdminS
           ))}
           {!hasSession ? <a href="/login">Giris</a> : null}
         </nav>
-        <div className="sidebar-status" role="status">
-          {hasSession ? `${role ?? 'Yetkili'} oturumu` : 'Oturum bekleniyor'}
-        </div>
         {hasSession ? (
           <form action={logoutAction} className="sidebar-logout">
             <button type="submit">Cikis yap</button>

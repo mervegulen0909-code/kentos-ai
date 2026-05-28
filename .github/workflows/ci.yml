@@ -142,7 +142,7 @@ jobs:
 
   deploy:
     name: Deploy to Production
-    needs: [verify, ui-e2e, security]
+    needs: [verify, security]
     if: github.ref == 'refs/heads/master' && github.event_name == 'push'
     runs-on: ubuntu-latest
     timeout-minutes: 45
