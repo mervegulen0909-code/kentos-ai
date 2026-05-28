@@ -1,0 +1,34 @@
+name: Update META_ACCESS_TOKEN on VPS
+
+on:
+  workflow_dispatch:
+    inputs:
+      meta_access_token:
+        description: 'New META_ACCESS_TOKEN value'
+        required: true
+        type: string
+
+jobs:
+  update-token:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: SSH update META_ACCESS_TOKEN
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.PROD_HOST }}
+          username: ${{ secrets.PROD_USER }}
+          key: ${{ secrets.PROD_SSH_KEY }}
+          port: ${{ secrets.PROD_SSH_PORT || 22 }}
+          script: |
+            cd /opt/kentos-ai
+            # Update or append META_ACCESS_TOKEN
+            if grep -q "^META_ACCESS_TOKEN=" .env.production.local; then
+              sed -i "s|^META_ACCESS_TOKEN=.*|META_ACCESS_TOKEN=${{ github.event.inputs.meta_access_token }}|" .env.production.local
+            else
+              echo "META_ACCESS_TOKEN=${{ github.event.inputs.meta_access_token }}" >> .env.production.local
+            fi
+            # Restart whatsapp-gateway
+            docker compose -f infra/docker-compose.prod.yml --env-file .env.production.local restart whatsapp-gateway
+            echo "Done. Gateway restarted."
+            docker compose -f infra/docker-compose.prod.yml ps whatsapp-gateway
