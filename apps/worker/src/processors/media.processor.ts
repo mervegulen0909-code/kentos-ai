@@ -68,22 +68,30 @@ export async function runMediaJob(job: { name: string; data: MediaJobData }, dep
     return { processor: 'media', job: job.name, ...summary };
   }
 
-  const scanOutcome = deps.scan ? await deps.scan({ storageKey: job.data.storageKey }) : skippedOutcome('no-scanner');
+  let scanOutcome = deps.scan ? await deps.scan({ storageKey: job.data.storageKey }) : skippedOutcome('no-scanner');
 
-  if (scanOutcome.scanStatus === 'INFECTED' && deps.onInfected) {
-    // Karantina hook başarısız olursa job yeniden denenebilmesi için hata fırlatılır
-    await deps.onInfected({
-      attachmentId: job.data.attachmentId,
-      tenantId: job.data.tenantId,
-      storageKey: job.data.storageKey,
-      scanProvider: scanOutcome.scanProvider,
-      threat: scanOutcome.threat,
-      scannedAt: scanOutcome.scannedAt,
-    }).catch((error) => {
-      const msg = error instanceof Error ? error.message : String(error);
-      // İnfected attachment karantinaya alınamazsa kritik hata — job retry edilmeli
-      throw new Error(`[media] quarantine hook failed for ${job.data.attachmentId}: ${msg}`);
-    });
+  if (scanOutcome.scanStatus === 'INFECTED') {
+    // VirusTotal secondary scan — fire-and-forget escalation for confirmation
+    const vtResult = await virusTotalEscalate(job.data.storageKey, job.data.attachmentId);
+    if (vtResult) {
+      scanOutcome = { ...scanOutcome, scanProvider: `clamav+virustotal`, reason: vtResult };
+    }
+
+    if (deps.onInfected) {
+      // Karantina hook başarısız olursa job yeniden denenebilmesi için hata fırlatılır
+      await deps.onInfected({
+        attachmentId: job.data.attachmentId,
+        tenantId: job.data.tenantId,
+        storageKey: job.data.storageKey,
+        scanProvider: scanOutcome.scanProvider,
+        threat: scanOutcome.threat,
+        scannedAt: scanOutcome.scannedAt,
+      }).catch((error) => {
+        const msg = error instanceof Error ? error.message : String(error);
+        // İnfected attachment karantinaya alınamazsa kritik hata — job retry edilmeli
+        throw new Error(`[media] quarantine hook failed for ${job.data.attachmentId}: ${msg}`);
+      });
+    }
   }
 
   if (deps.updateAttachment) {
@@ -264,6 +272,62 @@ async function openObjectStream(storageKey: string): Promise<Readable | null> {
   const response = await getS3Client().send(new GetObjectCommand({ Bucket: bucket, Key: storageKey }));
   const body = response.Body as Readable | undefined;
   return body ?? null;
+}
+
+async function virusTotalEscalate(storageKey: string, attachmentId: string): Promise<string | null> {
+  const apiKey = process.env.VIRUSTOTAL_API_KEY?.trim();
+  if (!apiKey) return null;
+
+  try {
+    const bucket = process.env.S3_BUCKET?.trim();
+    if (!bucket) return null;
+
+    const s3 = getS3Client();
+    const { Body, ContentLength } = await s3.send(new GetObjectCommand({ Bucket: bucket, Key: storageKey }));
+    if (!Body || !ContentLength) return null;
+    if (ContentLength > 32 * 1024 * 1024) return 'file-too-large-for-virustotal'; // 32 MB limit
+
+    const chunks: Uint8Array[] = [];
+    for await (const chunk of Body as AsyncIterable<Uint8Array>) {
+      chunks.push(chunk);
+    }
+    const fileBuffer = Buffer.concat(chunks);
+
+    const formData = new FormData();
+    formData.append('file', new Blob([fileBuffer]), storageKey.split('/').pop() ?? 'attachment');
+
+    const uploadRes = await fetch('https://www.virustotal.com/api/v3/files', {
+      method: 'POST',
+      headers: { 'x-apikey': apiKey },
+      body: formData,
+      signal: AbortSignal.timeout(30_000),
+    });
+
+    if (!uploadRes.ok) return `virustotal-upload-failed-${uploadRes.status}`;
+    const uploadData = await uploadRes.json() as { data?: { id?: string } };
+    const analysisId = uploadData.data?.id;
+    if (!analysisId) return 'virustotal-no-analysis-id';
+
+    // Poll for result (max 3 attempts with 5s delay)
+    for (let attempt = 0; attempt < 3; attempt++) {
+      await new Promise((r) => setTimeout(r, 5_000));
+      const pollRes = await fetch(`https://www.virustotal.com/api/v3/analyses/${analysisId}`, {
+        headers: { 'x-apikey': apiKey },
+        signal: AbortSignal.timeout(10_000),
+      });
+      if (!pollRes.ok) continue;
+      const pollData = await pollRes.json() as { data?: { attributes?: { status?: string; stats?: { malicious?: number; suspicious?: number } } } };
+      const attrs = pollData.data?.attributes;
+      if (attrs?.status !== 'completed') continue;
+      const malicious = attrs.stats?.malicious ?? 0;
+      const suspicious = attrs.stats?.suspicious ?? 0;
+      return `vt:malicious=${malicious},suspicious=${suspicious},attachment=${attachmentId}`;
+    }
+
+    return `vt:analysis=${analysisId},pending`;
+  } catch (error) {
+    return `virustotal-error:${error instanceof Error ? error.message.slice(0, 100) : 'unknown'}`;
+  }
 }
 
 function getS3Client() {

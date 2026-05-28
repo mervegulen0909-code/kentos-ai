@@ -2,6 +2,7 @@ import { Body, Controller, Get, Inject, Post, Req, UseGuards } from '@nestjs/com
 import { AuthGuard } from '@nestjs/passport';
 import { Throttle } from '@nestjs/throttler';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { IsString, Length } from 'class-validator';
 import { LoginDto } from './dto/login.dto.js';
 import { RefreshDto } from './dto/refresh.dto.js';
 import { LogoutDto } from './dto/logout.dto.js';
@@ -9,6 +10,14 @@ import { RequestPasswordResetDto } from './dto/request-password-reset.dto.js';
 import { ResetPasswordDto } from './dto/reset-password.dto.js';
 import { AuthService } from './auth.service.js';
 import { JwtBlacklistGuard } from './jwt-blacklist.guard.js';
+import { CurrentUser } from '../../common/decorators/current-user.decorator.js';
+import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
+
+class TotpVerifyDto {
+  @IsString()
+  @Length(6, 6)
+  code!: string;
+}
 
 const AUTH_LOGIN_THROTTLE_TTL_MS = Number(process.env.AUTH_LOGIN_THROTTLE_TTL_MS ?? 60_000);
 const IS_QA_STACK = process.env.PORT === '3110' && process.env.DATABASE_URL?.includes('kentos_ai_qa');
@@ -71,5 +80,32 @@ export class AuthController {
   @Get('me')
   me(@Req() request: { user: unknown }) {
     return request.user;
+  }
+
+  @ApiBearerAuth()
+  @ApiOperation({ summary: '2FA/TOTP kurulumu başlat — QR URI ve secret döner' })
+  @ApiResponse({ status: 200, description: 'otpauthUrl ve base32Secret' })
+  @UseGuards(AuthGuard('jwt'), JwtBlacklistGuard)
+  @Post('totp/setup')
+  totpSetup(@CurrentUser() user: AuthenticatedUser) {
+    return this.auth.totpSetup(user.id, user.tenantId);
+  }
+
+  @ApiBearerAuth()
+  @ApiOperation({ summary: '2FA/TOTP etkinleştir — doğrulama kodu ile onaylar' })
+  @ApiResponse({ status: 200, description: 'ok: true' })
+  @UseGuards(AuthGuard('jwt'), JwtBlacklistGuard)
+  @Post('totp/enable')
+  totpEnable(@CurrentUser() user: AuthenticatedUser, @Body() dto: TotpVerifyDto) {
+    return this.auth.totpEnable(user.id, user.tenantId, dto.code);
+  }
+
+  @ApiBearerAuth()
+  @ApiOperation({ summary: '2FA/TOTP devre dışı bırak' })
+  @ApiResponse({ status: 200, description: 'ok: true' })
+  @UseGuards(AuthGuard('jwt'), JwtBlacklistGuard)
+  @Post('totp/disable')
+  totpDisable(@CurrentUser() user: AuthenticatedUser, @Body() dto: TotpVerifyDto) {
+    return this.auth.totpDisable(user.id, user.tenantId, dto.code);
   }
 }

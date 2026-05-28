@@ -110,6 +110,7 @@ model Tenant {
   citizens             Citizen[]
   conversations        Conversation[]
   departments          Department[]
+  kvkkConsentVersions  KvkkConsentVersion[]
   managerReports       ManagerReport[]
   messageTemplates     MessageTemplate[]
   outboundDeliveries   OutboundDelivery[]
@@ -230,6 +231,8 @@ model User {
   passwordHash        String
   passwordResetToken  String?
   passwordResetExpiry DateTime?
+  totpSecret          String?
+  totpEnabled         Boolean  @default(false)
   fullName            String
   role                UserRole
   isActive            Boolean  @default(true)
@@ -256,20 +259,38 @@ model UserDepartment {
   @@id([userId, departmentId])
 }
 
+model KvkkConsentVersion {
+  id          String   @id @default(cuid())
+  tenantId    String
+  version     String
+  summary     String
+  contentUrl  String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  tenant      Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  citizens    Citizen[]
+
+  @@unique([tenantId, version])
+  @@index([tenantId, isActive])
+}
+
 model Citizen {
-  id                  String    @id @default(cuid())
-  tenantId            String
-  displayName         String?
-  phone               String?
-  email               String?
-  firebaseUid         String?
-  kvkkConsentAt       DateTime?
-  mergedIntoCitizenId String?
-  mergedAt            DateTime?
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
+  id                    String    @id @default(cuid())
+  tenantId              String
+  displayName           String?
+  phone                 String?
+  email                 String?
+  firebaseUid           String?
+  kvkkConsentAt         DateTime?
+  kvkkConsentVersionId  String?
+  mergedIntoCitizenId   String?
+  mergedAt              DateTime?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
 
   tenant              Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  kvkkConsentVersion  KvkkConsentVersion? @relation(fields: [kvkkConsentVersionId], references: [id], onDelete: SetNull)
   mergedIntoCitizen   Citizen?            @relation("CitizenMerge", fields: [mergedIntoCitizenId], references: [id], onDelete: SetNull)
   mergedCitizens      Citizen[]           @relation("CitizenMerge")
   identifiers         CitizenIdentifier[]

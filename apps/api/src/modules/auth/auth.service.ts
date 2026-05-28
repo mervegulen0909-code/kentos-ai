@@ -3,6 +3,7 @@ import { Inject, Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import bcrypt from 'bcryptjs';
+import { generateSecret as totpGenerateSecret, generateURI as totpGenerateURI, verifySync as totpVerifySync } from 'otplib';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { MailService } from '../mail/mail.service.js';
 import { JwtBlacklistService } from './jwt-blacklist.service.js';
@@ -47,6 +48,22 @@ export class AuthService {
 
     if (!user || !(await bcrypt.compare(dto.password, user.passwordHash))) {
       throw new UnauthorizedException('Gecersiz kullanici bilgileri.');
+    }
+
+    // 2FA/TOTP check — raw query until Prisma client is regenerated
+    const totpRows = await this.prisma.$queryRaw<Array<{ totpEnabled: boolean; totpSecret: string | null }>>`
+      SELECT "totpEnabled", "totpSecret" FROM "User" WHERE "id" = ${user.id} LIMIT 1
+    `;
+    const totpEnabled = totpRows[0]?.totpEnabled ?? false;
+    const totpSecret = totpRows[0]?.totpSecret ?? null;
+
+    if (totpEnabled && totpSecret) {
+      if (!dto.totpCode) {
+        throw new UnauthorizedException('2FA kodu gerekli.');
+      }
+      if (!totpVerifySync({ strategy: 'totp', token: dto.totpCode, secret: totpSecret })) {
+        throw new UnauthorizedException('Gecersiz 2FA kodu.');
+      }
     }
 
     const basePayload = { sub: user.id, tenantId: user.tenantId, email: user.email, role: user.role };
@@ -197,6 +214,55 @@ export class AuthService {
       },
     });
 
+    return { ok: true };
+  }
+
+  async totpSetup(userId: string, tenantId: string) {
+    const user = await this.prisma.user.findFirst({ where: { id: userId, tenantId, isActive: true } });
+    if (!user) throw new UnauthorizedException('Kullanici bulunamadi.');
+
+    const secret = totpGenerateSecret();
+    await this.prisma.$executeRaw`
+      UPDATE "User" SET "totpSecret" = ${secret}, "totpEnabled" = false
+      WHERE "id" = ${userId}
+    `;
+
+    const otpauthUrl = totpGenerateURI({ strategy: 'totp', issuer: 'KentOS', label: user.email, secret });
+    return { otpauthUrl, base32Secret: secret };
+  }
+
+  async totpEnable(userId: string, tenantId: string, code: string) {
+    const rows = await this.prisma.$queryRaw<Array<{ totpSecret: string | null }>>`
+      SELECT "totpSecret" FROM "User" WHERE "id" = ${userId} AND "tenantId" = ${tenantId} LIMIT 1
+    `;
+    const secret = rows[0]?.totpSecret;
+    if (!secret) throw new UnauthorizedException('Oncelikle 2FA kurulumunu baslatmalisiniz.');
+
+    if (!totpVerifySync({ strategy: 'totp', token: code, secret })) {
+      throw new UnauthorizedException('Gecersiz dogrulama kodu.');
+    }
+
+    await this.prisma.$executeRaw`
+      UPDATE "User" SET "totpEnabled" = true WHERE "id" = ${userId}
+    `;
+    return { ok: true };
+  }
+
+  async totpDisable(userId: string, tenantId: string, code: string) {
+    const rows = await this.prisma.$queryRaw<Array<{ totpSecret: string | null; totpEnabled: boolean }>>`
+      SELECT "totpSecret", "totpEnabled" FROM "User" WHERE "id" = ${userId} AND "tenantId" = ${tenantId} LIMIT 1
+    `;
+    const secret = rows[0]?.totpSecret;
+    const enabled = rows[0]?.totpEnabled;
+    if (!secret || !enabled) throw new UnauthorizedException('2FA etkinlestirilmemis.');
+
+    if (!totpVerifySync({ strategy: 'totp', token: code, secret })) {
+      throw new UnauthorizedException('Gecersiz dogrulama kodu.');
+    }
+
+    await this.prisma.$executeRaw`
+      UPDATE "User" SET "totpEnabled" = false, "totpSecret" = NULL WHERE "id" = ${userId}
+    `;
     return { ok: true };
   }
 

@@ -7,6 +7,7 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
 import { AppModule } from './app.module.js';
 import { AllExceptionsFilter } from './common/filters/http-exception.filter.js';
+import { PiiMaskInterceptor } from './common/interceptors/pii-mask.interceptor.js';
 import { initSentry } from './common/sentry.js';
 import { mountBullBoard } from './common/bull-board.js';
 
@@ -62,6 +63,8 @@ async function bootstrap() {
 
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }));
   app.useGlobalFilters(new AllExceptionsFilter());
+  // KVKK Madde 6 — TC Kimlik No maskeleme (disable via PII_MASK_ENABLED=false)
+  app.useGlobalInterceptors(new PiiMaskInterceptor());
 
   const swaggerConfig = new DocumentBuilder()
     .setTitle('KentOS AI API')
