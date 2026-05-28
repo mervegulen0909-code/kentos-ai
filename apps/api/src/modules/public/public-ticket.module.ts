@@ -8,6 +8,8 @@ import { NotificationTemplateService } from '../tickets/notification-template.se
 import { SlaService } from '../tickets/sla.service.js';
 import { TicketNumberService } from '../tickets/ticket-number.service.js';
 import { CitizensModule } from '../citizens/citizens.module.js';
+import { FaqArticlesModule } from '../faq/faq-articles.module.js';
+import { AppointmentsModule } from '../appointments/appointments.module.js';
 import { CitizenIdentityService } from './citizen-identity.service.js';
 import { CitizenSessionService } from './citizen-session.service.js';
 import { FirebaseAuthService } from './firebase-auth.service.js';
@@ -23,10 +25,11 @@ import { PublicTicketController } from './public-ticket.controller.js';
 import { PublicWidgetController } from './public-widget.controller.js';
 import { PublicTicketAiService, PublicTicketService } from './public-ticket.service.js';
 import { WidgetEmbedController } from './widget-embed.controller.js';
+import { PublicFaqAppointmentsController } from './public-faq-appointments.controller.js';
 
 @Module({
-  imports: [AttachmentsModule, AnalyticsModule, CitizensModule],
-  controllers: [PublicTicketController, PublicConversationController, PublicWidgetController, WidgetEmbedController, InternalChannelController, PublicFirebaseAuthController, PublicCitizenErasureController, PostmarkInboundController, TelegramInboundController],
+  imports: [AttachmentsModule, AnalyticsModule, CitizensModule, FaqArticlesModule, AppointmentsModule],
+  controllers: [PublicTicketController, PublicConversationController, PublicWidgetController, WidgetEmbedController, InternalChannelController, PublicFirebaseAuthController, PublicCitizenErasureController, PostmarkInboundController, TelegramInboundController, PublicFaqAppointmentsController],
   providers: [
     PublicTicketAiService,
     PublicTicketService,

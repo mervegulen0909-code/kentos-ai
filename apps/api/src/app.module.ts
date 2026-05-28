@@ -24,6 +24,8 @@ import { ChannelsModule } from './modules/channels/channels.module.js';
 import { DigestModule } from './modules/digest/digest.module.js';
 import { TicketTagsModule } from './modules/ticket-tags/ticket-tags.module.js';
 import { PresenceModule } from './modules/presence/presence.module.js';
+import { FaqArticlesModule } from './modules/faq/faq-articles.module.js';
+import { AppointmentsModule } from './modules/appointments/appointments.module.js';
 import { RootController } from './root.controller.js';
 
 @Module({
@@ -60,6 +62,8 @@ import { RootController } from './root.controller.js';
     DigestModule,
     TicketTagsModule,
     PresenceModule,
+    FaqArticlesModule,
+    AppointmentsModule,
   ],
   controllers: [RootController],
   providers: [

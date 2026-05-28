@@ -126,6 +126,9 @@ model Tenant {
   whatsappTemplates    WhatsappTemplate[]
   notificationSinks    NotificationSink[]
   reportSubscriptions  ReportSubscription[]
+  faqArticles          FaqArticle[]
+  appointmentSlots     AppointmentSlot[]
+  appointments         Appointment[]
 }
 
 model Department {
@@ -144,6 +147,7 @@ model Department {
   slaPolicies   SlaPolicy[]
   tickets       Ticket[]
   users         UserDepartment[]
+  appointmentSlots AppointmentSlot[]
 
   @@unique([tenantId, code])
   @@index([tenantId, isActive])
@@ -307,6 +311,7 @@ model Citizen {
   conversations       Conversation[]
   tickets             Ticket[]
   deviceTokens        CitizenDeviceToken[]
+  appointments        Appointment[]
 
   @@unique([tenantId, firebaseUid])
   @@index([tenantId, phone])
@@ -690,6 +695,63 @@ model ReportSubscription {
 
   @@index([tenantId, isActive])
   @@index([userId])
+}
+
+// FAZ 7.1: Bilgi bankası / FAQ
+model FaqArticle {
+  id          String   @id @default(cuid())
+  tenantId    String
+  title       String
+  body        String
+  lang        String   @default("tr")
+  slug        String
+  isPublished Boolean  @default(false)
+  viewCount   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant      Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, slug, lang])
+  @@index([tenantId, lang, isPublished])
+}
+
+// FAZ 7.2: Randevu sistemi
+model AppointmentSlot {
+  id           String   @id @default(cuid())
+  tenantId     String
+  departmentId String?
+  startsAt     DateTime
+  endsAt       DateTime
+  capacity     Int      @default(1)
+  booked       Int      @default(0)
+  createdAt    DateTime @default(now())
+
+  tenant       Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  department   Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  appointments Appointment[]
+
+  @@index([tenantId, startsAt])
+}
+
+model Appointment {
+  id            String   @id @default(cuid())
+  tenantId      String
+  slotId        String
+  citizenId     String?
+  citizenName   String
+  citizenPhone  String?
+  note          String?
+  status        String   @default("PENDING")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  tenant        Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  slot          AppointmentSlot @relation(fields: [slotId], references: [id], onDelete: Cascade)
+  citizen       Citizen?        @relation(fields: [citizenId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, status])
+  @@index([slotId])
 }
 
 // FAZ 5.3: WhatsApp template definitions
