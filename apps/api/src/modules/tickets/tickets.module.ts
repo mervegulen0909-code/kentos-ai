@@ -3,6 +3,7 @@ import { AttachmentsModule } from '../attachments/attachments.module.js';
 import { ChannelsModule } from '../channels/channels.module.js';
 import { EventsModule } from '../events/events.module.js';
 import { TenantsModule } from '../tenants/tenants.module.js';
+import { SemanticDuplicateModule } from '../semantic/semantic-duplicate.module.js';
 import { CsatQueueService } from './csat-queue.service.js';
 import { GeocodeQueueService } from './geocode-queue.service.js';
 import { SlaQueueService } from './sla-queue.service.js';
@@ -17,7 +18,7 @@ import { TicketsController } from './tickets.controller.js';
 import { TicketsService } from './tickets.service.js';
 
 @Module({
-  imports: [AttachmentsModule, ChannelsModule, EventsModule, TenantsModule],
+  imports: [AttachmentsModule, ChannelsModule, EventsModule, TenantsModule, SemanticDuplicateModule],
   controllers: [TicketsController],
   providers: [TicketsService, TicketAiService, FcmPushService, NotificationQueueService, NotificationTemplateService, SlaService, TicketNumberService, CsatQueueService, NeighborhoodRoutingService, SlaQueueService, GeocodeQueueService],
 })

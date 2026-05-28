@@ -17,13 +17,17 @@ import { ScheduleMessageDto } from './dto/schedule-message.dto.js';
 import { SuggestReplyDto } from './dto/suggest-reply.dto.js';
 import { UpdateTicketStatusDto } from './dto/update-ticket-status.dto.js';
 import { TicketsService } from './tickets.service.js';
+import { SemanticDuplicateService } from '../semantic/semantic-duplicate.service.js';
 
 @ApiBearerAuth()
 @ApiTags('tickets')
 @UseGuards(AuthGuard('jwt'), RolesGuard)
 @Controller('tickets')
 export class TicketsController {
-  constructor(@Inject(TicketsService) private readonly tickets: TicketsService) {}
+  constructor(
+    @Inject(TicketsService) private readonly tickets: TicketsService,
+    @Inject(SemanticDuplicateService) private readonly semantic: SemanticDuplicateService,
+  ) {}
 
   @ApiOperation({ summary: 'SSE stream — ticket durum değişikliği olayları' })
   @Sse(':id/events')
@@ -325,5 +329,24 @@ export class TicketsController {
     @Param('itemId') itemId: string,
   ) {
     return this.tickets.removeChecklistItem(user, id, itemId);
+  }
+
+  // 8.1 — Semantik duplicate tespiti
+  @ApiOperation({ summary: 'Semantik benzer (potansiyel duplicate) ticketları bul' })
+  @Roles('SUPER_ADMIN', 'TENANT_ADMIN', 'MANAGER', 'DEPARTMENT_STAFF', 'OPERATOR')
+  @Get(':id/duplicates')
+  findDuplicates(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+    return this.semantic.findDuplicates(user, id);
+  }
+
+  @ApiOperation({ summary: 'Ticketi baska bir ticketin duplicati olarak isaretl' })
+  @Roles('SUPER_ADMIN', 'TENANT_ADMIN', 'MANAGER', 'OPERATOR')
+  @Post(':id/mark-duplicate')
+  markDuplicate(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body('duplicateOfTicketId') duplicateOfTicketId: string,
+  ) {
+    return this.semantic.markAsDuplicate(user, id, duplicateOfTicketId);
   }
 }

@@ -18,6 +18,7 @@ enum ChannelType {
   SMS
   EMAIL
   TELEGRAM
+  TWITTER
 }
 
 enum TicketStatus {
@@ -129,6 +130,8 @@ model Tenant {
   faqArticles          FaqArticle[]
   appointmentSlots     AppointmentSlot[]
   appointments         Appointment[]
+  socialMonitorRules   SocialMonitorRule[]
+  ivrCalls             IvrCall[]
 }
 
 model Department {
@@ -369,6 +372,7 @@ model Ticket {
   aiConfidence           Decimal?       @db.Decimal(4, 3)
   aiClassification       Json?
   duplicateOfTicketId    String?
+  embeddingJson          String?        // FAZ 8.1: semantic duplicate detection (JSON-encoded float array)
   createdAt              DateTime       @default(now())
   updatedAt              DateTime       @updatedAt
 
@@ -788,4 +792,39 @@ model NotificationSink {
   tenant     Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([tenantId, isActive])
+}
+
+// FAZ 8.4: Sosyal medya izleme kuralları
+model SocialMonitorRule {
+  id          String    @id @default(cuid())
+  tenantId    String
+  platform    String    @default("TWITTER")
+  query       String
+  isActive    Boolean   @default(true)
+  lastChecked DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  tenant      Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, isActive])
+}
+
+// FAZ 8.3: IVR çağrı kayıtları
+model IvrCall {
+  id           String   @id @default(cuid())
+  tenantId     String
+  callSid      String   @unique
+  from         String
+  to           String
+  transcript   String?
+  ticketId     String?
+  status       String   @default("INITIATED")
+  recordingUrl String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  tenant       Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, status])
 }

@@ -26,6 +26,10 @@ import { TicketTagsModule } from './modules/ticket-tags/ticket-tags.module.js';
 import { PresenceModule } from './modules/presence/presence.module.js';
 import { FaqArticlesModule } from './modules/faq/faq-articles.module.js';
 import { AppointmentsModule } from './modules/appointments/appointments.module.js';
+import { SemanticDuplicateModule } from './modules/semantic/semantic-duplicate.module.js';
+import { IvrModule } from './modules/ivr/ivr.module.js';
+import { SocialMonitorModule } from './modules/social-monitor/social-monitor.module.js';
+import { EdevletModule } from './modules/edevlet/edevlet.module.js';
 import { RootController } from './root.controller.js';
 
 @Module({
@@ -64,6 +68,10 @@ import { RootController } from './root.controller.js';
     PresenceModule,
     FaqArticlesModule,
     AppointmentsModule,
+    SemanticDuplicateModule,
+    IvrModule,
+    SocialMonitorModule,
+    EdevletModule,
   ],
   controllers: [RootController],
   providers: [
