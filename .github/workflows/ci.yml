@@ -285,6 +285,9 @@ jobs:
           docker run --rm --network host --entrypoint /bin/sh minio/mc:latest -c \
             "until mc alias set local http://127.0.0.1:9000 minioadmin minioadmin; do sleep 1; done; mc mb --ignore-existing local/kentos-e2e"
 
+      - name: Build API for E2E
+        run: pnpm --filter @kentos/api build
+
       - name: Start E2E applications
         run: |
           PORT=3100 HOST=0.0.0.0 pnpm --filter @kentos/api start:qa > api-e2e.log 2>&1 &
