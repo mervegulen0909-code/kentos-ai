@@ -22,6 +22,7 @@ import { TicketAiService } from './ticket-ai.service.js';
 import { TicketNumberService } from './ticket-number.service.js';
 import { EventsService } from '../events/events.service.js';
 import { WebhookQueueService } from '../tenants/webhook-queue.service.js';
+import { NotificationSinksService } from '../channels/notification-sinks.service.js';
 
 @Injectable()
 export class TicketsService {
@@ -39,6 +40,7 @@ export class TicketsService {
     @Inject(FcmPushService) private readonly fcmPush: FcmPushService,
     @Inject(WebhookQueueService) private readonly webhooks: WebhookQueueService,
     @Inject(GeocodeQueueService) private readonly geocodeQueue: GeocodeQueueService,
+    @Inject(NotificationSinksService) private readonly notificationSinks: NotificationSinksService,
   ) {}
 
   suggestReply(user: AuthenticatedUser, ticketId: string, dto: SuggestReplyDto) {
@@ -280,6 +282,9 @@ export class TicketsService {
 
     void this.webhooks.dispatchEvent(user.tenantId, 'ticket.created', {
       ticketId: ticket.id, ticketNo: ticket.ticketNo, status: ticket.status, priority: ticket.priority,
+    });
+    void this.notificationSinks.dispatch(user.tenantId, 'ticket.created', {
+      ticketId: ticket.id, ticketNo: ticket.ticketNo, title: ticket.title, priority: ticket.priority,
     });
 
     // F9: Duplicate detection — link to an existing open ticket from the same citizen if similar title in last 48h
@@ -557,6 +562,9 @@ export class TicketsService {
 
     const webhookEvent = dto.status === 'RESOLVED' ? 'ticket.resolved' : dto.status === 'CLOSED' ? 'ticket.closed' : 'ticket.updated';
     void this.webhooks.dispatchEvent(user.tenantId, webhookEvent, { ticketId: id, status: dto.status });
+    if (dto.status === 'RESOLVED' || dto.status === 'CLOSED') {
+      void this.notificationSinks.dispatch(user.tenantId, webhookEvent, { ticketId: id, status: dto.status });
+    }
 
     // FCM push notification — fire-and-forget, does not block response
     void this.sendStatusPush(ticket, dto.status);

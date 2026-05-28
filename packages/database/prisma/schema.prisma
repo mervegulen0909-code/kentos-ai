@@ -17,6 +17,7 @@ enum ChannelType {
   FACEBOOK
   SMS
   EMAIL
+  TELEGRAM
 }
 
 enum TicketStatus {
@@ -122,6 +123,8 @@ model Tenant {
   users                User[]
   webhooks             TenantWebhook[]
   deviceTokens         CitizenDeviceToken[]
+  whatsappTemplates    WhatsappTemplate[]
+  notificationSinks    NotificationSink[]
 }
 
 model Department {
@@ -665,4 +668,40 @@ model TicketChecklistItem {
   doneBy    User?  @relation("ChecklistItemDoneBy", fields: [doneById], references: [id], onDelete: SetNull)
 
   @@index([tenantId, ticketId])
+}
+
+// FAZ 5.3: WhatsApp template definitions
+model WhatsappTemplate {
+  id         String   @id @default(cuid())
+  tenantId   String
+  name       String
+  language   String   @default("tr")
+  category   String   @default("UTILITY")
+  status     String   @default("PENDING")
+  components Json     @default("[]")
+  metaId     String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  tenant     Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, name, language])
+  @@index([tenantId])
+}
+
+// FAZ 5.4: Slack / MS Teams notification sinks
+model NotificationSink {
+  id         String   @id @default(cuid())
+  tenantId   String
+  name       String
+  type       String   // SLACK | TEAMS
+  webhookUrl String
+  events     Json     @default("[\"ticket.created\",\"ticket.resolved\"]")
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  tenant     Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, isActive])
 }

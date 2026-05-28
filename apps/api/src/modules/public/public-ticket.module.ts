@@ -12,6 +12,8 @@ import { CitizenIdentityService } from './citizen-identity.service.js';
 import { CitizenSessionService } from './citizen-session.service.js';
 import { FirebaseAuthService } from './firebase-auth.service.js';
 import { InternalChannelController } from './internal-channel.controller.js';
+import { PostmarkInboundController } from './postmark-inbound.controller.js';
+import { TelegramInboundController } from './telegram-inbound.controller.js';
 import { PublicCitizenErasureController } from './public-citizen-erasure.controller.js';
 import { OutboundDispatchService } from './outbound-dispatch.service.js';
 import { PublicConversationController } from './public-conversation.controller.js';
@@ -24,7 +26,7 @@ import { WidgetEmbedController } from './widget-embed.controller.js';
 
 @Module({
   imports: [AttachmentsModule, AnalyticsModule, CitizensModule],
-  controllers: [PublicTicketController, PublicConversationController, PublicWidgetController, WidgetEmbedController, InternalChannelController, PublicFirebaseAuthController, PublicCitizenErasureController],
+  controllers: [PublicTicketController, PublicConversationController, PublicWidgetController, WidgetEmbedController, InternalChannelController, PublicFirebaseAuthController, PublicCitizenErasureController, PostmarkInboundController, TelegramInboundController],
   providers: [
     PublicTicketAiService,
     PublicTicketService,

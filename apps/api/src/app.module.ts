@@ -20,6 +20,7 @@ import { TenantsModule } from './modules/tenants/tenants.module.js';
 import { TicketsModule } from './modules/tickets/tickets.module.js';
 import { UsersModule } from './modules/users/users.module.js';
 import { CannedRepliesModule } from './modules/canned-replies/canned-replies.module.js';
+import { ChannelsModule } from './modules/channels/channels.module.js';
 import { DigestModule } from './modules/digest/digest.module.js';
 import { TicketTagsModule } from './modules/ticket-tags/ticket-tags.module.js';
 import { PresenceModule } from './modules/presence/presence.module.js';
@@ -55,6 +56,7 @@ import { RootController } from './root.controller.js';
     CitizensModule,
     EventsModule,
     CannedRepliesModule,
+    ChannelsModule,
     DigestModule,
     TicketTagsModule,
     PresenceModule,

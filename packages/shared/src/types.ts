@@ -7,7 +7,8 @@ export type ChannelType =
   | 'INSTAGRAM'
   | 'FACEBOOK'
   | 'SMS'
-  | 'EMAIL';
+  | 'EMAIL'
+  | 'TELEGRAM';
 
 export type TicketStatus =
   | 'NEW'
