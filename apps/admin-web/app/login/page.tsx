@@ -37,6 +37,14 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
           pendingLabel="Giris dogrulaniyor..."
           style={{ minHeight: 48, borderRadius: 999, border: 0, padding: '0 18px', background: 'var(--accent)' }}
         />
+        <p style={{ marginTop: '1rem', textAlign: 'center', color: 'var(--muted)', fontSize: '0.85rem' }}>
+          <a href="/login/forgot-password">Sifremi unuttum</a>
+        </p>
+        {error === 'reset=success' ? (
+          <p role="status" style={{ color: 'var(--accent)', marginTop: '0.5rem', textAlign: 'center' }}>
+            Sifreniz guncellendi. Yeni sifrenizle giris yapabilirsiniz.
+          </p>
+        ) : null}
       </form>
     </main>
   );

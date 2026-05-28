@@ -508,4 +508,78 @@ export const adminApi = {
   // Analytics extras
   csat: (token: string) => apiFetch<CsatOverview>('/analytics/csat', { token }),
   operators: (token: string) => apiFetch<OperatorPerformanceItem[]>('/analytics/operators', { token }),
+
+  // Canned Replies
+  cannedReplies: (token: string) => apiFetch<Array<{ id: string; title: string; body: string; isShared: boolean; lang: string; createdAt: string }>>('/canned-replies', { token }),
+  createCannedReply: (token: string, dto: { title: string; body: string; isShared?: boolean; lang?: string }) =>
+    apiFetch<{ id: string }>('/canned-replies', { method: 'POST', token, body: JSON.stringify(dto) }),
+  updateCannedReply: (token: string, id: string, dto: { title?: string; body?: string; isShared?: boolean }) =>
+    apiFetch<{ id: string }>(`/canned-replies/${id}`, { method: 'PATCH', token, body: JSON.stringify(dto) }),
+  deleteCannedReply: (token: string, id: string) =>
+    apiFetch<{ ok: boolean }>(`/canned-replies/${id}`, { method: 'DELETE', token }),
+
+  // Ticket Tags
+  ticketTags: (token: string) => apiFetch<Array<{ id: string; name: string; color: string; createdAt: string }>>('/ticket-tags', { token }),
+  createTicketTag: (token: string, dto: { name: string; color?: string }) =>
+    apiFetch<{ id: string }>('/ticket-tags', { method: 'POST', token, body: JSON.stringify(dto) }),
+  updateTicketTag: (token: string, id: string, dto: { name?: string; color?: string }) =>
+    apiFetch<{ id: string }>(`/ticket-tags/${id}`, { method: 'PATCH', token, body: JSON.stringify(dto) }),
+  deleteTicketTag: (token: string, id: string) =>
+    apiFetch<{ ok: boolean }>(`/ticket-tags/${id}`, { method: 'DELETE', token }),
+
+  // FAQ Articles
+  faqArticles: (token: string, lang?: string) => {
+    const qs = lang ? `?lang=${lang}` : '';
+    return apiFetch<Array<{ id: string; title: string; slug: string; lang: string; isPublished: boolean; viewCount: number; createdAt: string }>>(`/faq${qs}`, { token });
+  },
+  createFaqArticle: (token: string, dto: { title: string; body: string; slug: string; lang?: string; isPublished?: boolean }) =>
+    apiFetch<{ id: string }>('/faq', { method: 'POST', token, body: JSON.stringify(dto) }),
+  updateFaqArticle: (token: string, id: string, dto: { title?: string; body?: string; slug?: string; lang?: string; isPublished?: boolean }) =>
+    apiFetch<{ id: string }>(`/faq/${id}`, { method: 'PATCH', token, body: JSON.stringify(dto) }),
+  deleteFaqArticle: (token: string, id: string) =>
+    apiFetch<{ ok: boolean }>(`/faq/${id}`, { method: 'DELETE', token }),
+
+  // Appointments
+  appointmentSlots: (token: string, from?: string, to?: string) => {
+    const qs = new URLSearchParams();
+    if (from) qs.set('from', from);
+    if (to) qs.set('to', to);
+    const q = qs.toString();
+    return apiFetch<Array<{ id: string; startsAt: string; endsAt: string; capacity: number; booked: number; department?: { id: string; name: string } | null }>>(`/appointments/slots${q ? `?${q}` : ''}`, { token });
+  },
+  createAppointmentSlot: (token: string, dto: { startsAt: string; endsAt: string; capacity?: number; departmentId?: string }) =>
+    apiFetch<{ id: string }>('/appointments/slots', { method: 'POST', token, body: JSON.stringify(dto) }),
+  deleteAppointmentSlot: (token: string, id: string) =>
+    apiFetch<{ ok: boolean }>(`/appointments/slots/${id}`, { method: 'DELETE', token }),
+  appointments: (token: string, status?: string) => {
+    const qs = status ? `?status=${status}` : '';
+    return apiFetch<Array<{ id: string; citizenName: string; citizenPhone?: string | null; note?: string | null; status: string; createdAt: string; slot: { startsAt: string; endsAt: string; department?: { name: string } | null } }>>(`/appointments${qs}`, { token });
+  },
+  updateAppointmentStatus: (token: string, id: string, status: string) =>
+    apiFetch<{ id: string }>(`/appointments/${id}/status`, { method: 'PATCH', token, body: JSON.stringify({ status }) }),
+
+  // Notification Sinks
+  notificationSinks: (token: string) => apiFetch<Array<{ id: string; name: string; type: string; webhookUrl: string; isActive: boolean; events: string[] }>>('/channels/notification-sinks', { token }),
+  createNotificationSink: (token: string, dto: { name: string; type: string; webhookUrl: string; events?: string[] }) =>
+    apiFetch<{ id: string }>('/channels/notification-sinks', { method: 'POST', token, body: JSON.stringify(dto) }),
+  updateNotificationSink: (token: string, id: string, dto: { name?: string; webhookUrl?: string; isActive?: boolean; events?: string[] }) =>
+    apiFetch<{ id: string }>(`/channels/notification-sinks/${id}`, { method: 'PATCH', token, body: JSON.stringify(dto) }),
+  deleteNotificationSink: (token: string, id: string) =>
+    apiFetch<{ ok: boolean }>(`/channels/notification-sinks/${id}`, { method: 'DELETE', token }),
+
+  // Social Monitor
+  socialMonitorRules: (token: string) => apiFetch<Array<{ id: string; platform: string; query: string; isActive: boolean; lastChecked?: string | null; createdAt: string }>>('/social-monitor/rules', { token }),
+  createSocialMonitorRule: (token: string, dto: { query: string; platform?: string }) =>
+    apiFetch<{ id: string }>('/social-monitor/rules', { method: 'POST', token, body: JSON.stringify(dto) }),
+  updateSocialMonitorRule: (token: string, id: string, dto: { query?: string; isActive?: boolean }) =>
+    apiFetch<{ id: string }>(`/social-monitor/rules/${id}`, { method: 'PATCH', token, body: JSON.stringify(dto) }),
+  deleteSocialMonitorRule: (token: string, id: string) =>
+    apiFetch<{ ok: boolean }>(`/social-monitor/rules/${id}`, { method: 'DELETE', token }),
+  pollSocialMonitor: (token: string) => apiFetch<{ processed: number; errors: number }>('/social-monitor/poll', { method: 'POST', token }),
+
+  // IVR Calls
+  ivrCalls: (token: string, status?: string) => {
+    const qs = status ? `?status=${status}` : '';
+    return apiFetch<Array<{ id: string; callSid: string; from: string; to: string; status: string; transcript?: string | null; recordingUrl?: string | null; createdAt: string }>>(`/ivr/calls${qs}`, { token });
+  },
 };

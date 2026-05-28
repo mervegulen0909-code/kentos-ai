@@ -15,6 +15,13 @@ const adminSections = [
   { href: '/reports', label: 'Raporlar' },
   { href: '/users', label: 'Kullanicilar' },
   { href: '/citizens', label: 'Vatandaslar' },
+  { href: '/canned-replies', label: 'Hazir Yanitlar' },
+  { href: '/ticket-tags', label: 'Etiketler' },
+  { href: '/faq', label: 'Bilgi Bankasi' },
+  { href: '/appointments', label: 'Randevular' },
+  { href: '/channels', label: 'Kanal Ayarlari' },
+  { href: '/social-monitor', label: 'Sosyal Medya' },
+  { href: '/ivr', label: 'IVR Cagrilar' },
   { href: '/settings', label: 'Ayarlar' },
 ];
 
