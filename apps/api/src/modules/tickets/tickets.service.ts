@@ -43,6 +43,47 @@ export class TicketsService {
     @Inject(NotificationSinksService) private readonly notificationSinks: NotificationSinksService,
   ) {}
 
+  // 6.4 — Cursor-tabanlı sayfalama
+  async listCursor(
+    user: AuthenticatedUser,
+    filters: { status?: TicketStatus; departmentId?: string; q?: string; cursor?: string; limit?: number },
+  ) {
+    const limit = Math.min(100, Math.max(1, filters.limit ?? 30));
+    const departmentScope = await this.departmentScope(user);
+    const where = {
+      tenantId: user.tenantId,
+      status: filters.status,
+      departmentId: this.scopedDepartmentFilter(departmentScope, filters.departmentId),
+      ...(filters.q
+        ? { OR: [
+            { ticketNo: { contains: filters.q, mode: 'insensitive' as const } },
+            { title: { contains: filters.q, mode: 'insensitive' as const } },
+          ] }
+        : {}),
+      // Cursor: only return items created BEFORE the cursor ticket (for desc ordering)
+      ...(filters.cursor ? { createdAt: { lt: new Date(Buffer.from(filters.cursor, 'base64').toString()) } } : {}),
+    };
+
+    const tickets = await this.prisma.ticket.findMany({
+      where,
+      include: { department: true, category: true, assignedTo: true },
+      orderBy: { createdAt: 'desc' },
+      take: limit + 1,
+    });
+
+    const hasNextPage = tickets.length > limit;
+    const items = hasNextPage ? tickets.slice(0, limit) : tickets;
+    const nextCursor = hasNextPage && items.length > 0
+      ? Buffer.from(items[items.length - 1]!.createdAt.toISOString()).toString('base64')
+      : null;
+
+    return {
+      data: items.map((t) => ({ ...t, slaState: this.slaState(t.resolutionDueAt) })),
+      nextCursor,
+      hasNextPage,
+    };
+  }
+
   suggestReply(user: AuthenticatedUser, ticketId: string, dto: SuggestReplyDto) {
     return this.ticketAi.suggestReply(user.tenantId, ticketId, dto.operatorNote);
   }

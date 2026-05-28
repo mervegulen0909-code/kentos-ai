@@ -78,6 +78,25 @@ export class TicketsController {
     return this.tickets.create(user, dto);
   }
 
+  // 6.4 — Cursor tabanlı sayfalama
+  @ApiOperation({ summary: 'Ticket listesi (cursor tabanlı sayfalama — sonsuz kaydırma için)' })
+  @ApiQuery({ name: 'cursor', required: false, description: 'Önceki yanıttan gelen nextCursor değeri' })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiQuery({ name: 'status', required: false, enum: TicketStatus })
+  @ApiQuery({ name: 'departmentId', required: false })
+  @ApiQuery({ name: 'q', required: false })
+  @Get('cursor')
+  listCursor(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query('cursor') cursor?: string,
+    @Query('limit') limit?: string,
+    @Query('status') status?: TicketStatus,
+    @Query('departmentId') departmentId?: string,
+    @Query('q') q?: string,
+  ) {
+    return this.tickets.listCursor(user, { cursor, status, departmentId, q, limit: limit ? Number(limit) : undefined });
+  }
+
   @ApiOperation({ summary: 'WhatsApp handoff listesi' })
   @Get('handoffs')
   listHandoffs(@CurrentUser() user: AuthenticatedUser) {

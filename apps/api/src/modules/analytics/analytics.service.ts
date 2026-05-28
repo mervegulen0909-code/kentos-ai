@@ -583,4 +583,36 @@ export class AnalyticsService {
     await this.redis().setex(cacheKey, 300, JSON.stringify(result)).catch(() => null); // 5 min TTL
     return result;
   }
+
+  // 6.3 — Coğrafi ısı haritası
+  async heatmap(user: AuthenticatedUser, from?: Date, to?: Date) {
+    const now = new Date();
+    const start = from ?? new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const end = to ?? now;
+
+    const rows = await this.prisma.$queryRaw<Array<{ lat: number; lon: number; count: bigint }>>`
+      SELECT
+        ROUND("latitude"::numeric, 4) AS lat,
+        ROUND("longitude"::numeric, 4) AS lon,
+        COUNT(*) AS count
+      FROM "Ticket"
+      WHERE "tenantId" = ${user.tenantId}
+        AND "latitude" IS NOT NULL
+        AND "longitude" IS NOT NULL
+        AND "createdAt" >= ${start}
+        AND "createdAt" <= ${end}
+      GROUP BY ROUND("latitude"::numeric, 4), ROUND("longitude"::numeric, 4)
+      ORDER BY count DESC
+      LIMIT 2000
+    `;
+
+    return {
+      type: 'FeatureCollection',
+      features: rows.map((r) => ({
+        type: 'Feature',
+        geometry: { type: 'Point', coordinates: [r.lon, r.lat] },
+        properties: { count: Number(r.count) },
+      })),
+    };
+  }
 }

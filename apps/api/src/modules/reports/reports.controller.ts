@@ -1,7 +1,9 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
+  Header,
   Inject,
   Param,
   Post,
@@ -69,5 +71,42 @@ export class ReportsController {
     @Param('id') id: string,
   ) {
     return this.reports.get(user, id);
+  }
+
+  // 6.2 — Rapor abonelikleri
+  @ApiOperation({ summary: 'Rapor aboneliklerini listele' })
+  @Get('subscriptions')
+  listSubscriptions(@CurrentUser() user: AuthenticatedUser) {
+    return this.reports.listSubscriptions(user);
+  }
+
+  @ApiOperation({ summary: 'Yeni rapor aboneliği oluştur' })
+  @Post('subscriptions')
+  createSubscription(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: { reportType: string; frequency?: string; email?: string },
+  ) {
+    return this.reports.createSubscription(user, dto);
+  }
+
+  @ApiOperation({ summary: 'Rapor aboneliğini iptal et' })
+  @Delete('subscriptions/:id')
+  removeSubscription(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+    return this.reports.removeSubscription(user, id);
+  }
+
+  // 6.1 — CSV export
+  @ApiOperation({ summary: 'Ticket listesini CSV olarak indir (maks 10.000 kayıt)' })
+  @ApiQuery({ name: 'from', required: false, description: 'ISO 8601 başlangıç tarihi' })
+  @ApiQuery({ name: 'to', required: false, description: 'ISO 8601 bitiş tarihi' })
+  @Header('Cache-Control', 'no-store')
+  @Get('export/csv')
+  exportCsv(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+  ) {
+    const parseDate = (v?: string) => (v ? (isNaN(new Date(v).getTime()) ? undefined : new Date(v)) : undefined);
+    return this.reports.exportCsv(user, { from: parseDate(from), to: parseDate(to) });
   }
 }

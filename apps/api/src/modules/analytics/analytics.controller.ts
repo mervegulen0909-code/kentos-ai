@@ -105,4 +105,13 @@ export class AnalyticsController {
   slaTrend(@CurrentUser() user: AuthenticatedUser, @Query('from') from?: string, @Query('to') to?: string) {
     return this.analytics.slaTrend(user, parseDateParam(from), parseDateParam(to));
   }
+
+  // 6.3 — Coğrafi ısı haritası
+  @ApiOperation({ summary: 'Ticket yoğunluk ısı haritası (Leaflet.js uyumlu GeoJSON noktaları)' })
+  @ApiQuery({ name: 'from', required: false })
+  @ApiQuery({ name: 'to', required: false })
+  @Get('heatmap')
+  heatmap(@CurrentUser() user: AuthenticatedUser, @Query('from') from?: string, @Query('to') to?: string) {
+    return this.analytics.heatmap(user, parseDateParam(from), parseDateParam(to));
+  }
 }

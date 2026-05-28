@@ -125,6 +125,7 @@ model Tenant {
   deviceTokens         CitizenDeviceToken[]
   whatsappTemplates    WhatsappTemplate[]
   notificationSinks    NotificationSink[]
+  reportSubscriptions  ReportSubscription[]
 }
 
 model Department {
@@ -249,8 +250,9 @@ model User {
   auditLogs        AuditLog[]
   departments      UserDepartment[]
   cannedReplies    CannedReply[]
-  watchedTickets   TicketWatcher[]
-  checklistItems   TicketChecklistItem[] @relation("ChecklistItemDoneBy")
+  watchedTickets       TicketWatcher[]
+  checklistItems       TicketChecklistItem[] @relation("ChecklistItemDoneBy")
+  reportSubscriptions  ReportSubscription[]
 
   @@unique([tenantId, email])
   @@index([tenantId, role, isActive])
@@ -668,6 +670,26 @@ model TicketChecklistItem {
   doneBy    User?  @relation("ChecklistItemDoneBy", fields: [doneById], references: [id], onDelete: SetNull)
 
   @@index([tenantId, ticketId])
+}
+
+// FAZ 6.2: Zamanlanmış rapor abonelikleri
+model ReportSubscription {
+  id          String   @id @default(cuid())
+  tenantId    String
+  userId      String
+  reportType  String
+  frequency   String   @default("WEEKLY")  // DAILY | WEEKLY | MONTHLY
+  email       String
+  isActive    Boolean  @default(true)
+  lastSentAt  DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant      Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user        User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, isActive])
+  @@index([userId])
 }
 
 // FAZ 5.3: WhatsApp template definitions
