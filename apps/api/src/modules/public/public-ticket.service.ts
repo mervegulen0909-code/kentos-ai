@@ -818,6 +818,72 @@ export class PublicTicketService {
     return this.get(tenantSlug, identifier);
   }
 
+  async escalate(tenantSlug: string, identifier: string) {
+    const ticket = await this.requirePublicTicket(tenantSlug, identifier);
+
+    if (['CLOSED', 'REJECTED', 'RESOLVED'].includes(ticket.status)) {
+      throw new ForbiddenException('Kapatilmis veya reddedilmis basvuru yukseltilemiyor.');
+    }
+
+    const escalatablePriorities = ['LOW', 'NORMAL'];
+    if (!escalatablePriorities.includes(ticket.priority)) {
+      return { ticketId: ticket.id, priority: ticket.priority, escalated: false, reason: 'Oncelik zaten yuksek.' };
+    }
+
+    const newPriority = ticket.priority === 'LOW' ? 'NORMAL' : 'HIGH';
+    await this.prisma.ticket.update({
+      where: { id: ticket.id },
+      data: {
+        priority: newPriority as 'NORMAL' | 'HIGH',
+        auditLogs: {
+          create: {
+            tenantId: ticket.tenantId,
+            actorType: AuditActorType.CITIZEN,
+            action: 'ticket.citizen_escalated',
+            before: { priority: ticket.priority },
+            after: { priority: newPriority },
+          },
+        },
+      },
+    });
+
+    return { ticketId: ticket.id, priority: newPriority, escalated: true, reason: 'Vatandas tarafindan yukseltildi.' };
+  }
+
+  async timeline(tenantSlug: string, identifier: string) {
+    const ticket = await this.requirePublicTicket(tenantSlug, identifier);
+    const [messages, auditLogs] = await Promise.all([
+      this.prisma.ticketMessage.findMany({
+        where: { ticketId: ticket.id, visibility: MessageVisibility.PUBLIC },
+        orderBy: { createdAt: 'asc' },
+        select: { id: true, body: true, senderType: true, createdAt: true },
+      }),
+      this.prisma.auditLog.findMany({
+        where: { ticketId: ticket.id, action: { in: ['ticket.status_changed', 'ticket.citizen_escalated', 'ticket.assigned'] } },
+        orderBy: { createdAt: 'asc' },
+        select: { id: true, action: true, after: true, createdAt: true },
+      }),
+    ]);
+
+    type TimelineEntry = { type: string; at: Date; body?: string; status?: string; priority?: string; senderType?: string };
+    const entries: TimelineEntry[] = [
+      { type: 'created', at: ticket.createdAt },
+      ...messages.map((m) => ({ type: 'message', at: m.createdAt, body: m.body, senderType: m.senderType })),
+      ...auditLogs.map((log) => {
+        const after = log.after as Record<string, string> | null;
+        return {
+          type: log.action === 'ticket.status_changed' ? 'status_change' : log.action === 'ticket.citizen_escalated' ? 'escalated' : 'assigned',
+          at: log.createdAt,
+          status: after?.status,
+          priority: after?.priority,
+        };
+      }),
+    ];
+
+    entries.sort((a, b) => a.at.getTime() - b.at.getTime());
+    return { ticketId: ticket.id, trackingToken: ticket.publicTrackingToken, timeline: entries };
+  }
+
   private async requirePublicTicket(tenantSlug: string, identifier: string) {
     const normalizedIdentifier = identifier.trim().toUpperCase();
     const ticket = await this.prisma.ticket.findFirst({

@@ -4,6 +4,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { ThrottlerWithHeadersGuard } from './common/guards/throttler-with-headers.guard.js';
 import { TenantThrottleGuard } from './common/guards/tenant-throttle.guard.js';
+import { IpAllowlistGuard } from './common/guards/ip-allowlist.guard.js';
 import { validateEnv } from './common/env.validation.js';
 import { AdminModule } from './modules/admin/admin.module.js';
 import { CitizensModule } from './modules/citizens/citizens.module.js';
@@ -56,6 +57,8 @@ import { RootController } from './root.controller.js';
     { provide: APP_GUARD, useClass: ThrottlerWithHeadersGuard },
     // F8 — Tenant-based rate limit: 300 req/min per tenant (after auth)
     { provide: APP_GUARD, useClass: TenantThrottleGuard },
+    // FAZ 1.9 — IP allowlist: tenant-level IP restriction for admin routes (no-op when list empty)
+    { provide: APP_GUARD, useClass: IpAllowlistGuard },
   ],
 })
 export class AppModule {}

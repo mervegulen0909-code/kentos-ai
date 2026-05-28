@@ -22,26 +22,39 @@ export class AnalyticsService {
     return this._redis;
   }
 
-  async overview(user: AuthenticatedUser) {
-    const cacheKey = `analytics:overview:${user.tenantId}`;
-    const cached = await this.redis().get(cacheKey).catch(() => null);
-    if (cached) return JSON.parse(cached) as unknown;
+  private dateRange(from?: Date, to?: Date) {
+    if (!from && !to) return undefined;
+    return {
+      ...(from ? { gte: from } : {}),
+      ...(to ? { lte: to } : {}),
+    };
+  }
+
+  async overview(user: AuthenticatedUser, from?: Date, to?: Date) {
+    const hasRange = from || to;
+    const cacheKey = hasRange ? null : `analytics:overview:${user.tenantId}`;
+    if (cacheKey) {
+      const cached = await this.redis().get(cacheKey).catch(() => null);
+      if (cached) return JSON.parse(cached) as unknown;
+    }
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+    const createdFilter = this.dateRange(from, to) ?? { gte: new Date(0) };
 
     const [totalOpen, openedToday, resolvedToday, byStatus, dueTickets] = await Promise.all([
       this.prisma.ticket.count({
-        where: { tenantId: user.tenantId, status: { notIn: [TicketStatus.CLOSED, TicketStatus.REJECTED] } },
+        where: { tenantId: user.tenantId, status: { notIn: [TicketStatus.CLOSED, TicketStatus.REJECTED] }, createdAt: hasRange ? createdFilter : undefined },
       }),
-      this.prisma.ticket.count({ where: { tenantId: user.tenantId, createdAt: { gte: today } } }),
-      this.prisma.ticket.count({ where: { tenantId: user.tenantId, resolvedAt: { gte: today } } }),
-      this.prisma.ticket.groupBy({ by: ['status'], where: { tenantId: user.tenantId }, _count: { _all: true } }),
+      this.prisma.ticket.count({ where: { tenantId: user.tenantId, createdAt: hasRange ? createdFilter : { gte: today } } }),
+      this.prisma.ticket.count({ where: { tenantId: user.tenantId, resolvedAt: hasRange ? createdFilter : { gte: today } } }),
+      this.prisma.ticket.groupBy({ by: ['status'], where: { tenantId: user.tenantId, ...(hasRange ? { createdAt: createdFilter } : {}) }, _count: { _all: true } }),
       this.prisma.ticket.findMany({
         where: {
           tenantId: user.tenantId,
           status: { notIn: [TicketStatus.RESOLVED, TicketStatus.CLOSED, TicketStatus.REJECTED] },
           resolutionDueAt: { not: null },
+          ...(hasRange ? { createdAt: createdFilter } : {}),
         },
         select: { resolutionDueAt: true },
       }),
@@ -62,18 +75,19 @@ export class AnalyticsService {
       byStatus: byStatus.map((item) => ({ status: item.status, count: item._count._all })),
     };
 
-    await this.redis().setex(cacheKey, 60, JSON.stringify(result)).catch(() => null); // 60s TTL, swallow errors
+    if (cacheKey) await this.redis().setex(cacheKey, 60, JSON.stringify(result)).catch(() => null);
     return result;
   }
 
-  async departments(user: AuthenticatedUser) {
+  async departments(user: AuthenticatedUser, from?: Date, to?: Date) {
+    const createdAt = this.dateRange(from, to);
     const departments = await this.prisma.department.findMany({
       where: { tenantId: user.tenantId, isActive: true },
       include: {
         _count: {
           select: {
             tickets: {
-              where: { status: { notIn: [TicketStatus.CLOSED, TicketStatus.REJECTED] } },
+              where: { status: { notIn: [TicketStatus.CLOSED, TicketStatus.REJECTED] }, ...(createdAt ? { createdAt } : {}) },
             },
           },
         },
@@ -89,10 +103,11 @@ export class AnalyticsService {
     }));
   }
 
-  async categories(user: AuthenticatedUser) {
+  async categories(user: AuthenticatedUser, from?: Date, to?: Date) {
+    const createdAt = this.dateRange(from, to);
     const categories = await this.prisma.category.findMany({
       where: { tenantId: user.tenantId, isActive: true },
-      include: { _count: { select: { tickets: true } }, department: true },
+      include: { _count: { select: { tickets: { where: createdAt ? { createdAt } : {} } } }, department: true },
       orderBy: { name: 'asc' },
     });
 
@@ -105,10 +120,11 @@ export class AnalyticsService {
     }));
   }
 
-  async neighborhoods(user: AuthenticatedUser) {
+  async neighborhoods(user: AuthenticatedUser, from?: Date, to?: Date) {
+    const createdAt = this.dateRange(from, to);
     const neighborhoods = await this.prisma.neighborhood.findMany({
       where: { tenantId: user.tenantId, isActive: true },
-      include: { _count: { select: { tickets: true } } },
+      include: { _count: { select: { tickets: { where: createdAt ? { createdAt } : {} } } } },
       orderBy: { name: 'asc' },
     });
 
@@ -203,18 +219,20 @@ export class AnalyticsService {
     }));
   }
 
-  async channels(user: AuthenticatedUser) {
+  async channels(user: AuthenticatedUser, from?: Date, to?: Date) {
+    const createdAt = this.dateRange(from, to);
+    const baseWhere = { tenantId: user.tenantId, ...(createdAt ? { createdAt } : {}) };
     const [ticketsByChannel, conversationsByChannel, aiCreatedMessagesByChannel, publicMessagesByChannel, attachments] = await Promise.all([
-      this.prisma.ticket.groupBy({ by: ['channel'], where: { tenantId: user.tenantId }, _count: { _all: true } }),
-      this.prisma.conversation.groupBy({ by: ['channel'], where: { tenantId: user.tenantId }, _count: { _all: true } }),
+      this.prisma.ticket.groupBy({ by: ['channel'], where: baseWhere, _count: { _all: true } }),
+      this.prisma.conversation.groupBy({ by: ['channel'], where: { tenantId: user.tenantId, ...(createdAt ? { createdAt } : {}) }, _count: { _all: true } }),
       this.prisma.ticketMessage.groupBy({
         by: ['channel'],
-        where: { tenantId: user.tenantId, senderType: AuditActorType.AI },
+        where: { tenantId: user.tenantId, senderType: AuditActorType.AI, ...(createdAt ? { createdAt } : {}) },
         _count: { _all: true },
       }),
       this.prisma.ticketMessage.groupBy({
         by: ['channel'],
-        where: { tenantId: user.tenantId, visibility: MessageVisibility.PUBLIC },
+        where: { tenantId: user.tenantId, visibility: MessageVisibility.PUBLIC, ...(createdAt ? { createdAt } : {}) },
         _count: { _all: true },
       }),
       this.prisma.attachment.findMany({
@@ -259,16 +277,18 @@ export class AnalyticsService {
     });
   }
 
-  async outboundDeliveries(user: AuthenticatedUser) {
+  async outboundDeliveries(user: AuthenticatedUser, from?: Date, to?: Date) {
+    const createdAt = this.dateRange(from, to);
+    const baseWhere = { tenantId: user.tenantId, ...(createdAt ? { createdAt } : {}) };
     const [byState, byChannelState, recentFailures] = await Promise.all([
       this.prisma.outboundDelivery.groupBy({
         by: ['state'],
-        where: { tenantId: user.tenantId },
+        where: baseWhere,
         _count: { _all: true },
       }),
       this.prisma.outboundDelivery.groupBy({
         by: ['channel', 'state'],
-        where: { tenantId: user.tenantId },
+        where: baseWhere,
         _count: { _all: true },
       }),
       this.prisma.outboundDelivery.findMany({
@@ -325,14 +345,47 @@ export class AnalyticsService {
     };
   }
 
+  // 1.4: SLA trend — daily breach / open / resolved counts
+  async slaTrend(user: AuthenticatedUser, from?: Date, to?: Date) {
+    const start = from ?? new Date(Date.now() - 30 * 86_400_000);
+    const end = to ?? new Date();
+
+    const rows = await this.prisma.$queryRaw<Array<{
+      day: Date;
+      opened: number;
+      resolved: number;
+      breached: number;
+    }>>`
+      SELECT
+        DATE_TRUNC('day', "createdAt" AT TIME ZONE 'Europe/Istanbul') AS day,
+        COUNT(*) FILTER (WHERE TRUE)::int AS opened,
+        COUNT(*) FILTER (WHERE "resolvedAt" IS NOT NULL)::int AS resolved,
+        COUNT(*) FILTER (WHERE "slaBreachedAt" IS NOT NULL)::int AS breached
+      FROM "Ticket"
+      WHERE "tenantId" = ${user.tenantId}
+        AND "createdAt" >= ${start}
+        AND "createdAt" <= ${end}
+      GROUP BY DATE_TRUNC('day', "createdAt" AT TIME ZONE 'Europe/Istanbul')
+      ORDER BY day ASC
+    `;
+
+    return rows.map((row) => ({
+      day: row.day.toISOString().slice(0, 10),
+      opened: Number(row.opened),
+      resolved: Number(row.resolved),
+      breached: Number(row.breached),
+    }));
+  }
+
   // F7: Operator Performance Dashboard
-  async operatorPerformance(user: AuthenticatedUser) {
-    const since30d = new Date(Date.now() - 30 * 86_400_000);
+  async operatorPerformance(user: AuthenticatedUser, from?: Date, to?: Date) {
+    const since30d = from ?? new Date(Date.now() - 30 * 86_400_000);
+    const until = to ?? new Date();
 
     const [assignedCounts, resolvedCounts, avgResolution, csatByOp] = await Promise.all([
       this.prisma.ticket.groupBy({
         by: ['assignedToId'],
-        where: { tenantId: user.tenantId, assignedToId: { not: null }, createdAt: { gte: since30d } },
+        where: { tenantId: user.tenantId, assignedToId: { not: null }, createdAt: { gte: since30d, lte: until } },
         _count: { _all: true },
       }),
       this.prisma.ticket.groupBy({
@@ -340,7 +393,7 @@ export class AnalyticsService {
         where: {
           tenantId: user.tenantId,
           assignedToId: { not: null },
-          resolvedAt: { gte: since30d, not: null },
+          resolvedAt: { gte: since30d, lte: until, not: null },
         },
         _count: { _all: true },
       }),
@@ -352,11 +405,12 @@ export class AnalyticsService {
           AND "assignedToId" IS NOT NULL
           AND "resolvedAt" IS NOT NULL
           AND "createdAt" >= ${since30d}
+          AND "createdAt" <= ${until}
         GROUP BY "assignedToId"
       `,
       this.prisma.ticket.groupBy({
         by: ['assignedToId'],
-        where: { tenantId: user.tenantId, assignedToId: { not: null }, csatScore: { not: null }, createdAt: { gte: since30d } },
+        where: { tenantId: user.tenantId, assignedToId: { not: null }, csatScore: { not: null }, createdAt: { gte: since30d, lte: until } },
         _avg: { csatScore: true },
         _count: { csatScore: true },
       }),
@@ -400,25 +454,28 @@ export class AnalyticsService {
   }
 
   // F3: CSAT Dashboard
-  async csat(user: AuthenticatedUser) {
+  async csat(user: AuthenticatedUser, from?: Date, to?: Date) {
+    const createdAt = this.dateRange(from, to);
+    const baseWhere = { tenantId: user.tenantId, csatScore: { not: null } as object, ...(createdAt ? { createdAt } : {}) };
+    const trendSince = from ?? new Date(Date.now() - 30 * 86_400_000);
     const [overall, byDepartment, trend] = await Promise.all([
       this.prisma.ticket.aggregate({
         _avg: { csatScore: true },
         _count: { csatScore: true },
-        where: { tenantId: user.tenantId, csatScore: { not: null } },
+        where: baseWhere,
       }),
       this.prisma.ticket.groupBy({
         by: ['departmentId'],
         _avg: { csatScore: true },
         _count: { csatScore: true },
-        where: { tenantId: user.tenantId, csatScore: { not: null } },
+        where: baseWhere,
         orderBy: { _avg: { csatScore: 'desc' } },
       }),
       this.prisma.ticket.findMany({
         where: {
           tenantId: user.tenantId,
           csatScore: { not: null },
-          csatRespondedAt: { gte: new Date(Date.now() - 30 * 86_400_000) },
+          csatRespondedAt: { gte: trendSince, ...(to ? { lte: to } : {}) },
         },
         select: { csatScore: true, csatRespondedAt: true },
         orderBy: { csatRespondedAt: 'asc' },

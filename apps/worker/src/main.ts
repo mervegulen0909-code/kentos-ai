@@ -3,6 +3,7 @@ import { Queue } from 'bullmq';
 import { logger } from './logger.js';
 import { initSentry } from './sentry.js';
 import { processCsatJob } from './processors/csat.processor.js';
+import { processGeocodeJob } from './processors/geocode.processor.js';
 import { processMediaJob } from './processors/media.processor.js';
 import { processNotificationJob } from './processors/notifications.processor.js';
 import { processOutboundJob } from './processors/outbound.processor.js';
@@ -24,6 +25,7 @@ const workers = [
   createWorker(queueNames.outbound, processOutboundJob),
   createWorker(queueNames.webhooks, processWebhookJob),
   createWorker(queueNames.csat, processCsatJob),
+  createWorker(queueNames.geocode, processGeocodeJob),
 ];
 
 logger.info('KentOS worker ready', { queues: workers.map((w) => w.name) });

@@ -98,6 +98,7 @@ model Tenant {
   widgetAllowedOrigins Json?
   retentionOverrides   Json?
   aiBudgetOverrides    Json?
+  ipAllowlist          Json?
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
 

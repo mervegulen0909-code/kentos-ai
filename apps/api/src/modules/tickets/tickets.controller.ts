@@ -163,6 +163,20 @@ export class TicketsController {
     return this.tickets.suggestReply(user, id, dto);
   }
 
+  @ApiOperation({ summary: 'Akıllı otomatik atama — en az yüklü operatörü atar' })
+  @Roles('SUPER_ADMIN', 'TENANT_ADMIN', 'MANAGER', 'OPERATOR')
+  @Post(':id/smart-assign')
+  smartAssign(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+    return this.tickets.smartAssign(user, id);
+  }
+
+  @ApiOperation({ summary: 'AI öncelik önerisi — ticket içeriğine göre öncelik tahmin eder' })
+  @Roles('SUPER_ADMIN', 'TENANT_ADMIN', 'MANAGER', 'DEPARTMENT_STAFF', 'OPERATOR')
+  @Post(':id/suggest-priority')
+  suggestPriority(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+    return this.tickets.suggestPriority(user, id);
+  }
+
   @Roles('SUPER_ADMIN', 'TENANT_ADMIN', 'MANAGER', 'OPERATOR')
   @Post('bulk-assign')
   @ApiOperation({ summary: 'Toplu atama (max 50 ticket)' })

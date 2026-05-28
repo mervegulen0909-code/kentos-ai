@@ -6,6 +6,7 @@ import type { IntakeClassification } from '@kentos/shared';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import { AttachmentsService } from '../attachments/attachments.service.js';
 import { CsatQueueService } from './csat-queue.service.js';
+import { GeocodeQueueService } from './geocode-queue.service.js';
 import { NeighborhoodRoutingService } from './neighborhood-routing.service.js';
 import { NotificationQueueService } from './notification-queue.service.js';
 import { NotificationTemplateService } from './notification-template.service.js';
@@ -37,10 +38,101 @@ export class TicketsService {
     @Inject(TicketAiService) private readonly ticketAi: TicketAiService,
     @Inject(FcmPushService) private readonly fcmPush: FcmPushService,
     @Inject(WebhookQueueService) private readonly webhooks: WebhookQueueService,
+    @Inject(GeocodeQueueService) private readonly geocodeQueue: GeocodeQueueService,
   ) {}
 
   suggestReply(user: AuthenticatedUser, ticketId: string, dto: SuggestReplyDto) {
     return this.ticketAi.suggestReply(user.tenantId, ticketId, dto.operatorNote);
+  }
+
+  async smartAssign(user: AuthenticatedUser, id: string) {
+    const ticket = await this.requireTicket(user, id);
+    this.requireMutableTicket(ticket.status);
+
+    if (!ticket.departmentId) {
+      throw new BadRequestException('Ticket bir birime atanmamis, once birim belirleyin.');
+    }
+
+    // Find active operators in the same department ordered by open ticket count
+    const staffInDept = await this.prisma.userDepartment.findMany({
+      where: { departmentId: ticket.departmentId, user: { tenantId: user.tenantId, isActive: true } },
+      select: { userId: true, user: { select: { fullName: true, email: true, role: true } } },
+    });
+
+    if (!staffInDept.length) {
+      throw new BadRequestException('Bu birimde aktif personel bulunamadi.');
+    }
+
+    const openCountMap = await this.prisma.ticket.groupBy({
+      by: ['assignedToId'],
+      where: {
+        tenantId: user.tenantId,
+        assignedToId: { in: staffInDept.map((s) => s.userId) },
+        status: { notIn: [TicketStatus.RESOLVED, TicketStatus.CLOSED, TicketStatus.REJECTED] },
+      },
+      _count: { _all: true },
+    });
+
+    const countByUser = new Map(openCountMap.map((row) => [row.assignedToId, row._count._all]));
+    const best = staffInDept.sort((a, b) => (countByUser.get(a.userId) ?? 0) - (countByUser.get(b.userId) ?? 0))[0];
+
+    const updated = await this.prisma.ticket.update({
+      where: { id },
+      data: {
+        assignedToId: best.userId,
+        status: ticket.status === TicketStatus.NEW || ticket.status === TicketStatus.TRIAGED ? TicketStatus.ASSIGNED : ticket.status,
+        auditLogs: {
+          create: {
+            tenantId: user.tenantId,
+            actorType: AuditActorType.SYSTEM,
+            actorUserId: user.id,
+            action: 'ticket.smart_assigned',
+            before: { assignedToId: ticket.assignedToId },
+            after: { assignedToId: best.userId, reason: 'min_open_tickets' },
+          },
+        },
+      },
+    });
+
+    this.eventsService.emit({ type: 'ticket.assigned', tenantId: user.tenantId, payload: { ticketId: id, assignedToId: best.userId } });
+
+    return { ticketId: id, assignedToId: best.userId, assignedToName: best.user.fullName, openTickets: countByUser.get(best.userId) ?? 0 };
+  }
+
+  async suggestPriority(user: AuthenticatedUser, id: string) {
+    const ticket = await this.requireTicket(user, id);
+
+    const keywords: Record<string, string> = {
+      acil: 'URGENT', aciliyet: 'URGENT', tehlike: 'URGENT', yangın: 'URGENT', yangin: 'URGENT',
+      sel: 'URGENT', kaza: 'HIGH', yara: 'HIGH', döküntü: 'HIGH', patlama: 'HIGH',
+      şikayet: 'NORMAL', talep: 'NORMAL', istek: 'NORMAL', öneri: 'LOW', bilgi: 'LOW',
+    };
+
+    const text = `${ticket.title} ${ticket.description}`.toLowerCase();
+    let suggestedPriority = 'NORMAL';
+    for (const [keyword, priority] of Object.entries(keywords)) {
+      if (text.includes(keyword)) {
+        suggestedPriority = priority;
+        if (priority === 'URGENT') break;
+      }
+    }
+
+    const priorityOrder = ['LOW', 'NORMAL', 'HIGH', 'URGENT'];
+    const currentIndex = priorityOrder.indexOf(ticket.priority);
+    const suggestedIndex = priorityOrder.indexOf(suggestedPriority);
+    const confidence = suggestedIndex !== currentIndex ? 0.7 : 0.9;
+
+    return {
+      ticketId: id,
+      currentPriority: ticket.priority,
+      suggestedPriority,
+      confidence,
+      reason: suggestedIndex > currentIndex
+        ? `Tahmin edilen "${suggestedPriority}" mevcut "${ticket.priority}" değerinden daha yüksek — içerik analizi ile belirlendi.`
+        : suggestedIndex < currentIndex
+        ? `Tahmin edilen "${suggestedPriority}" mevcut "${ticket.priority}" değerinden daha düşük.`
+        : 'Mevcut öncelik uygun görünüyor.',
+    };
   }
 
   async list(
@@ -162,6 +254,11 @@ export class TicketsService {
     });
 
     await this.attachments.attachAdminToTicket(user, ticket.id, dto.attachmentIds);
+
+    // Enqueue reverse geocoding if coordinates provided but no address text
+    if (dto.latitude != null && dto.longitude != null && !dto.addressText) {
+      void this.geocodeQueue.enqueue(ticket.id, Number(dto.latitude), Number(dto.longitude));
+    }
 
     this.eventsService.emit({
       type: 'ticket.created',
@@ -366,6 +463,9 @@ export class TicketsService {
     await this.audit(user, id, 'ticket.public_message_added', undefined, { messageId: message.id });
     await this.attachments.attachAdminToMessage(user, id, message.id, dto.attachmentIds);
     await this.notifications.enqueueMessage(message.id);
+
+    // FCM push — public staff reply
+    void this.sendPublicReplyPush(ticket);
 
     this.eventsService.emit({
       type: 'ticket.message_added',
@@ -679,6 +779,18 @@ export class TicketsService {
 
   private asRecord(value: unknown): Record<string, unknown> | null {
     return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
+  }
+
+  private async sendPublicReplyPush(ticket: { id: string; tenantId: string; title: string; citizenId: string | null }) {
+    if (!ticket.citizenId) return;
+    try {
+      const deviceTokens = await this.prisma.citizenDeviceToken.findMany({
+        where: { tenantId: ticket.tenantId, citizenId: ticket.citizenId, isActive: true },
+        select: { token: true },
+      });
+      const tokens = deviceTokens.map((dt) => dt.token);
+      await this.fcmPush.sendToMany(tokens, 'Talebinize yanıt geldi', ticket.title, { ticketId: ticket.id, event: 'new_reply' });
+    } catch { /* push failure must never break the response */ }
   }
 
   private async sendStatusPush(ticket: { id: string; tenantId: string; title: string; citizenId: string | null }, newStatus: string) {

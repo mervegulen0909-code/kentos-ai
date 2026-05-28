@@ -38,4 +38,24 @@ export class PublicTicketController {
   ) {
     return this.tickets.addMessage(tenantSlug, trackingToken, dto);
   }
+
+  @ApiOperation({ summary: 'Vatandaş şikayet yükseltme — önceliği artırır' })
+  @ApiResponse({ status: 200, description: 'Yükseltme sonucu' })
+  @Post(':trackingToken/escalate')
+  escalate(
+    @Param('tenantSlug') tenantSlug: string,
+    @Param('trackingToken') trackingToken: string,
+  ) {
+    return this.tickets.escalate(tenantSlug, trackingToken);
+  }
+
+  @ApiOperation({ summary: 'Ticket zaman çizelgesi — herkese açık durum ve mesaj geçmişi' })
+  @ApiResponse({ status: 200, description: 'Kronolojik olaylar listesi' })
+  @Get(':trackingToken/timeline')
+  timeline(
+    @Param('tenantSlug') tenantSlug: string,
+    @Param('trackingToken') trackingToken: string,
+  ) {
+    return this.tickets.timeline(tenantSlug, trackingToken);
+  }
 }

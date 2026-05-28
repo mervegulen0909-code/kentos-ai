@@ -49,10 +49,12 @@ export async function processNotificationJob(job: { name: string; data: Notifica
     return { processor: 'notifications', job: job.name, skipped: 'already_dispatched', deliveryId: existing.id };
   }
 
+  const channel = message.ticket.channel ?? 'WHATSAPP';
+
   const delivery = await prisma.outboundDelivery.create({
     data: {
       tenantId: message.tenantId,
-      channel: 'WHATSAPP',
+      channel,
       state: OutboundDeliveryState.PENDING,
       recipientPhone: to,
       externalConversationId: idempotencyKey,
@@ -84,7 +86,7 @@ export async function processNotificationJob(job: { name: string; data: Notifica
     job: job.name,
     dispatched: true,
     deliveryId: delivery.id,
-    channel: 'WHATSAPP',
+    channel,
     recipientPhone: to,
   };
 }
