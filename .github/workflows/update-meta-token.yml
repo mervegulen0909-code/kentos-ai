@@ -28,7 +28,6 @@ jobs:
             else
               echo "META_ACCESS_TOKEN=${{ github.event.inputs.meta_access_token }}" >> .env.production.local
             fi
-            # Restart whatsapp-gateway
-            docker compose -f infra/docker-compose.prod.yml --env-file .env.production.local restart whatsapp-gateway
+            # Force-recreate whatsapp-gateway to pick up new env vars
+            docker compose -f infra/docker-compose.prod.yml --env-file .env.production.local up -d --force-recreate --no-deps whatsapp-gateway
             echo "Done. Gateway restarted."
-            docker compose -f infra/docker-compose.prod.yml ps whatsapp-gateway
