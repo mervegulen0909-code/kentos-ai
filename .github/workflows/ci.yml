@@ -40,7 +40,7 @@ jobs:
       DATABASE_URL: postgresql://kentos:kentos@localhost:5432/kentos_ai?schema=public
       REDIS_URL: redis://localhost:6379
       KENTOS_API_BASE_URL: http://127.0.0.1:3110/api/v1
-      INTERNAL_API_KEY: change-me-internal
+      INTERNAL_API_KEY: ci-test-internal-api-key-32-chars-min
       INTERNAL_EVENTS_KEY: ci-test-events-secret-32-chars-minimum
       CITIZEN_SESSION_SECRET: ci-test-citizen-session-secret-32-chars-minimum
       AUTH_LOGIN_THROTTLE_LIMIT: 100
