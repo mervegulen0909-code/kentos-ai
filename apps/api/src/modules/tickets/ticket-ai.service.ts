@@ -46,74 +46,64 @@ export class TicketAiService {
     });
     if (!ticket) throw new NotFoundException('Talep bulunamadi.');
 
-    const config = this.readAnthropicConfig();
+    const config = this.readOpenAiConfig();
     if (!config.enabled) {
       return this.buildDeterministicSuggestion(ticket);
     }
 
     try {
-      return await this.callAnthropic(ticket, config, operatorNote);
+      return await this.callOpenAi(ticket, config, operatorNote);
     } catch (err) {
       this.logger.warn(`AI suggest-reply failed, using deterministic: ${String(err)}`);
       return this.buildDeterministicSuggestion(ticket);
     }
   }
 
-  private async callAnthropic(
+  private async callOpenAi(
     ticket: TicketWithContext,
-    config: ReturnType<TicketAiService['readAnthropicConfig']>,
+    config: ReturnType<TicketAiService['readOpenAiConfig']>,
     operatorNote?: string,
   ): Promise<SuggestReplyResult> {
-    const body = JSON.stringify({
-      model: config.model,
-      max_tokens: 600,
-      temperature: 0.3,
-      system: [
-        {
-          type: 'text',
-          text: [
-            'Sen bir Türk belediyesi için çalışan deneyimli bir müşteri hizmetleri uzmanısın.',
-            'Görüşme geçmişine ve talep bilgilerine göre vatandaşa kibar, açık ve çözüm odaklı Türkçe bir yanıt oluştur.',
-            'Yanıt 2-4 paragraf uzunluğunda olmalı. İnsan gibi, samimi ama profesyonel bir dil kullan.',
-            'Sadece yanıt metnini döndür; JSON, başlık veya ek biçimlendirme kullanma.',
-          ].join(' '),
-          cache_control: { type: 'ephemeral' },
-        },
-      ],
-      messages: [
-        {
-          role: 'user',
-          content: this.buildUserPrompt(ticket, operatorNote),
-        },
-      ],
-    });
+    const systemPrompt = [
+      'Sen bir Türk belediyesi için çalışan deneyimli bir müşteri hizmetleri uzmanısın.',
+      'Görüşme geçmişine ve talep bilgilerine göre vatandaşa kibar, açık ve çözüm odaklı Türkçe bir yanıt oluştur.',
+      'Yanıt 2-4 paragraf uzunluğunda olmalı. İnsan gibi, samimi ama profesyonel bir dil kullan.',
+      'Sadece yanıt metnini döndür; JSON, başlık veya ek biçimlendirme kullanma.',
+    ].join(' ');
 
-    const response = await fetch(`${config.baseUrl}/v1/messages`, {
+    const response = await fetch(`${config.baseUrl}/v1/chat/completions`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': config.apiKey,
-        'anthropic-version': config.version,
+        Authorization: `Bearer ${config.apiKey}`,
       },
-      body,
+      body: JSON.stringify({
+        model: config.model,
+        max_tokens: 600,
+        temperature: 0.3,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: this.buildUserPrompt(ticket, operatorNote) },
+        ],
+      }),
       signal: AbortSignal.timeout(config.timeoutMs),
     });
 
     if (!response.ok) {
-      throw new Error(`Anthropic HTTP ${response.status}`);
+      throw new Error(`OpenAI HTTP ${response.status}`);
     }
 
     const payload = await response.json() as {
-      content?: Array<{ type?: string; text?: string }>;
-      usage?: { input_tokens?: number; output_tokens?: number };
+      choices?: Array<{ message?: { content?: string }; model?: string }>;
+      usage?: { prompt_tokens?: number; completion_tokens?: number };
       model?: string;
     };
 
-    const suggestion = payload.content?.find((p) => p.type === 'text')?.text;
-    if (!suggestion) throw new Error('No text content in Anthropic response');
+    const suggestion = payload.choices?.[0]?.message?.content;
+    if (!suggestion) throw new Error('No content in OpenAI response');
 
     const tokensUsed =
-      (payload.usage?.input_tokens ?? 0) + (payload.usage?.output_tokens ?? 0) || null;
+      (payload.usage?.prompt_tokens ?? 0) + (payload.usage?.completion_tokens ?? 0) || null;
 
     return {
       suggestion: suggestion.trim(),
@@ -189,7 +179,7 @@ export class TicketAiService {
     });
     if (!ticket) throw new NotFoundException('Talep bulunamadi.');
 
-    const config = this.readAnthropicConfig();
+    const config = this.readOpenAiConfig();
     if (!config.enabled) {
       return this.buildDeterministicSummary(ticket);
     }
@@ -214,17 +204,17 @@ export class TicketAiService {
           ].filter(Boolean).join('\n'),
         }],
       });
-      const response = await fetch(`${config.baseUrl}/v1/messages`, {
+      const response = await fetch(`${config.baseUrl}/v1/chat/completions`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-api-key': config.apiKey, 'anthropic-version': config.version },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${config.apiKey}` },
         body,
         signal: AbortSignal.timeout(config.timeoutMs),
       });
-      if (!response.ok) throw new Error(`Anthropic HTTP ${response.status}`);
-      const payload = await response.json() as { content?: Array<{ type?: string; text?: string }>; model?: string; usage?: { input_tokens?: number; output_tokens?: number } };
-      const text = payload.content?.find((p) => p.type === 'text')?.text;
+      if (!response.ok) throw new Error(`OpenAI HTTP ${response.status}`);
+      const payload = await response.json() as { choices?: Array<{ message?: { content?: string } }>; model?: string; usage?: { prompt_tokens?: number; completion_tokens?: number } };
+      const text = payload.choices?.[0]?.message?.content;
       if (!text) throw new Error('No text in response');
-      return { ticketId, summary: text.trim(), model: payload.model ?? config.model, tokensUsed: (payload.usage?.input_tokens ?? 0) + (payload.usage?.output_tokens ?? 0) || null };
+      return { ticketId, summary: text.trim(), model: payload.model ?? config.model, tokensUsed: (payload.usage?.prompt_tokens ?? 0) + (payload.usage?.completion_tokens ?? 0) || null };
     } catch (err) {
       this.logger.warn(`AI summarize failed: ${String(err)}`);
       return this.buildDeterministicSummary(ticket);
@@ -260,7 +250,7 @@ export class TicketAiService {
       return { ticketId, sentiment: 'NEUTRAL', score: 0.5, summary: 'Vatandaş mesajı bulunamadı.' };
     }
 
-    const config = this.readAnthropicConfig();
+    const config = this.readOpenAiConfig();
     if (!config.enabled) {
       return this.buildDeterministicSentiment(ticketId, citizenText);
     }
@@ -275,15 +265,15 @@ export class TicketAiService {
           content: `Aşağıdaki vatandaş mesajlarının duygusal tonunu analiz et. JSON formatında yanıt ver: {"sentiment":"POSITIVE"|"NEUTRAL"|"NEGATIVE","score":0.0-1.0,"summary":"kısa açıklama"}\n\nMesajlar:\n${citizenText.slice(0, 2000)}`,
         }],
       });
-      const response = await fetch(`${config.baseUrl}/v1/messages`, {
+      const response = await fetch(`${config.baseUrl}/v1/chat/completions`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-api-key': config.apiKey, 'anthropic-version': config.version },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${config.apiKey}` },
         body,
         signal: AbortSignal.timeout(config.timeoutMs),
       });
-      if (!response.ok) throw new Error(`Anthropic HTTP ${response.status}`);
-      const payload = await response.json() as { content?: Array<{ type?: string; text?: string }> };
-      const text = payload.content?.find((p) => p.type === 'text')?.text ?? '{}';
+      if (!response.ok) throw new Error(`OpenAI HTTP ${response.status}`);
+      const payload = await response.json() as { choices?: Array<{ message?: { content?: string } }> };
+      const text = payload.choices?.[0]?.message?.content ?? '{}';
       const parsed = JSON.parse(text) as { sentiment?: string; score?: number; summary?: string };
       return {
         ticketId,
@@ -342,17 +332,15 @@ export class TicketAiService {
     };
   }
 
-  private readAnthropicConfig() {
-    const provider = process.env.AI_PROVIDER?.trim().toLowerCase();
-    const apiKey = process.env.ANTHROPIC_API_KEY?.trim() || '';
-    const baseUrl = (process.env.ANTHROPIC_BASE_URL || 'https://api.anthropic.com').trim().replace(/\/+$/, '');
+  private readOpenAiConfig() {
+    const apiKey = process.env.OPENAI_API_KEY?.trim() || '';
+    const baseUrl = (process.env.OPENAI_BASE_URL || 'https://api.openai.com').trim().replace(/\/+$/, '');
     return {
-      enabled: provider === 'anthropic' && Boolean(apiKey),
+      enabled: Boolean(apiKey),
       apiKey,
       baseUrl,
-      model: process.env.ANTHROPIC_MODEL?.trim() || 'claude-haiku-4-5-20251001',
+      model: process.env.OPENAI_MODEL?.trim() || 'gpt-4o',
       timeoutMs: 12_000,
-      version: process.env.ANTHROPIC_API_VERSION?.trim() || '2023-06-01',
     };
   }
 }

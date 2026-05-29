@@ -325,6 +325,59 @@ input, textarea, button, select { max-width: 100%; }
 .widget-result-success { border: 1px solid color-mix(in oklch, var(--green) 46%, var(--line)); background: color-mix(in oklch, var(--green) 12%, white); }
 .widget-result-error { border: 1px solid color-mix(in oklch, var(--accent) 46%, var(--line)); background: color-mix(in oklch, var(--accent) 11%, white); }
 
+/* ── Floating mascot assistant ─────────────────────────────── */
+.mascot-root { position: fixed; right: clamp(14px, 3vw, 24px); bottom: clamp(14px, 3vw, 24px); z-index: 2147483000; display: flex; flex-direction: column; align-items: flex-end; gap: 14px; }
+.mascot-launcher { display: inline-flex; align-items: center; gap: 10px; border: 0; cursor: pointer; padding: 8px 18px 8px 8px; border-radius: 999px; background: linear-gradient(135deg, oklch(56% 0.13 152), oklch(45% 0.12 150)); color: white; font: 800 0.95rem/1.1 var(--font-body); box-shadow: 0 16px 40px oklch(45% 0.12 150 / 0.34); transition: transform .18s ease, box-shadow .18s ease; }
+.mascot-launcher:hover { transform: translateY(-2px); box-shadow: 0 20px 48px oklch(45% 0.12 150 / 0.42); }
+.mascot-launcher .mascot-svg { animation: mascot-float 3.6s ease-in-out infinite; }
+.mascot-launcher-label { max-width: 220px; }
+.mascot-launcher.is-open .mascot-launcher-label { display: none; }
+
+.mascot-panel { width: min(384px, calc(100vw - 28px)); height: min(560px, calc(100dvh - 130px)); display: flex; flex-direction: column; overflow: hidden; background: var(--surface); border: 1px solid color-mix(in oklch, var(--line) 82%, white); border-radius: var(--radius-xl); box-shadow: var(--shadow-2); animation: mascot-pop .18s ease; }
+.mascot-panel-head { display: flex; align-items: center; gap: 12px; padding: 14px 16px; background: linear-gradient(135deg, oklch(56% 0.13 152), oklch(46% 0.12 150)); color: white; }
+.mascot-head-avatar { display: inline-flex; background: oklch(100% 0 0 / 0.16); border-radius: 50%; padding: 4px; }
+.mascot-head-text { display: grid; gap: 2px; flex: 1; min-width: 0; }
+.mascot-head-text strong { font-size: 1rem; }
+.mascot-head-status { display: inline-flex; align-items: center; gap: 6px; font-size: 0.78rem; opacity: 0.92; }
+.mascot-dot { width: 8px; height: 8px; border-radius: 50%; background: oklch(85% 0.18 150); box-shadow: 0 0 0 0 oklch(85% 0.18 150 / 0.7); animation: mascot-pulse 2s infinite; }
+.mascot-close { margin-left: auto; background: transparent; border: 0; color: white; font-size: 1.5rem; line-height: 1; cursor: pointer; padding: 0 4px; opacity: 0.85; }
+.mascot-close:hover { opacity: 1; }
+
+.mascot-messages { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding: 16px; background: radial-gradient(circle at 100% 0, color-mix(in oklch, var(--green) 8%, transparent), transparent 16rem); }
+.mascot-message { max-width: 86%; padding: 11px 14px; border-radius: 16px; line-height: 1.45; font-size: 0.94rem; white-space: pre-wrap; word-wrap: break-word; }
+.mascot-message-assistant { align-self: flex-start; background: white; border: 1px solid var(--line); color: var(--ink); border-bottom-left-radius: 5px; }
+.mascot-message-user { align-self: flex-end; background: oklch(46% 0.12 150); color: white; border-bottom-right-radius: 5px; }
+.mascot-message-tracking { align-self: stretch; max-width: 100%; background: color-mix(in oklch, var(--green) 14%, white); border: 1px solid color-mix(in oklch, var(--green) 46%, var(--line)); color: oklch(30% 0.1 150); font-weight: 700; }
+.mascot-typing { display: inline-flex; gap: 5px; align-items: center; }
+.mascot-typing span { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); animation: mascot-bounce 1.2s infinite; }
+.mascot-typing span:nth-child(2) { animation-delay: .2s; }
+.mascot-typing span:nth-child(3) { animation-delay: .4s; }
+
+.mascot-composer { display: flex; gap: 8px; align-items: flex-end; padding: 12px; border-top: 1px solid var(--line); background: color-mix(in oklch, white 70%, var(--paper-1)); }
+.mascot-input { flex: 1; resize: none; max-height: 120px; border: 1px solid var(--line); border-radius: var(--radius-md); padding: 11px 13px; font: 400 0.94rem/1.4 var(--font-body); background: color-mix(in oklch, var(--surface-warm) 70%, white); color: var(--ink); }
+.mascot-input:focus { outline: 2px solid color-mix(in oklch, var(--green) 60%, white); outline-offset: 1px; }
+.mascot-send { flex: 0 0 auto; width: 42px; height: 42px; border: 0; border-radius: 50%; cursor: pointer; background: oklch(46% 0.12 150); color: white; font-size: 1.05rem; transition: transform .15s ease, opacity .15s ease; }
+.mascot-send:hover:not(:disabled) { transform: scale(1.06); }
+.mascot-send:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* mascot SVG micro-animations */
+.mascot-svg .mascot-eye { transform-box: fill-box; transform-origin: center; animation: mascot-blink 4.5s infinite; }
+.mascot-svg .mascot-antenna-dot { animation: mascot-pulse-dot 2.4s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+.mascot-svg.is-talking .mascot-mouth { animation: mascot-talk .35s ease-in-out infinite; }
+
+@keyframes mascot-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+@keyframes mascot-pop { from { opacity: 0; transform: translateY(12px) scale(.97); } to { opacity: 1; transform: none; } }
+@keyframes mascot-pulse { 0% { box-shadow: 0 0 0 0 oklch(85% 0.18 150 / 0.7); } 70% { box-shadow: 0 0 0 7px oklch(85% 0.18 150 / 0); } 100% { box-shadow: 0 0 0 0 oklch(85% 0.18 150 / 0); } }
+@keyframes mascot-pulse-dot { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.55; transform: scale(1.18); } }
+@keyframes mascot-blink { 0%, 92%, 100% { transform: scaleY(1); } 96% { transform: scaleY(0.1); } }
+@keyframes mascot-bounce { 0%, 60%, 100% { transform: translateY(0); opacity: .5; } 30% { transform: translateY(-4px); opacity: 1; } }
+@keyframes mascot-talk { 0%, 100% { d: path("M26 37 Q32 41 38 37"); } 50% { d: path("M26 38 Q32 35 38 38"); } }
+
+@media (max-width: 900px) {
+  .mascot-launcher-label { display: none; }
+  .mascot-panel { height: min(70dvh, calc(100dvh - 110px)); }
+}
+
 @keyframes sweep { to { transform: translateX(100%); } }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; transition-duration: 0.01ms !important; }

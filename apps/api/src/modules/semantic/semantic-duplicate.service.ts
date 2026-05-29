@@ -17,8 +17,7 @@ export class SemanticDuplicateService {
   constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
 
   private async embed(text: string): Promise<number[]> {
-    // Anthropic doesn't have a native embedding API — use a simple hash-based vector as fallback
-    // In production, integrate with OpenAI text-embedding-3-small or a local model
+    // OpenAI text-embedding-3-small is used when OPENAI_API_KEY is set; falls back to hash-based vector
     try {
       // Attempt to call a real embedding provider if configured
       if (process.env.OPENAI_API_KEY) {
@@ -33,7 +32,7 @@ export class SemanticDuplicateService {
         }
       }
     } catch (e) {
-      this.logger.warn('Embedding call failed, using Anthropic AI similarity instead');
+      this.logger.warn('Embedding call failed, using OpenAI AI similarity instead');
     }
     return [];
   }
@@ -62,7 +61,7 @@ export class SemanticDuplicateService {
       return this.findByVector(user.tenantId, ticketId, embedding);
     }
 
-    // Fallback: use Anthropic to identify duplicates from recent tickets
+    // Fallback: use OpenAI to identify duplicates from recent tickets
     return this.findByAi(user.tenantId, ticketId, inputText);
   }
 
@@ -116,26 +115,25 @@ ${JSON.stringify(candidates.map((c: { id: string; ticketNo: string; title: strin
 Hiç yoksa boş array döndür: []`;
 
     try {
-      const apiKey = process.env.ANTHROPIC_API_KEY;
+      const apiKey = process.env.OPENAI_API_KEY;
       if (!apiKey) return [];
 
-      const res = await fetch('https://api.anthropic.com/v1/messages', {
+      const res = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
-          'x-api-key': apiKey,
-          'anthropic-version': '2023-06-01',
+          Authorization: `Bearer ${apiKey}`,
           'content-type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'claude-haiku-4-5-20251001',
+          model: process.env.OPENAI_MODEL?.trim() || 'gpt-4o',
           max_tokens: 256,
           messages: [{ role: 'user', content: prompt }],
         }),
       });
 
       if (!res.ok) return [];
-      const data = await res.json() as { content: Array<{ type: string; text: string }> };
-      const text = data.content[0]?.type === 'text' ? data.content[0].text : '[]';
+      const data = await res.json() as { choices: Array<{ message: { content: string } }> };
+      const text = data.choices?.[0]?.message?.content ?? '[]';
       const match = text.match(/\[[\s\S]*\]/);
       const results: Array<{ id: string; similarity: number }> = match ? JSON.parse(match[0]) : [];
 
