@@ -98,6 +98,20 @@ kaydedin (NN = video sırası).
 > ⭐ = vurgu sahneleri. `02c` (maskot TK) için `fix/maskot-ticket` PR'ı merge + deploy
 > edildikten sonra `/demo-belediye/report` → maskot → net şikâyet ile yeniden çekilmeli.
 
+#### Ek admin bölümleri (kapsam tamamlandı — tüm sol menü)
+| # | Bölüm | Önerilen dosya | Durum |
+|---|---|---|---|
+| 16 | Kullanıcılar — RBAC (Birim Personeli/Operatör/Yönetici/Salt Okuma) | `16-admin-kullanicilar-rbac.png` | ✅ |
+| 17 | Hazır Yanıtlar — şablonlar | `17-admin-hazir-yanitlar.png` | ⏳ canlıda çöküyordu; `fix/maskot-ticket` ile düzeltildi, deploy bekliyor |
+| 17b | Etiketler — renk kodlu sınıflandırma | `17b-admin-etiketler.png` | ✅ |
+| 19 | Randevular (admin) — randevu/slot yönetimi | `19-admin-randevular.png` | ✅ |
+| 20 | Kanallar — Slack/Teams bildirim entegrasyonu | `20-admin-kanallar.png` | ✅ |
+| 20b | Sosyal Medya İzleme — Twitter/X mention→ticket | `20b-admin-sosyal-medya.png` | ✅ |
+| 20c | IVR — Twilio Voice çağrı kayıtları + transkript | `20c-admin-ivr.png` | ✅ |
+
+> `17` (Hazır Yanıtlar) canlıda **çöküyordu** (`r.lang.toUpperCase()`, model'de lang yok →
+> RSC render hatası). `fix/maskot-ticket` ile düzeltildi; deploy sonrası temiz çekilmeli.
+
 ### Canlı kanıt (öne çıkanlar)
 - **Başvuru → AI:** "Cumhuriyet Mah. ...kaldırım çöktü... acil" → **TK-0FCD1B0FC9D2AED5**,
   birim **Fen İşleri**, kategori **Yol/kaldırım/asfalt**, öncelik **Acil**, SLA otomatik.
