@@ -62,17 +62,6 @@ export class ReportsController {
     });
   }
 
-  @ApiOperation({ summary: 'Tek raporu getir' })
-  @ApiResponse({ status: 200, description: 'Rapor detayı' })
-  @ApiResponse({ status: 404, description: 'Rapor bulunamadı' })
-  @Get(':id')
-  getOne(
-    @CurrentUser() user: AuthenticatedUser,
-    @Param('id') id: string,
-  ) {
-    return this.reports.get(user, id);
-  }
-
   // 6.2 — Rapor abonelikleri
   @ApiOperation({ summary: 'Rapor aboneliklerini listele' })
   @Get('subscriptions')
@@ -108,5 +97,18 @@ export class ReportsController {
   ) {
     const parseDate = (v?: string) => (v ? (isNaN(new Date(v).getTime()) ? undefined : new Date(v)) : undefined);
     return this.reports.exportCsv(user, { from: parseDate(from), to: parseDate(to) });
+  }
+
+  // NOTE: ':id' route MUST be declared last so static paths
+  // (subscriptions, export/csv) are matched before the param route.
+  @ApiOperation({ summary: 'Tek raporu getir' })
+  @ApiResponse({ status: 200, description: 'Rapor detayı' })
+  @ApiResponse({ status: 404, description: 'Rapor bulunamadı' })
+  @Get(':id')
+  getOne(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+  ) {
+    return this.reports.get(user, id);
   }
 }
