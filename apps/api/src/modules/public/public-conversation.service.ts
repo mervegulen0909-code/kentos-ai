@@ -198,10 +198,7 @@ export class PublicConversationService {
       assistantMessage = 'Talebiniz belediye ekibine insan desteği isteği olarak iletildi. Kısa süre içinde sizinle paylaştığınız iletişim bilgisinden dönüş yapılacaktır.';
     }
 
-    // Başvuru formuyla tutarlı: yalnızca açıklama zorunlu. Konum/iletişim/kategori
-    // eksikse de talep oluşur (vatandaş takip koduyla izler, operatör tamamlar).
-    const blockingMissing = aiResult.classification.missingFields.filter((field) => field === 'description');
-    if (!blockingMissing.length && aiResult.classification.intent === 'new_ticket') {
+    if (!aiResult.classification.missingFields.length && aiResult.classification.intent === 'new_ticket') {
       ticket = await this.tickets.create(tenantSlug, {
         description: aiResult.classification.description,
         title: aiResult.classification.title,
