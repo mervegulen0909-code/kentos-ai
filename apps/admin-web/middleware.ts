@@ -38,13 +38,43 @@ function isTokenFresh(token: string | null, safetyWindowSeconds = 30): boolean {
   return exp * 1000 > Date.now() + safetyWindowSeconds * 1000;
 }
 
+function buildCspHeader(nonce: string): string {
+  return [
+    "default-src 'self'",
+    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'`,
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data: blob: https:",
+    "connect-src 'self' https://firebaseapp.com https://*.googleapis.com https://*.firebaseio.com wss: ws:",
+    "font-src 'self' data:",
+    "frame-ancestors 'none'",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+  ].join('; ');
+}
+
 export async function middleware(request: NextRequest): Promise<NextResponse> {
+  // Per-request nonce for a strict, hydration-safe Content-Security-Policy.
+  // Next.js reads the nonce from the CSP on the request headers and stamps it
+  // onto every framework <script>, so 'strict-dynamic' works without
+  // 'unsafe-inline'. (CSP is owned here, not in Caddy.)
+  const nonce = Buffer.from(crypto.randomUUID()).toString('base64');
+  const csp = buildCspHeader(nonce);
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set('x-nonce', nonce);
+  requestHeaders.set('content-security-policy', csp);
+  const proceed = (): NextResponse => {
+    const res = NextResponse.next({ request: { headers: requestHeaders } });
+    res.headers.set('content-security-policy', csp);
+    return res;
+  };
+
   const accessToken = request.cookies.get(ACCESS_COOKIE)?.value ?? null;
   const refreshToken = request.cookies.get(REFRESH_COOKIE)?.value ?? null;
 
   // Nothing to do: access token is still valid, or there is no refresh token
   if (isTokenFresh(accessToken) || !refreshToken) {
-    return NextResponse.next();
+    return proceed();
   }
 
   // Access token is missing / expired — try silent refresh
@@ -62,7 +92,7 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
     if (!res.ok) {
       // Refresh token rejected — clear session cookies and let the page
       // redirect the user to /login as it normally would.
-      const response = NextResponse.next();
+      const response = proceed();
       response.cookies.delete(ACCESS_COOKIE);
       response.cookies.delete(REFRESH_COOKIE);
       response.cookies.delete(SESSION_COOKIE);
@@ -82,7 +112,7 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
       path: '/',
     };
 
-    const response = NextResponse.next();
+    const response = proceed();
     response.cookies.set(ACCESS_COOKIE, data.accessToken, {
       ...cookieBase,
       maxAge: 15 * 60,
@@ -97,7 +127,7 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
   } catch {
     // Network error during refresh — let the request through unchanged;
     // the page will see no valid access token and redirect to /login.
-    return NextResponse.next();
+    return proceed();
   }
 }
 

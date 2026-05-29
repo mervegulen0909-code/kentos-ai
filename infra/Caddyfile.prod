@@ -11,7 +11,7 @@
 		Referrer-Policy "strict-origin-when-cross-origin"
 		Permissions-Policy "geolocation=(), microphone=(), camera=(), payment=()"
 		Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
-		Content-Security-Policy "default-src 'self'; script-src 'self' 'strict-dynamic' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; connect-src 'self' https://firebaseapp.com https://*.googleapis.com https://api.anthropic.com wss: ws:; font-src 'self' data:; frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action 'self'"
+		# Content-Security-Policy: per-request nonce CSP, Next.js app middleware (admin-web/citizen-web) tarafindan set edilir; API ise Helmet kullanir.
 		-Server
 	}
 }
@@ -39,7 +39,7 @@
 			Referrer-Policy "strict-origin-when-cross-origin"
 			Permissions-Policy "geolocation=(), microphone=(), camera=(), payment=()"
 			Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
-			Content-Security-Policy "default-src 'self'; script-src 'self' 'strict-dynamic' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; connect-src 'self' https://firebaseapp.com https://*.googleapis.com https://api.anthropic.com wss: ws:; font-src 'self' data:; frame-ancestors *; object-src 'none'; base-uri 'self'; form-action 'self'"
+			# Content-Security-Policy: per-request nonce CSP, citizen-web middleware tarafindan set edilir (widget icin frame-ancestors *).
 			-Server
 		}
 		reverse_proxy citizen-web:3102
