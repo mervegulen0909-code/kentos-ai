@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "qa-admin",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": ["/c", "echo qa-admin already running on 3111"],
+      "port": 3111
+    },
+    {
+      "name": "qa-citizen",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": ["/c", "echo qa-citizen already running on 3112"],
+      "port": 3112
+    }
+  ]
+}
