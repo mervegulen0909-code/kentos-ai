@@ -17,7 +17,7 @@
 
 ## AI provider safety
 
-- [x] `AI_PROVIDER=stub` is the default; live providers (`anthropic`, `netiva`) require an explicit credential to activate.
+- [x] `AI_PROVIDER=stub` is the default; live providers (`anthropic`, `gemini`) require an explicit credential to activate.
 - [x] Daily token + cost budgets per tenant enforced at runtime via `AiRun` aggregate query before each live call. Budget exceedance silently falls back to the deterministic stub and records `errorReason='budget:token-budget-exceeded'` for audit visibility.
 - [x] AiRun telemetry rows (`tokensInput`, `tokensOutput`, `tokensTotal`, `costMicros`, `latencyMs`, `success`, `errorReason`) support per-tenant cost review without exposing prompt content.
 

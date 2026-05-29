@@ -127,7 +127,7 @@
 ### Summary
 
 - New Anthropic intake provider in `PublicTicketAiService`. When `AI_PROVIDER=anthropic` and `ANTHROPIC_API_KEY` is set, the service POSTs to `https://api.anthropic.com/v1/messages` with `x-api-key` and `anthropic-version` headers, captures `usage.input_tokens` / `usage.output_tokens`, and persists those into the `AiRun` row. No SDK dependency — direct `fetch` keeps `apps/api` package.json untouched.
-- Provider preference order: `anthropic` (preferred) → `netiva` → `stub` (deterministic). Each layer falls back to the next on error or when its credentials are unset; stub fallbacks record an `errorReason` like `anthropic:request failed with 429`.
+- Provider preference order: `anthropic` (preferred) → `gemini` → `stub` (deterministic). Each layer falls back to the next on error or when its credentials are unset; stub fallbacks record an `errorReason` like `anthropic:request failed with 429`.
 - Budget guard: `AI_DAILY_TOKEN_BUDGET` and `AI_DAILY_COST_BUDGET_MICROS` enforce a per-tenant 24h cap. Before each live call, `AiRun` aggregates over the last 24h for the tenant are summed; if either cap is reached the call is short-circuited to the deterministic stub with `errorReason='budget:token-budget-exceeded'` (or cost-budget). Calls inside the budget run normally and contribute to the next aggregate.
 - Token cost is computed per-request via `AI_COST_INPUT_MICROS_PER_TOKEN` (default 3) and `AI_COST_OUTPUT_MICROS_PER_TOKEN` (default 15) — the published claude-sonnet-4-6 list price of $3/$15 per million tokens.
 - Telemetry: every classify call writes an `AiRun` row with provider, model, promptVersion, latencyMs, token counts, costMicros, success, errorReason. Failures during telemetry persistence are swallowed so the citizen-facing ticket flow never breaks because of a logging issue.
@@ -139,7 +139,7 @@ Migration `20260510140000_add_ai_run_telemetry` extends `AiRun` with `tokensInpu
 ### Configuration
 
 ```
-AI_PROVIDER=stub | netiva | anthropic
+AI_PROVIDER=stub | anthropic | gemini
 AI_DAILY_TOKEN_BUDGET=        # leave empty for unlimited
 AI_DAILY_COST_BUDGET_MICROS=  # leave empty for unlimited
 AI_PER_REQUEST_TOKEN_LIMIT=
