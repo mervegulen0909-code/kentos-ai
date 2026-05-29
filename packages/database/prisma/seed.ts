@@ -223,6 +223,97 @@ async function main() {
   });
 
   await seedDemoChannelData(tenant.id);
+  await seedKnowledgeBase(tenant.id);
+}
+
+// Maskot/asistan bilgi katmani: SSS makaleleri + paylasimli hazir yanitlar.
+// Idempotent (slug/title bazli upsert) — her db:seed calistiginda guvenli.
+const faqArticles: Array<[string, string, string]> = [
+  [
+    'cop-toplama',
+    'Cop ve konteyner toplama saatleri',
+    'Evsel atiklar mahalleye gore haftanin belirli gunlerinde, genellikle aksam saatlerinde toplanir. Konteyner dolulugu, hasarli konteyner veya yeni konteyner talebi icin "Cop toplama / konteyner" kategorisinden basvuru olusturabilirsiniz. Toplama gun ve saatleri mahalleye gore degisebilir; net bilgi icin adresinizi belirterek talep acin.',
+  ],
+  [
+    'su-kesintisi',
+    'Su kesintisi ve su arizasi bildirimi',
+    'Planli su kesintileri onceden duyurulur. Ani su kesintisi, boru patlagi, sayac veya kanalizasyon arizasi icin "Su ve kanalizasyon arizasi" kategorisinden, adres ve mumkunse fotograf ekleyerek talep olusturun. Acil durumlar yuksek oncelikle ekibe yonlendirilir.',
+  ],
+  [
+    'yol-kaldirim',
+    'Yol, kaldirim ve asfalt onarimi',
+    'Bozuk yol, cokmus asfalt, kirik kaldirim tasi veya tehlikeli cukur bildirimleri Fen Isleri birimine yonlendirilir. Konumu (mahalle/sokak) ve varsa fotografi ekleyerek talep olusturmaniz ekibin daha hizli mudahale etmesini saglar.',
+  ],
+  [
+    'sokak-aydinlatma',
+    'Sokak aydinlatmasi ve lamba arizasi',
+    'Yanmayan veya arizali sokak lambalari icin adres tarifi vererek talep olusturabilirsiniz. Aydinlatma bazi bolgelerde dagitim sirketinin sorumlulugunda olabilir; talebiniz dogru birime yonlendirilir.',
+  ],
+  [
+    'imar-ruhsat',
+    'Imar durumu ve yapi ruhsati',
+    'Imar durumu, yapi ruhsati ve iskan islemleri Ruhsat ve Denetim birimi tarafindan yurutulur. Gerekli belgeler ve surec hakkinda bilgi almak ya da basvuru baslatmak icin talep olusturabilir veya e-randevu alabilirsiniz.',
+  ],
+  [
+    'emlak-vergisi',
+    'Emlak ve cevre temizlik vergisi',
+    'Emlak vergisi ve cevre temizlik vergisi taksitleri yilda iki donemde odenir. Tahakkuk, borc sorgusu ve odeme islemleri Mali Hizmetler birimi tarafindan yurutulur. Detayli bilgi icin talep olusturabilirsiniz.',
+  ],
+  [
+    'nikah-nufus',
+    'Nikah ve evlilik islemleri',
+    'Resmi nikah islemleri icin gerekli belgeler ve randevu Kultur ve Sosyal Isler / evlendirme birimi uzerinden yurutulur. Uygun gun ve saat icin e-randevu alabilir, gerekli evraklar icin bilgi talep edebilirsiniz.',
+  ],
+  [
+    'sokak-hayvani',
+    'Sokak hayvanlari ve veteriner hizmetleri',
+    'Sahipsiz hayvanlarin kisirlastirilmasi, tedavisi, asilanmasi ve yaralı hayvan bildirimleri Veteriner Isleri birimine iletilir. Konum bilgisi vererek talep olusturmaniz mudahaleyi hizlandirir.',
+  ],
+  [
+    'gurultu-sikayet',
+    'Gurultu, isgal ve denetim sikayetleri',
+    'Asiri gurultu, kaldirim/yol isgali, ruhsatsiz faaliyet gibi konular Zabita birimine iletilir. Sikayetinizi adres ve saat bilgisiyle olusturmaniz denetimin etkinligini artirir.',
+  ],
+  [
+    'e-randevu',
+    'E-randevu nasil alinir?',
+    'Belediye hizmetleri icin internetten randevu alabilirsiniz. "E-Randevu" sayfasindan uygun gun ve saati secip ad-soyad ve telefon bilginizle randevunuzu olusturabilirsiniz. Randevu kodunuzu daha sonra islemler sirasinda kullanabilirsiniz.',
+  ],
+  [
+    'takip-kodu',
+    'Basvuru takip kodu (TK) nasil kullanilir?',
+    'Her basvuru olusturuldugunda size TK- ile baslayan gizli bir takip kodu verilir. "Basvuru Takibi" sayfasina bu kodu girerek talebinizin durumunu, ilgili birimi ve belediye mesajlarini gorebilirsiniz. Takip kodunuzu baskasiyla paylasmayin.',
+  ],
+  [
+    'kvkk-veri-silme',
+    'Kisisel verilerim ve veri silme hakki (KVKK)',
+    'Kisisel verileriniz KVKK kapsaminda islenir. Verilerinizin anonimlestirilmesini talep edebilirsiniz; bu durumda kimlik bilgileriniz anonim hale getirilir, basvurular teknik kayit olarak korunur. Talebinizi hesap sayfanizdaki veri silme adimindan iletebilirsiniz.',
+  ],
+];
+
+const cannedReplies: Array<[string, string]> = [
+  ['Cop toplama yonlendirme', 'Cop toplama ve konteyner talepleriniz Temizlik Isleri birimine iletilmektedir. Adres bilginizi paylasirsaniz ekibimiz en kisa surede ilgilenir.'],
+  ['Su arizasi yonlendirme', 'Su ve kanalizasyon arizalari Su ve Kanalizasyon birimine acil olarak iletilir. Konum ve varsa fotograf eklemeniz mudahaleyi hizlandirir.'],
+  ['Tesekkur ve kapanis', 'Belediyemize ulastiginiz icin tesekkur ederiz. Talebinizin durumunu takip kodunuzla istediginiz zaman izleyebilirsiniz. Iyi gunler dileriz.'],
+];
+
+async function seedKnowledgeBase(tenantId: string) {
+  for (const [slug, title, body] of faqArticles) {
+    await prisma.faqArticle.upsert({
+      where: { tenantId_slug_lang: { tenantId, slug, lang: 'tr' } },
+      update: { title, body, isPublished: true },
+      create: { tenantId, slug, lang: 'tr', title, body, isPublished: true },
+    });
+  }
+
+  for (const [title, body] of cannedReplies) {
+    const existing = await prisma.cannedReply.findFirst({ where: { tenantId, ownerId: null, title } });
+    if (existing) {
+      await prisma.cannedReply.update({ where: { id: existing.id }, data: { body, isActive: true } });
+    } else {
+      await prisma.cannedReply.create({ data: { tenantId, ownerId: null, title, body, isActive: true } });
+    }
+  }
 }
 
 async function seedDemoChannelData(tenantId: string) {

@@ -161,15 +161,22 @@ export class PublicConversationService {
       return this.toResponse(conversation.id, channel, nextContext, assistantMessage, false);
     }
 
+    const departments = await this.listTenantDepartments(tenant.id);
+    const categories = await this.listTenantCategories(tenant.id);
+    // Çok-turlu intake: sınıflandırıcı tek mesaj görür; konuşmada bağlamın
+    // kaybolmaması için son vatandaş mesajlarını birleştirip veriyoruz
+    // (örn. önce "lamba yanmıyor", sonra "Atatürk Cad. No 25" → tek talep).
+    const citizenTurns = messages.filter((message) => message.role === 'citizen').map((message) => message.text);
+    const classificationText = citizenTurns.slice(-6).join('\n');
     const aiResult = await this.ai.classify({
       tenantContext: {
         tenantId: tenant.id,
         tenantSlug: tenant.slug,
-        departments: await this.listTenantDepartments(tenant.id),
-        categories: await this.listTenantCategories(tenant.id),
+        departments,
+        categories,
       },
       message: {
-        text,
+        text: classificationText,
         channel,
         receivedAt: now.toISOString(),
         citizenContact: contact,
@@ -208,6 +215,26 @@ export class PublicConversationService {
       });
       nextContext.ticket = { trackingToken: ticket.trackingToken, createdAt: new Date().toISOString() };
       assistantMessage = `Başvurunuz oluşturuldu. Takip kodunuz: ${ticket.trackingToken}.`;
+    }
+
+    // Mascot: generate a natural-language reply for general questions (or any
+    // turn that has no template reply yet) so the citizen always gets answered.
+    if (!ticket && !handoffRequested && (aiResult.classification.intent === 'general_question' || !assistantMessage)) {
+      const [faq, cannedReplies] = await Promise.all([
+        this.listTenantFaq(tenant.id),
+        this.listTenantCannedReplies(tenant.id),
+      ]);
+      const generated = await this.ai.answerConversation({
+        tenantId: tenant.id,
+        assistantName: tenant.widgetTitle,
+        history: context.messages ?? [],
+        message: text,
+        faq,
+        cannedReplies,
+        departments,
+        categories,
+      });
+      if (generated) assistantMessage = generated;
     }
 
     if (assistantMessage) messages.push({ role: 'assistant', text: assistantMessage, at: new Date().toISOString() });
@@ -342,6 +369,24 @@ export class PublicConversationService {
       where: { tenantId, isActive: true },
       orderBy: { name: 'asc' },
       select: { id: true, code: true, name: true, departmentId: true },
+    });
+  }
+
+  private async listTenantFaq(tenantId: string) {
+    return this.prisma.faqArticle.findMany({
+      where: { tenantId, isPublished: true },
+      orderBy: { viewCount: 'desc' },
+      take: 12,
+      select: { title: true, body: true },
+    });
+  }
+
+  private async listTenantCannedReplies(tenantId: string) {
+    return this.prisma.cannedReply.findMany({
+      where: { tenantId, isActive: true, ownerId: null },
+      orderBy: { updatedAt: 'desc' },
+      take: 8,
+      select: { title: true, body: true },
     });
   }
 

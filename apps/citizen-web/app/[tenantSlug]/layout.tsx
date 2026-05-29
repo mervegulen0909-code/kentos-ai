@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import type { ReactNode } from 'react';
-import { citizenApi } from '../../lib/api';
+import { citizenApi, type PublicWidgetSettings } from '../../lib/api';
+import { FloatingMascot } from '../components/floating-mascot';
 
 export default async function TenantLayout({
   children,
@@ -15,11 +16,22 @@ export default async function TenantLayout({
     notFound();
   }
 
+  let settings: PublicWidgetSettings;
   try {
-    await citizenApi.getWidgetSettings(tenantSlug);
+    settings = await citizenApi.getWidgetSettings(tenantSlug);
   } catch {
     notFound();
   }
 
-  return <>{children}</>;
+  return (
+    <>
+      {children}
+      <FloatingMascot
+        tenantSlug={tenantSlug}
+        title={settings.widgetTitle || 'Belediye Asistanı'}
+        welcome={settings.widgetWelcome || 'Merhaba! Size nasıl yardımcı olabilirim?'}
+        enabled={settings.widgetEnabled}
+      />
+    </>
+  );
 }

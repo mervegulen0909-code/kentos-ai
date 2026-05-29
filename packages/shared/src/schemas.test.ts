@@ -94,16 +94,16 @@ function testValidResultSchema() {
   assert(parsed.data.classification.confidence === 0.92, 'confidence should survive parsing');
 }
 
-function testValidNetivaResultSchema() {
-  const netivaResult: PublicTicketAiIntakeResult = {
+function testValidOpenAiResultSchema() {
+  const openaiResult: PublicTicketAiIntakeResult = {
     ...buildValidResult(),
-    provider: 'netiva',
-    model: 'claude-sonnet-4-6',
+    provider: 'openai',
+    model: 'gpt-4o',
   };
 
-  const parsed = publicTicketAiIntakeResultSchema.safeParse(netivaResult);
-  assert(parsed.success, 'valid Netiva intake result should parse');
-  assert(parsed.data.provider === 'netiva', 'Netiva provider should survive parsing');
+  const parsed = publicTicketAiIntakeResultSchema.safeParse(openaiResult);
+  assert(parsed.success, 'valid OpenAI intake result should parse');
+  assert(parsed.data.provider === 'openai', 'OpenAI provider should survive parsing');
 }
 
 function testRejectInvalidMissingField() {
@@ -221,7 +221,7 @@ function testCitizenContactPhoneRegex() {
 testValidRequestSchema();
 testRejectInvalidRequestEmail();
 testValidResultSchema();
-testValidNetivaResultSchema();
+testValidOpenAiResultSchema();
 testRejectInvalidMissingField();
 testRejectInvalidConfidence();
 testRejectLegacyStatusTicketNo();
