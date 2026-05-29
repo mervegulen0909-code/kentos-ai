@@ -176,6 +176,7 @@ jobs:
             docker compose --env-file .env.production.local -f infra/docker-compose.prod.yml run --rm api pnpm db:seed
             docker compose --env-file .env.production.local -f infra/docker-compose.prod.yml up -d --remove-orphans
             docker compose --env-file .env.production.local -f infra/docker-compose.prod.yml up -d --force-recreate worker whatsapp-gateway
+            docker compose --env-file .env.production.local -f infra/docker-compose.prod.yml up -d --force-recreate caddy
             echo "Waiting for services to become healthy..."
             sleep 120
             echo "=== Container states ==="
