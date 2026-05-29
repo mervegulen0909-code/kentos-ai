@@ -61,11 +61,12 @@ export default async function CannedRepliesPage() {
                 <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
                   <strong>{r.title}</strong>
                   <span style={{ color: 'var(--muted)', fontSize: '0.8rem' }}>
-                    {r.lang.toUpperCase()} · {r.isShared ? 'Paylasilan' : 'Kisisel'}
+                    {/* CannedReply modelinde lang kolonu yok; varsayilan TR (undefined.toUpperCase crash'ini onler) */}
+                    {(r.lang ?? 'tr').toUpperCase()} · {r.isShared ? 'Paylasilan' : 'Kisisel'}
                   </span>
                 </div>
                 <p style={{ margin: 0, color: 'var(--muted)', fontSize: '0.85rem', whiteSpace: 'pre-wrap' }}>
-                  {r.body.slice(0, 200)}{r.body.length > 200 ? '...' : ''}
+                  {(r.body ?? '').slice(0, 200)}{(r.body ?? '').length > 200 ? '...' : ''}
                 </p>
                 <form action={deleteCannedReplyAction}>
                   <input type="hidden" name="id" value={r.id} />

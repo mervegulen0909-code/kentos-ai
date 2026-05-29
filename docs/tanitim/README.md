@@ -60,3 +60,64 @@
 | 21 | Admin · Ayarlar | Tek satır widget kurulum kodu |
 
 > Not: Maskot ve tüm client etkileşimi canlıda **CSP düzeltmesi deploy edilince** tam çalışır (bkz. BULGULAR.md). Backend (maskot AI) zaten canlıda çalışıyor.
+
+---
+
+## Canlı Yakalama Sonuçları (29 Mayıs 2026)
+
+Canlı ortamda (`vatandas.izmirusulü.com` / `admin.izmirusulü.com`) uçtan uca, gerçek
+kullanıcı/operatör gibi gezildi. Hydration + maskot UI **canlıda çalışıyor** (CSP
+düzeltmesi deploy edildi); SSS dolu, randevu slotları mevcut.
+
+**Video sahne sırası → önerilen dosya adı → durum.** Ekran görüntüleri sohbete
+iliştirildi; her birini `docs/tanitim/screenshots/<bölüm>/` altına aşağıdaki adla
+kaydedin (NN = video sırası).
+
+| # | Sahne | Önerilen dosya | Durum |
+|---|---|---|---|
+| 00 | Açılış: başvuru sayfası + maskot launcher | `00-acilis-basvuru-maskot.png` | ✅ |
+| 01a | Başvuru formu (dolu) | `01-basvuru-form-dolu.png` | ✅ |
+| 01b | Başvuru başarılı → **TK kodu + AI sınıflandırma** (Fen İşleri / Acil / SLA) | `01-basvuru-basari-tk-ai.png` | ✅ ⭐ |
+| 02a | Maskot AI yanıtı — "Çöp ne zaman toplanıyor?" | `02-maskot-ai-yanit-cop.png` | ✅ ⭐ |
+| 02b | Maskot AI yanıtı — sokak lambası | `02-maskot-ai-yanit-lamba.png` | ✅ |
+| 02c | Maskot sohbetten **TK kodu** verir | `02-maskot-tk-kodu.png` | ⏳ `fix/maskot-ticket` deploy bekliyor |
+| 03 | Takip: TK ile sorgu → durum + vatandaş zaman çizelgesi | `03-takip-detay.png` | ✅ |
+| 05 | SSS — çok dilli (TR/EN/Kurdî/AR), 12 makale | `05-faq-cokdilli.png` | ✅ |
+| 06 | E-Randevu — müsait slotlar | `06-randevu-slotlar.png` | ✅ |
+| 07 | Hesap — KVKK giriş guard'ı | `07-account-kvkk-guard.png` | ✅ |
+| 10 | Admin Dashboard — KPI + öncelikli kuyruk | `10-admin-dashboard.png` | ✅ |
+| 11a | Admin Talepler listesi + filtreler | `11-admin-talepler-liste.png` | ✅ |
+| 11b | Talep detayı — **AI intake özeti** (URGENT, güven %95, YOL_KALDIRIM) | `11-admin-talep-detay-ai.png` | ✅ ⭐ |
+| 12 | Operatör devri — çok kanallı (Facebook DM, WhatsApp) | `12-admin-operator-devri.png` | ✅ |
+| 13 | Birim kuyrukları — departman SLA yoğunluğu | `13-admin-birim-kuyruklari.png` | ✅ |
+| 14 | Raporlar — **AI kullanım & maliyet** (openai, %100, $0.0661) | `14-admin-raporlar-ai-maliyet.png` | ✅ ⭐ |
+| 15 | Vatandaşlar — KVKK anonimleştirme | `15-admin-vatandaslar-kvkk.png` | ✅ |
+| 18 | Bilgi Bankası — çok dilli FAQ yönetimi (maskotu besler) | `18-admin-bilgi-bankasi.png` | ✅ |
+| 21 | Ayarlar — **tek satır widget kurulum kodu** | `21-admin-ayarlar-widget.png` | ✅ ⭐ |
+
+> ⭐ = vurgu sahneleri. `02c` (maskot TK) için `fix/maskot-ticket` PR'ı merge + deploy
+> edildikten sonra `/demo-belediye/report` → maskot → net şikâyet ile yeniden çekilmeli.
+
+#### Ek admin bölümleri (kapsam tamamlandı — tüm sol menü)
+| # | Bölüm | Önerilen dosya | Durum |
+|---|---|---|---|
+| 16 | Kullanıcılar — RBAC (Birim Personeli/Operatör/Yönetici/Salt Okuma) | `16-admin-kullanicilar-rbac.png` | ✅ |
+| 17 | Hazır Yanıtlar — şablonlar | `17-admin-hazir-yanitlar.png` | ⏳ canlıda çöküyordu; `fix/maskot-ticket` ile düzeltildi, deploy bekliyor |
+| 17b | Etiketler — renk kodlu sınıflandırma | `17b-admin-etiketler.png` | ✅ |
+| 19 | Randevular (admin) — randevu/slot yönetimi | `19-admin-randevular.png` | ✅ |
+| 20 | Kanallar — Slack/Teams bildirim entegrasyonu | `20-admin-kanallar.png` | ✅ |
+| 20b | Sosyal Medya İzleme — Twitter/X mention→ticket | `20b-admin-sosyal-medya.png` | ✅ |
+| 20c | IVR — Twilio Voice çağrı kayıtları + transkript | `20c-admin-ivr.png` | ✅ |
+
+> `17` (Hazır Yanıtlar) canlıda **çöküyordu** (`r.lang.toUpperCase()`, model'de lang yok →
+> RSC render hatası). `fix/maskot-ticket` ile düzeltildi; deploy sonrası temiz çekilmeli.
+
+### Canlı kanıt (öne çıkanlar)
+- **Başvuru → AI:** "Cumhuriyet Mah. ...kaldırım çöktü... acil" → **TK-0FCD1B0FC9D2AED5**,
+  birim **Fen İşleri**, kategori **Yol/kaldırım/asfalt**, öncelik **Acil**, SLA otomatik.
+- **Maskot Q&A:** "Çöp ne zaman toplanıyor?" → grounded, gün uydurmadan, talep önerisiyle.
+- **Raporlar:** sağlayıcı **openai**, %100 başarı; otomasyon oranı %27.3.
+
+> Dosya teslimi: MCP tarayıcısı yerel dosya sistemine yazamadığından görüntüler repoya
+> otomatik commit edilemedi; sohbete iliştirilen görselleri yukarıdaki adlarla ilgili
+> klasörlere bırakın.
