@@ -264,6 +264,42 @@ test('tenant izolasyonu — her iki taraf boş → true (eşitlik)', () => {
   assert.equal(isOwnedByTenant({ tenantId: '' }, ''), true);
 });
 
+// ── Ticket oluşturma koşulu (processMessage'dan) ──────────────────────────────
+// Başvuru formuyla tutarlı: yalnızca 'description' eksikse talep bloklanır.
+// Konum/iletişim/kategori eksikse de talep oluşur (vatandaş TK ile izler).
+function shouldCreateTicket(intent: string, missingFields: string[]): boolean {
+  const blockingMissing = missingFields.filter((field) => field === 'description');
+  return !blockingMissing.length && intent === 'new_ticket';
+}
+
+test('ticket — net şikayet (eksik yok) → oluşur', () => {
+  assert.equal(shouldCreateTicket('new_ticket', []), true);
+});
+
+test('ticket — yalnız contact eksik → yine oluşur (form ile tutarlı)', () => {
+  assert.equal(shouldCreateTicket('new_ticket', ['contact']), true);
+});
+
+test('ticket — location + category eksik → yine oluşur', () => {
+  assert.equal(shouldCreateTicket('new_ticket', ['location', 'category']), true);
+});
+
+test('ticket — description eksik → bloklanır', () => {
+  assert.equal(shouldCreateTicket('new_ticket', ['description']), false);
+});
+
+test('ticket — description + contact eksik → bloklanır', () => {
+  assert.equal(shouldCreateTicket('new_ticket', ['description', 'contact']), false);
+});
+
+test('ticket — intent new_ticket değil (general_question) → oluşmaz', () => {
+  assert.equal(shouldCreateTicket('general_question', []), false);
+});
+
+test('ticket — status_query → oluşmaz', () => {
+  assert.equal(shouldCreateTicket('status_query', []), false);
+});
+
 // ── Sonuç ─────────────────────────────────────────────────────────────────────
 console.log(`\n${passed} passed, ${failed} failed\n`);
 if (failed > 0) process.exit(1);
