@@ -47,3 +47,34 @@
 ## Deploy gereken her şey (tek merge)
 `chore/ci-auto-db-seed` merge edilince CI deploy: nonce CSP (hydration düzelir → maskot + tüm client etkileşim çalışır) + Caddy reload + `db:seed` (SSS/hazır yanıt dolar).
 👉 https://github.com/mervegulen0909-code/kentos-ai/compare/master...chore/ci-auto-db-seed?expand=1
+
+---
+
+## 29 Mayıs 2026 (akşam) — deploy sonrası canlı tekrar kontrol
+
+PR #18 merge edildi; CI'da yalnız `ui-e2e` job'u patladı, **"Deploy to Production" job'u
+başarılı** → CSP/hydration düzeltmesi + `db:seed` canlıda.
+
+**Doğrulanan (✅ çalışıyor):**
+- Hydration + **maskot UI canlıda açılıyor ve etkileşimli** (önceki ölüm giderildi).
+- Başvuru formu → AI sınıflandırma → **TK kodu** (TK-0FCD1B0FC9D2AED5, Fen İşleri, Acil, SLA).
+- Maskot **soru-cevap** (OpenAI gpt-4o) grounded yanıt veriyor.
+- SSS **dolu** (12 makale, çok dilli) — önceki "boş" eksiği giderildi.
+- E-Randevu **slotları mevcut** — önceki "slot yok" eksiği giderildi.
+- Admin: dashboard, talepler+detay (AI intake özeti), raporlar (AI maliyet), vatandaşlar
+  (KVKK), ayarlar (widget kodu), kuyruklar, devir, bilgi bankası — hepsi çalışıyor.
+
+**🔴 Bulunan bug → DÜZELTİLDİ (`fix/maskot-ticket`, deploy bekliyor):**
+- **Maskot sohbetten talep açmıyordu.** Net şikâyette sınıflandırıcı `intent=new_ticket`,
+  `missingFields=['contact']` dönüyor; `4d00588` ile katılaştırılan koşul (herhangi bir
+  eksik alan bloklar) yüzünden ticket açılmıyor, TK kodu verilmiyordu. İletişim bırakmayan
+  vatandaş maskottan **asla** talep açamıyordu (oysa başvuru formu anonim talebe izin verir).
+- **Düzeltme:** yalnız `description` eksikse blokla (form ile tutarlı). + widget e2e
+  tek-adımlı akışa uyarlandı + 7 birim testi eklendi.
+
+**📝 İçerik (kod değil) notu:**
+- Raporlar → AI kullanım'da hâlâ **eski `netiva` AiRun kayıtları** görünüyor (geçmiş
+  telemetri, 30 günlük pencere). Temiz demo için bu eski satırlar DB'den silinebilir
+  (telemetri verisi — opsiyonel, dikkatli yapılmalı).
+
+**Tanıtım görüntüleri:** [README.md](README.md) "Canlı Yakalama Sonuçları" tablosuna işlendi.
