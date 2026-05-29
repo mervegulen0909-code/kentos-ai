@@ -63,8 +63,9 @@ PUBLIC_API_BASE_URL=https://api.xn--izmirusul-y9a.com
 PUBLIC_CITIZEN_BASE_URL=https://vatandas.xn--izmirusul-y9a.com
 PUBLIC_GATEWAY_BASE_URL=https://gateway.xn--izmirusul-y9a.com
 
-# ── Anthropic AI ──────────────────────────────────────────────
-ANTHROPIC_API_KEY=sk-ant-...
+# ── OpenAI ────────────────────────────────────────────────────
+OPENAI_API_KEY=sk-...
+OPENAI_MODEL=gpt-4o
 
 # ── Hata İzleme ───────────────────────────────────────────────
 SENTRY_DSN=https://...@sentry.io/...
@@ -74,7 +75,7 @@ BULL_BOARD_USER=admin
 BULL_BOARD_PASS=<guclu-parola>
 
 # ── Vatandaş widget ───────────────────────────────────────────
-NEXT_PUBLIC_DEFAULT_TENANT_SLUG=netiva
+NEXT_PUBLIC_DEFAULT_TENANT_SLUG=demo-belediye
 
 # ── Kanal outbound (güvenli başlangıç: hepsi kapalı) ──────────
 WHATSAPP_OUTBOUND_LIVE=false
@@ -173,8 +174,8 @@ brew install k6  # veya: https://k6.io/docs/get-started/installation/
 # Smoke test (50 VU × 5dk)
 k6 run test/load/k6-smoke.js \
   --env BASE_URL=https://api.xn--izmirusul-y9a.com \
-  --env TENANT_SLUG=netiva \
-  --env ADMIN_EMAIL=admin@netiva.belediye.tr \
+  --env TENANT_SLUG=demo-belediye \
+  --env ADMIN_EMAIL=admin@demo.local \
   --env ADMIN_PASS=<parola>
 
 # Hedefler: p95 < 500ms, error rate < %1

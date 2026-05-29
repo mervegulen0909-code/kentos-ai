@@ -34,7 +34,7 @@ http://localhost:3102/demo-belediye/report üzerinde test edildi:
 
 ## Canlıya alma (DEPLOY GEREKİR)
 Repo değişiklikleri canlıyı otomatik güncellemez. Canlıda devreye almak için:
-1. **Sağlayıcı:** Canlı şu an eski (Netiva) sürümde. Bu branch OpenAI-only; deploy ile sunucuda **`OPENAI_API_KEY` ayarlı olmalı** (yerelde çalışan anahtar mevcut — değer paylaşılmadı). `OPENAI_MODEL` opsiyonel (vars. `gpt-4o`).
+1. **Sağlayıcı:** Canlı şu an deploy edilmiş eski sürümde. Bu branch **OpenAI-only**; deploy ile sunucudaki `.env.production.local` içinde **`OPENAI_API_KEY` ayarlı olmalı** (yerelde kök `.env`'de çalışan anahtar mevcut — değer paylaşılmadı). `OPENAI_MODEL` opsiyonel (vars. `gpt-4o`).
 2. **Bilgi tabanı:** Deploy sonrası `pnpm db:seed` çalıştır → SSS + hazır yanıtlar canlı demo tenant'a yüklenir (idempotent). Belediyeye özel içerik admin panelinden genişletilebilir (maskot otomatik öğrenir).
 3. **Build + restart:** API + citizen-web yeniden build/deploy edilir (DEPLOYMENT.md / docker compose prod).
 4. Doğrula: `/demo-belediye/report` sağ-altta maskot; bir soru sor → gerçek cevap; admin → Raporlar → AI kullanım: `public-conversation-answer / openai` kayıtları görünür.

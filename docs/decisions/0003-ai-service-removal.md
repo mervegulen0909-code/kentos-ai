@@ -8,7 +8,7 @@ Accepted — 2026-05-10
 
 `apps/ai-service` was added during the early citizen-identity-reconciliation work as a self-contained reference implementation of the public-intake AI runner. It exposed an `IntakeClassifierService` and a `PublicTicketAiRunnerService` and shipped a prompt template at `src/prompts/intake-classifier.v1.ts`.
 
-By the time W3.4 landed (Anthropic + Netiva live wiring with cost cap and AiRun telemetry inside `apps/api/src/modules/public/public-ticket.service.ts`), the live runtime path had moved entirely into `apps/api`. The `ai-service` package was no longer imported by any app, worker, or test. Its prompt template was effectively duplicated by the inline prompt builder in `PublicTicketAiService`.
+By the time W3.4 landed (live AI provider wiring with cost cap and AiRun telemetry inside `apps/api/src/modules/public/public-ticket.service.ts`; the runtime is now OpenAI-only), the live runtime path had moved entirely into `apps/api`. The `ai-service` package was no longer imported by any app, worker, or test. Its prompt template was effectively duplicated by the inline prompt builder in `PublicTicketAiService`.
 
 We surveyed the repo with `grep -rn '@kentos/ai-service'` and found references only in:
 
