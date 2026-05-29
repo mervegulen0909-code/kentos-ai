@@ -72,6 +72,16 @@ başarılı** → CSP/hydration düzeltmesi + `db:seed` canlıda.
 - **Düzeltme:** yalnız `description` eksikse blokla (form ile tutarlı). + widget e2e
   tek-adımlı akışa uyarlandı + 7 birim testi eklendi.
 
+**🔴 İkinci bug → DÜZELTİLDİ (`fix/maskot-ticket`):**
+- **Admin "Hazır Yanıtlar" (`/canned-replies`) sayfası tamamen çöküyordu** ("Ekran şu an
+  yenilenemedi"). Kök neden: sayfa `r.lang.toUpperCase()` çağırıyor ama `CannedReply`
+  Prisma modelinde **`lang` kolonu yok** → `undefined.toUpperCase()` → Server Component
+  render hatası. (Formdaki "Dil" seçici de API DTO'sunda karşılıksız.)
+- **Düzeltme (minimal, migrasyonsuz):** render'da `lang`/`body` korundu
+  (`(r.lang ?? 'tr')`, `(r.body ?? '')`); lib/api tipinde `lang` opsiyonel yapıldı.
+  Sayfa artık çökmüyor. (Tam çok-dilli destek istenirse modele `lang` kolonu + migrasyon
+  ayrı iş.)
+
 **📝 İçerik (kod değil) notu:**
 - Raporlar → AI kullanım'da hâlâ **eski `netiva` AiRun kayıtları** görünüyor (geçmiş
   telemetri, 30 günlük pencere). Temiz demo için bu eski satırlar DB'den silinebilir

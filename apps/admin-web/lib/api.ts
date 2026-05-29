@@ -510,7 +510,7 @@ export const adminApi = {
   operators: (token: string) => apiFetch<OperatorPerformanceItem[]>('/analytics/operators', { token }),
 
   // Canned Replies
-  cannedReplies: (token: string) => apiFetch<Array<{ id: string; title: string; body: string; isShared: boolean; lang: string; createdAt: string }>>('/canned-replies', { token }),
+  cannedReplies: (token: string) => apiFetch<Array<{ id: string; title: string; body: string; isShared: boolean; lang?: string; createdAt: string }>>('/canned-replies', { token }),
   createCannedReply: (token: string, dto: { title: string; body: string; isShared?: boolean; lang?: string }) =>
     apiFetch<{ id: string }>('/canned-replies', { method: 'POST', token, body: JSON.stringify(dto) }),
   updateCannedReply: (token: string, id: string, dto: { title?: string; body?: string; isShared?: boolean }) =>
