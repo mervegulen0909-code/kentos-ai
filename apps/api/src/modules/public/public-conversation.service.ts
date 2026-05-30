@@ -38,6 +38,7 @@ export class PublicConversationService {
   }
 
   async start(tenantSlug: string, dto: CreatePublicConversationDto) {
+    const __t0 = Date.now();
     const tenant = await this.requireTenant(tenantSlug);
     const channel = dto.channel ?? ChannelType.WEB_CHAT;
     const contact = this.normalizeContact(dto.contact, dto.displayName);
@@ -46,6 +47,7 @@ export class PublicConversationService {
       contact,
       source: this.identitySourceForChannel(channel),
     });
+    console.warn(`[CONV-TIMING] start.resolveCitizen: +${Date.now() - __t0}ms`);
     const now = new Date();
     const context: ConversationContext = {
       messages: dto.initialMessage ? [{ role: 'citizen', text: dto.initialMessage.trim(), at: now.toISOString() }] : [],
@@ -62,6 +64,7 @@ export class PublicConversationService {
         lastMessageAt: dto.initialMessage ? now : null,
       },
     });
+    console.warn(`[CONV-TIMING] start.TOTAL: +${Date.now() - __t0}ms`);
 
     return this.toResponse(conversation.id, channel, context, null, false);
   }
@@ -120,8 +123,12 @@ export class PublicConversationService {
   }
 
   private async processMessage(tenantSlug: string, conversationId: string, dto: SendPublicConversationMessageDto) {
+    const __t0 = Date.now();
+    const __mark = (label: string) => console.warn(`[CONV-TIMING] ${label}: +${Date.now() - __t0}ms`);
     const tenant = await this.requireTenant(tenantSlug);
+    __mark('requireTenant');
     const conversation = await this.prisma.conversation.findFirst({ where: { id: conversationId, tenantId: tenant.id } });
+    __mark('findConversation');
     if (!conversation) throw new NotFoundException('Konusma bulunamadi.');
 
     const channel = conversation.channel as IntakeChannel;
@@ -137,6 +144,7 @@ export class PublicConversationService {
       source: this.identitySourceForChannel(channel),
       preferredCitizenId: conversation.citizenId,
     });
+    __mark('resolveCitizen');
     const now = new Date();
     const text = dto.text.trim();
     const messages = [...(context.messages ?? []), { role: 'citizen' as const, text, at: now.toISOString() }];
@@ -163,6 +171,7 @@ export class PublicConversationService {
 
     const departments = await this.listTenantDepartments(tenant.id);
     const categories = await this.listTenantCategories(tenant.id);
+    __mark('listDepartments+Categories');
     // Çok-turlu intake: sınıflandırıcı tek mesaj görür; konuşmada bağlamın
     // kaybolmaması için son vatandaş mesajlarını birleştirip veriyoruz
     // (örn. önce "lamba yanmıyor", sonra "Atatürk Cad. No 25" → tek talep).
@@ -182,6 +191,8 @@ export class PublicConversationService {
         citizenContact: contact,
       },
     });
+
+    __mark('ai.classify');
 
     const nextContext: ConversationContext = {
       ...context,
@@ -219,6 +230,7 @@ export class PublicConversationService {
       });
       nextContext.ticket = { trackingToken: ticket.trackingToken, createdAt: new Date().toISOString() };
       assistantMessage = `Başvurunuz oluşturuldu. Takip kodunuz: ${ticket.trackingToken}.`;
+      __mark('tickets.create');
     }
 
     // Mascot: generate a natural-language reply for general questions (or any
@@ -253,6 +265,7 @@ export class PublicConversationService {
         state: ticket ? 'TICKET_CREATED' : 'OPEN',
       },
     });
+    __mark('conversation.update');
 
     if (assistantMessage) {
       await this.outbound.dispatch({
@@ -265,6 +278,7 @@ export class PublicConversationService {
         text: assistantMessage,
       });
     }
+    __mark('outbound.dispatch+TOTAL');
 
     return this.toResponse(conversation.id, channel, nextContext, assistantMessage, handoffRequested);
   }
