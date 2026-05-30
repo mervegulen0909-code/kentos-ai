@@ -8,15 +8,24 @@ const suggestedMessages = [
 ];
 
 export default async function WidgetPreviewPage({ params }: { params: Promise<{ tenantSlug: string }> }) {
+  const __t0 = Date.now();
+  console.warn(`[WIDGET-PAGE-TIMING] render start`);
   const { tenantSlug } = await params;
-  const widgetSettings = await citizenApi.getWidgetSettings(tenantSlug).catch(() => ({
+  const widgetSettings = await citizenApi.getWidgetSettings(tenantSlug).then((s) => {
+    console.warn(`[WIDGET-PAGE-TIMING] getWidgetSettings OK: +${Date.now() - __t0}ms`);
+    return s;
+  }).catch(() => {
+    console.warn(`[WIDGET-PAGE-TIMING] getWidgetSettings CATCH: +${Date.now() - __t0}ms`);
+    return ({
     tenantSlug,
     widgetEnabled: true,
     widgetTitle: 'KentOS Belediye Asistani',
     widgetWelcome: 'Merhaba. Talebinizi kisa bir cumleyle yazin. Eksik bilgi varsa size bir takip sorusu sorarim, ardindan resmi basvuruya geceriz.',
     widgetAllowedOrigins: [],
-  }));
+    });
+  });
   const trackHref = `/${tenantSlug}/track`;
+  console.warn(`[WIDGET-PAGE-TIMING] render end (pre-return): +${Date.now() - __t0}ms`);
 
   return (
     <main className="widget-preview-page">
