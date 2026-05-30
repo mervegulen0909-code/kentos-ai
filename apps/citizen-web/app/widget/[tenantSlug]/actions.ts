@@ -13,6 +13,7 @@ type WidgetSubmitState = {
 };
 
 export async function submitWidgetMessage(tenantSlug: string, _state: WidgetSubmitState, formData: FormData): Promise<WidgetSubmitState> {
+  console.warn(`[TS-ACTION] entry @${Date.now()}`);
   const description = String(formData.get('draft') ?? '').trim();
   const contact = String(formData.get('contact') ?? '').trim();
   const displayName = String(formData.get('displayName') ?? '').trim();

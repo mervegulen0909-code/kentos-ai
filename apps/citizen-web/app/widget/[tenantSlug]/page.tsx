@@ -26,6 +26,7 @@ export default async function WidgetPreviewPage({ params }: { params: Promise<{ 
   });
   const trackHref = `/${tenantSlug}/track`;
   console.warn(`[WIDGET-PAGE-TIMING] render end (pre-return): +${Date.now() - __t0}ms`);
+  console.warn(`[TS-PAGE] render end @${Date.now()}`);
 
   return (
     <main className="widget-preview-page">
