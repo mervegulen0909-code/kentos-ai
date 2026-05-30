@@ -289,23 +289,41 @@ jobs:
           docker run --rm --network host --entrypoint /bin/sh minio/mc:latest -c \
             "until mc alias set local http://127.0.0.1:9000 minioadmin minioadmin; do sleep 1; done; mc mb --ignore-existing local/kentos-e2e"
 
-      - name: Start E2E applications
+      - name: Start API for E2E
         run: |
           PORT=3100 HOST=0.0.0.0 pnpm --filter @kentos/api dev:qa > api-e2e.log 2>&1 &
-          pnpm --filter @kentos/admin-web exec next dev -p 3001 -H 0.0.0.0 > admin-e2e.log 2>&1 &
-          pnpm --filter @kentos/citizen-web exec next dev -p 3002 -H 0.0.0.0 > citizen-e2e.log 2>&1 &
 
-      - name: Wait for E2E applications
+      - name: Wait for API
         run: |
           for i in {1..90}; do
-            if curl -fsS http://127.0.0.1:3100/api/v1/health/ready >/dev/null \
-              && curl -fsS http://127.0.0.1:3001/login >/dev/null \
+            if curl -fsS http://127.0.0.1:3100/api/v1/health/ready >/dev/null; then exit 0; fi
+            sleep 2
+          done
+          tail -n 200 api-e2e.log || true
+          exit 1
+
+      # citizen-web prod modunda (next start) calistirilir; next dev'de server
+      # action sonrasi RSC response ~69sn asiliyor (sadece dev'e ozgu),
+      # Playwright 60sn test timeout'unu asip widget+account testlerini
+      # dusuruyordu. Prod build/start canliyla eslesir ve sorunu giderir.
+      - name: Build citizen-web (production mode for E2E)
+        run: pnpm --filter @kentos/citizen-web build
+
+      - name: Start web applications
+        run: |
+          pnpm --filter @kentos/admin-web exec next dev -p 3001 -H 0.0.0.0 > admin-e2e.log 2>&1 &
+          pnpm --filter @kentos/citizen-web exec next start -p 3002 -H 0.0.0.0 > citizen-e2e.log 2>&1 &
+
+      - name: Wait for web applications
+        run: |
+          for i in {1..90}; do
+            if curl -fsS http://127.0.0.1:3001/login >/dev/null \
               && curl -fsS http://127.0.0.1:3002/demo-belediye/report >/dev/null; then
               exit 0
             fi
             sleep 2
           done
-          tail -n 200 api-e2e.log admin-e2e.log citizen-e2e.log || true
+          tail -n 200 admin-e2e.log citizen-e2e.log || true
           exit 1
 
       - name: UI E2E

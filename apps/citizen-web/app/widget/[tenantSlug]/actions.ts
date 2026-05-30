@@ -13,7 +13,6 @@ type WidgetSubmitState = {
 };
 
 export async function submitWidgetMessage(tenantSlug: string, _state: WidgetSubmitState, formData: FormData): Promise<WidgetSubmitState> {
-  console.warn(`[TS-ACTION] entry @${Date.now()}`);
   const description = String(formData.get('draft') ?? '').trim();
   const contact = String(formData.get('contact') ?? '').trim();
   const displayName = String(formData.get('displayName') ?? '').trim();
@@ -29,11 +28,8 @@ export async function submitWidgetMessage(tenantSlug: string, _state: WidgetSubm
     };
   }
 
-  const __t0 = Date.now();
-  const __mark = (label: string) => console.warn(`[WIDGET-ACTION-TIMING] ${label}: +${Date.now() - __t0}ms`);
   try {
     const attachmentIds = await uploadAttachmentIfPresent(tenantSlug, formData);
-    __mark('uploadAttachmentIfPresent');
     const conversationId = _state.conversationId && !_state.trackingToken
       ? _state.conversationId
       : (await citizenApi.startConversation(tenantSlug, {
@@ -41,7 +37,6 @@ export async function submitWidgetMessage(tenantSlug: string, _state: WidgetSubm
           displayName: displayName || undefined,
           contact: contact || undefined,
         })).conversationId;
-    __mark('startConversation');
     const result = await citizenApi.sendConversationMessage(tenantSlug, conversationId, {
       text: description,
       displayName: displayName || undefined,
@@ -49,7 +44,6 @@ export async function submitWidgetMessage(tenantSlug: string, _state: WidgetSubm
       email: contact.includes('@') ? contact : undefined,
       attachmentIds,
     });
-    __mark('sendConversationMessage');
 
     return {
       status: 'success',

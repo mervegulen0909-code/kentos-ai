@@ -27,9 +27,6 @@ function buildCspHeader(nonce: string, frameAncestors: string): string {
 }
 
 export function middleware(request: NextRequest): NextResponse {
-  if (request.method === 'POST' && request.nextUrl.pathname.startsWith('/widget')) {
-    console.warn(`[TS-MW] widget POST enter @${Date.now()}`);
-  }
   const nonce = Buffer.from(crypto.randomUUID()).toString('base64');
   const isWidget = request.nextUrl.pathname.startsWith('/widget');
   const csp = buildCspHeader(nonce, isWidget ? '*' : "'none'");
