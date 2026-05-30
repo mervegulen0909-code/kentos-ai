@@ -157,6 +157,36 @@ async function main() {
   await go(page, `${CITIZEN}/data-deletion`, 'citizen/data-deletion');
   await snap(page, { section: 'citizen', id: '12_data_deletion', title: 'Veri Silme Talebi', desc: 'KVKK/GDPR uyumlu veri silme yönergeleri ve self-servis seçenekleri.' });
 
+  // ---------------- MASKOT AI: yüzen asistan + soru-cevap + ticket ----------------
+  console.log('\n— Maskot AI asistan —');
+  await go(page, `${CITIZEN}/${TENANT}/report`, 'citizen/maskot');
+  await snap(page, { section: 'citizen', id: '13_maskot_launcher', title: 'AI Maskot — Yüzen Sohbet Asistanı', desc: 'Her belediye sayfasında yüzen, tek tıkla açılan yapay zekâ sohbet butonu. Bilgi Bankası ve hazır yanıtlarla beslenir; kullandıkça gelişir.' }, { settle: 1000 });
+
+  try {
+    // Sağ alttaki yüzen maskot butonuna tıkla
+    const mascotBtn = page.locator('button').filter({ hasText: /yardımcı|asistan/i }).last();
+    const altBtn = page.locator('[data-testid="mascot-trigger"], .mascot-trigger, [aria-label*="asistan"]').first();
+    const btn = (await mascotBtn.count()) ? mascotBtn : altBtn;
+    await btn.click({ timeout: 8_000 });
+    await page.waitForTimeout(1500);
+    await snap(page, { section: 'citizen', id: '14_maskot_open', title: 'AI Maskot — Sohbet Açık & Karşılama', desc: 'Maskot açıldığında vatandaşı belediye tonu ve diliyle karşılar. Çok turlu konuşma yönetir; eksik bilgiyi soru sorarak tamamlar.' }, { settle: 400 });
+
+    // Bilgi bankası soru-cevap
+    const chatInput = page.locator('textarea, input[placeholder*="sorunuzu"], input[placeholder*="yazın"], input[placeholder*="çöp"]').last();
+    await chatInput.fill('Çöp toplama saatleri nedir?');
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(10_000);
+    await snap(page, { section: 'citizen', id: '15_maskot_qa', title: 'AI Maskot — Anlık Soru Yanıtlama (Bilgi Bankası)', desc: 'AI, soruyu Bilgi Bankası makalelerinden grounded yanıtla karşılar. Bilmediğinde uydurmaz, doğru birime yönlendirir. Sistem her yeni makaleyle zenginleşir.' }, { settle: 400 });
+
+    // Net şikâyet → otomatik ticket + TK kodu
+    await chatInput.fill('Park girişindeki aydınlatma direği devrilmiş, tehlike oluşturuyor.');
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(14_000);
+    await snap(page, { section: 'citizen', id: '16_maskot_ticket', title: 'AI Maskot — Otomatik Ticket & TK Kodu', desc: 'Net şikâyeti AI anında tanır; iletişim bilgisi olmadan ticket oluşturur, vatandaşa güvenli TK takip kodunu verir. Konuşma tarihçesi ticket\'a eklenir.' }, { settle: 600 });
+  } catch (err) {
+    logIssue('citizen/maskot-flow', `maskot akış başarısız: ${String(err).slice(0, 200)}`);
+  }
+
   // ---------------- ADMIN: login + tüm sayfalar ----------------
   console.log('\n— Yönetim paneli —');
   await go(page, `${ADMIN}/login`, 'admin/login');

@@ -18,8 +18,8 @@ interface Frame { id: string; section: 'citizen' | 'admin' | 'api'; title: strin
 interface Manifest { tenant: string; frames: Frame[]; }
 
 const SECTIONS: Record<Frame['section'], { title: string; tag: string; blurb: string }> = {
-  citizen: { title: 'Vatandaş Portalı', tag: 'citizen-web', blurb: 'Vatandaşların 7/24 başvuru oluşturduğu, takip ettiği ve belediyeyle iletişim kurduğu yapay zekâ destekli portal.' },
-  admin: { title: 'Yönetim Paneli', tag: 'admin-web', blurb: 'Belediye ekiplerinin başvuruları yönettiği, SLA ve performansı izlediği, sistemi yapılandırdığı yönetim arayüzü.' },
+  citizen: { title: 'Vatandaş Portalı & AI Maskot', tag: 'citizen-web', blurb: 'Vatandaşların 7/24 başvuru oluşturduğu, takip ettiği ve AI Maskot sohbet asistanıyla doğrudan iletişim kurduğu yapay zekâ destekli portal. Maskot; Bilgi Bankası\'ndan öğrenir, net şikâyette ticket oluşturur, TK kodu verir.' },
+  admin: { title: 'Yönetim Paneli', tag: 'admin-web', blurb: 'Belediye ekiplerinin başvuruları yönettiği, SLA ve performansı izlediği, AI içgörüleriyle sistemi yapılandırdığı yönetim arayüzü.' },
   api: { title: 'Platform & API', tag: 'NestJS API', blurb: 'Çok kiracılı, güvenli ve ölçeklenebilir backend; sağlık izleme ve OpenAPI dokümantasyonu.' },
 };
 
@@ -62,14 +62,14 @@ function main() {
   <section class="divider ai-divider">
     <span class="chip ai-chip">Yapay Zekâ</span>
     <h2>KentOS AI'ın Yapay Zekâ Motoru</h2>
-    <p>Her başvuru, uçtan uca yapay zekâ tarafından işlenir — sınıflandırmadan yanıt önerisine, tekrar tespitinden maliyet kontrolüne kadar.</p>
+    <p>Her başvuru uçtan uca yapay zekâyla işlenir — konuşan maskot asistandan otomatik sınıflandırmaya, öğrenen bilgi tabanından maliyet kontrolüne kadar. Sistem kullandıkça, içerik eklendikçe daha akıllı hâle gelir.</p>
   </section>
 
   <section class="page feat-page">
     <div class="caption">
       <span class="chip small ai-chip">Yapay Zekâ Özellikleri</span>
-      <h3>Tam Otomatik, Bütçeli, Uyumlu AI Altyapısı</h3>
-      <p>KentOS AI, her müşteri talebini otomatik olarak işler; operatör yükünü azaltır, SLA'yı güvence altına alır.</p>
+      <h3>Öğrenen, Konuşan, Otomasyon Sağlayan 12 AI Özelliği</h3>
+      <p>KentOS AI her vatandaş talebini otomatik işler, maskot asistanı sohbetle yönlendirir, Bilgi Bankası\'ndan öğrenerek gelişir; operatör yükünü azaltır, SLA'yı güvence altına alır.</p>
     </div>
     <div class="feat-grid">
       <div class="feat-card ai-card">
@@ -116,6 +116,21 @@ function main() {
         <div class="feat-icon">🔒</div>
         <h4>KVKK Uyumlu AI İşleme</h4>
         <p>TC kimlik numaraları ve kişisel veriler AI'a gönderilmeden önce maskelenir. Tüm AI işlemleri denetim kütüğüne kaydedilir.</p>
+      </div>
+      <div class="feat-card ai-card">
+        <div class="feat-icon">🪄</div>
+        <h4>AI Maskot — Yüzen Sohbet Asistanı</h4>
+        <p>Vatandaş portalının her sayfasında yüzen, tek tıkla açılan AI sohbet penceresi. Net şikâyeti anında ticket'a çevirir, güvenli TK takip kodu verir; iletişim bilgisi olmayan vatandaş bile başvurabilir.</p>
+      </div>
+      <div class="feat-card ai-card">
+        <div class="feat-icon">🧠</div>
+        <h4>Öğrenen Yapay Zeka</h4>
+        <p>Bilgi Bankası makaleleri ve operatör onaylı hazır yanıtlar AI'ın bilgi tabanını besler. Her yeni makale maskot ve AI yanıtlarını zenginleştirir; sistem kullandıkça, içerik eklendikçe gelişir — sıfır ek geliştirme maliyetiyle.</p>
+      </div>
+      <div class="feat-card ai-card">
+        <div class="feat-icon">💡</div>
+        <h4>Çok Turlu Bağlam Yönetimi</h4>
+        <p>Maskot birden fazla mesajı bağlamıyla birlikte hatırlar; eksik bilgiyi (adres, iletişim) soru sorarak tamamlar, vatandaşı adım adım yönlendirir. Her konuşma oturumu ticket tarihçesine otomatik eklenir.</p>
       </div>
     </div>
   </section>
