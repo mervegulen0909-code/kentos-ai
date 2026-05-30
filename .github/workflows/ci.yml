@@ -329,20 +329,6 @@ jobs:
       - name: UI E2E
         run: pnpm e2e
 
-      - name: E2E diagnostics on failure
-        if: failure()
-        run: |
-          echo "===================== api-e2e.log (tail) ====================="
-          tail -n 400 api-e2e.log || true
-          echo "===================== citizen-e2e.log (tail) ====================="
-          tail -n 500 citizen-e2e.log || true
-          echo "===================== admin-e2e.log (tail) ====================="
-          tail -n 200 admin-e2e.log || true
-          echo "===================== Playwright error-context files ====================="
-          find test-results -name 'error-context.md' -print -exec echo '--- BEGIN {} ---' \; -exec cat {} \; -exec echo '--- END ---' \; 2>/dev/null || true
-          echo "===================== test-results tree ====================="
-          ls -R test-results 2>/dev/null || true
-
   security:
     name: Security Scan (CodeQL)
     runs-on: ubuntu-latest
