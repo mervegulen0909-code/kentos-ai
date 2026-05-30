@@ -1,6 +1,7 @@
 import './globals.css';
 import type { Metadata, Viewport } from 'next';
 import type { ReactNode } from 'react';
+import { headers } from 'next/headers';
 import { PwaRegister } from './components/pwa-register';
 
 const metadataBase = resolveMetadataBase();
@@ -33,7 +34,12 @@ export const viewport: Viewport = {
   themeColor: '#0f172a',
 };
 
-export default function RootLayout({ children }: { children: ReactNode }) {
+export default async function RootLayout({ children }: { children: ReactNode }) {
+  // Reading headers opts into dynamic rendering, which causes Next.js to
+  // read the per-request x-nonce set by middleware and stamp it onto every
+  // framework-generated <script> tag so that strict-dynamic CSP works.
+  await headers();
+
   return (
     <html lang="tr">
       <body>
