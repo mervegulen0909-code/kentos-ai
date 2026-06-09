@@ -15,7 +15,7 @@ import { Trend, Rate } from 'k6/metrics';
 
 // ── Config ────────────────────────────────────────────────────────────────────
 const BASE_URL = __ENV.BASE_URL || 'http://localhost:3100';
-const TENANT_SLUG = __ENV.TENANT_SLUG || 'netiva';
+const TENANT_SLUG = __ENV.TENANT_SLUG || 'demo-belediye';
 const ADMIN_EMAIL = __ENV.ADMIN_EMAIL || 'admin@kentos.local';
 const ADMIN_PASS = __ENV.ADMIN_PASS || 'changeme';
 
